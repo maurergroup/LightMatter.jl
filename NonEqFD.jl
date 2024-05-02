@@ -2,7 +2,6 @@ using Integrals,Plots,SpecialFunctions,DelimitedFiles,Interpolations,Roots,LaTeX
 using OrdinaryDiffEq,BenchmarkTools
 
 include("Structs.jl")
-
 using .Structs
 
 function tau_0(mp,sv)
@@ -123,19 +122,9 @@ function prefactor(sv,gc,mp,l,E::Float64,particle::Float64,internalFD::Float64
     return num/denom
 end
 
-function differential(sv,gc,l,mp,E::Float64,t::Float64,particle::Float64)
-
-    τ=tau_ee(E,sv,gc)
-    
-    int(u,p)=FDChange(u,sv,particle,gc,l)*sv.DOS(u)*u
-    prob=IntegralProblem(int,sv.μ-(3*l.hv),sv.μ+(3*l.hv))
-    sol=solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5)
-
-    
-    B=-4*log(2)/l.FWHM^2
+function differential(sv,gc,l,mp,E::Float64,t::Float64,particle::Float64,τ::Float64,internalFD,B::Float64)
     C=(1/τ)+(8*l.delay*log(2)/l.FWHM^2)
-    A=prefactor(sv,gc,mp,l,E,particle,sol.u,τ,t,B,C)
-
+    A=prefactor(sv,gc,mp,l,E,particle,internalFD,τ,t,B,C)
     f1=2*A*sqrt(complex(B))*exp(((2*B*t)+C)^2/(4*B)-(t/τ))/sqrt(pi)
     f2=A*exp(-t/τ)*(erfi(C/(2*sqrt(complex(B))))-erfi(((2*B*t)+C)/(2*sqrt(complex(B)))))/τ
     return f1+f2
@@ -147,21 +136,21 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
     sv.Tel[1]=Ttraj[trunc(Int,t*10)+1]
     sv.μ=ChemicalPotential(sv,gc)
     particle=particleconstant(sv,l,gc)
-    
+    #τ=tau_ee.(ERange,Ref(sv),Ref(gc))
+    B=-4*log(2)/l.FWHM^2
+
+    int(u,p)=FDChange(u,sv,particle,gc,l)*sv.DOS(u)*u
+    prob=IntegralProblem(int,sv.μ-(3*l.hv),sv.μ+(3*l.hv))
+    sol=solve(prob,HCubatureJL(initdiv=2);reltol=1e-10,abstol=1e-10)
+    internalFD=sol.u
 
     Threads.@threads for i in eachindex(ERange)
-        #= if ERange[i]<=sv.μ
+        if ERange[i]<=sv.μ
             τ=excholerelax(ERange[i],sv,gc)
         elseif ERange[i]>sv.μ
             τ=excelecrelax(ERange[i],sv,gc)
         end
-        dFDdt=differential(sv,gc,l,mp,ERange[i],t,particle,τ,internalFD,B)*tstep
-        if isnan(dFDdt)
-            FD[i]+=0.0
-        else
-            FD[i]+=dFDdt
-        end =#
-        FD[i]+=differential(sv,gc,l,mp,ERange[i],t,particle)*tstep
+        FD[i]+=differential(sv,gc,l,mp,ERange[i],t,particle,τ,internalFD,B)*tstep
     end
 
 end
@@ -191,13 +180,13 @@ end
 
 function excelecrelax(E,sv,gc)
     int(u,p)=(1-FermiDirac(u,sv,gc))*sv.DOS(u)*scatterer(E-u,sv,gc,sv.lb,sv.μ)
-    prob=IntegralProblem(int,sv.μ,E)
+    prob=IntegralProblem(int,sv,μ,E)
     sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-5,reltol=1e-5)
     return sol.u*2*pi/gc.hbar
 end
 
 function excholerelax(E,sv,gc)
-    int(u,p)=FermiDirac(u,sv,gc)*sv.DOS(u)*scatterer(u-E,sv,gc,sv.μ,sv.ub)
+    int(u,p)=FermiDirac(u,sv,gc)*sv.DOS(u)*scatterer(u-E,sv,gc,sv.lb,sv.ub)
     prob=IntegralProblem(int,E,sv.μ)
     sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-5,reltol=1e-5)
     return sol.u*2*pi/gc.hbar
@@ -207,15 +196,15 @@ function main()
     l,mp,sim,gc,sv=Structs.parameterbuilder("InputFiles/Au_Input.txt")
     Ttraj=parse.(Float64,chop.(readdlm("../PhD Code/Gold/0D/0D_3.1_10F_5fsNoep.csv",skipstart=1)[:,2],tail=1))
     DensityOfStates(mp,sv,1.0)
-    ERange=range(-4+mp.FE,4+mp.FE,step=0.1)
+    ERange=range(-4+mp.FE,4+mp.FE,step=0.01)
     
     sv.NumElec=NumberOfElectrons(0.0,mp.FE,sv,gc)
     sv.τ=tau_0(mp,sv)
 
     FD=zeros(length(ERange))
-    tstop=500.0
+    tstop=10.0
     tstep=1.0
-    Diffpoints=[300,350,400,500]
+    Diffpoints=[2,4,6,8,10]
     Diffout=Array{Number}(undef,length(FD),length(Diffpoints))
     trange=range(0.0,tstop,step=tstep)
     counter=1
@@ -228,16 +217,16 @@ function main()
         end
     end
     #ThermFermi=Fermivector(ERange,sv,gc)
-    plot(ERange,Diffout,label=["300" "350" "400" "500"])
+    #plot(ERange,Diffout,label=["300" "350" "400" "500"])
     #p2=plot(ERange,FD.+ThermFermi)
     #plot(p1,p2)
-    #= output=hcat(ERange,FD)
-    writedlm("../PhD Code/Gold/ODEneqFD.csv",' ')
-    io=open("../PhD Code/Gold/ODEneqFD.csv","a")
+    output=hcat(ERange,Diffout)
+    writedlm("NewSecondelectest.csv",' ')
+    io=open("NewSecondelectest.csv","a")
     for row in eachrow(output)
         println(io,row)
     end
-    close(io) =#
+    close(io)
 end
 
 main()
