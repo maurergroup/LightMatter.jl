@@ -38,7 +38,7 @@ SimEnd=0.5e-12 #Time span of the simulation in s
 LaserOff=0.3E-12 #Offset of the laser pulse in s (recommend no less than FWHM)
 
 #File Locations
-DOS=Au_DOS.dat #File name and location of the Density of states file
+DOS=DOS/Au_DOS.dat #File name and location of the Density of states file
 Output=../Gold/SurfaceTest.csv # Name and location of the output file
 LongOutput=Carpene_Au.csv
 

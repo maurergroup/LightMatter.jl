@@ -1,6 +1,6 @@
 module Structs
 
-using Unitful,DelimitedFiles
+using Unitful,DelimitedFiles,StaticArrays
 
 @kwdef struct GlobalConsts
     kB::Float64 #Boltzmann Constant
@@ -34,9 +34,10 @@ end
 end
 
 @kwdef mutable struct SimMaterialParam
-    Tel::Float64 #Electronic temperature
-    Tph::Float64 #Phononic temperature
+    Tel::Vector{Float64} #Electronic temperature
+    Tph::Vector{Float64} #Phononic temperature
     μ::Float64 #Chemical Potential
+    zgrid::Vector{Float64}
     DOS #Interpolate Density of States
     lb::Float64 #lower bound of the DOS data
     ub::Float64 #Upper bound of the DOS data
@@ -52,6 +53,7 @@ end
     Dim::Int16
     Output::String
     vers::String
+    SimEnd::Float64
 end
 
 function Units(Input)
@@ -70,8 +72,8 @@ function Units(Input)
     return Input
 end
 
-function parameterbuilder()
-    IO = readdlm("Au_Input.txt",'=',comments=true,comment_char='#')
+function parameterbuilder(InputFile::String)
+    IO = readdlm(InputFile,'=',comments=true,comment_char='#')
     for (x,y) in enumerate(IO[:,2])
         if typeof(y) == SubString{String}
             IO[x,2]=strip(IO[x,2],' ')
@@ -87,8 +89,13 @@ function parameterbuilder()
         ,ϵ0=8.854187e-12,hbar=1.054571e-34)
     end
 
+    if Input["Dims"]==0
+        Input["Length"]=1
+    end
+
     simsettings=SimParam(ChemPot=Input["EF"],ElecPhon=Input["Gep"],
-    ElecHeat=Input["Cel"],Dim=Input["Dims"],Output=Input["Output"],vers=Input["Type"])
+    ElecHeat=Input["Cel"],Dim=Input["Dims"],Output=Input["Output"],vers=Input["Type"],
+    SimEnd=Input["SimEnd"])
 
     laser=LaserParam(FWHM=Input["FWHM"],ϕ=Input["Fluence"],delay=Input["LaserOff"],
     hv=Input["PhotEn"])
@@ -98,8 +105,12 @@ function parameterbuilder()
     ω=Input["Plasma"],DOSFile=Input["DOS"],γ=Input["gamma"],κ=Input["RTKappa"]
     ,L=Input["Length"],dz=Input["dz"],λ=0.0)
 
-    Simvariables=SimMaterialParam(Tel=Input["Tel"],Tph=Input["Tph"],μ=Input["FE"],
-    DOS=undef,lb=0.0,ub=0.0,NumElec=0.0,τ=0.0,g=Input["g"])
+    
+    slab=collect(0:matpat.dz:matpat.L)
+    
+    Simvariables=SimMaterialParam(Tel=fill(Input["Tel"],length(slab))
+    ,Tph=fill(Input["Tel"],length(slab)),μ=Input["FE"],
+    DOS=undef,lb=0.0,ub=0.0,NumElec=0.0,τ=0.0,g=Input["g"],zgrid=slab)
 
     return laser,matpat,simsettings,Globals,Simvariables
 

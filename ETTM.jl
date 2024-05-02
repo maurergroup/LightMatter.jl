@@ -10,7 +10,7 @@ function tau_0(mp)::Float64
     sv.τ= 128/(sqrt(3)*pi^2*mp.ω)
 end
 
-function tau_ee(E::Float64,sv,gc,mp)::Float64
+function tau_ee(E::Float64,sv,gc)::Float64
     return sv.τ*sv.μ^2 /((E-sv.μ)^2 +(pi*gc.kB*sv.Tel)^2)
 end
 
@@ -59,8 +59,7 @@ function stepsize(sv,gc,tprime::Float64,particle::Float64,l)::Float64
 end
 
 function ueeintegral!(u::Float64,sv,t::Float64,tprime::Float64,gc,mp,particle::Float64)::Float64
-    #1/τee*FDChange*exp(-((t-tprime)/τee)-((t-tprime)/τep))*DOS(E)*E
-    τee=tau_ee(E::Float64,sv,gc,mp)
+    τee=tau_ee(E,sv,gc)
     return τee*FDChange(u,sv,particle,gc)*exp((t-tprime)/τee)*sv.DOS(u)*u
 end
 
@@ -79,8 +78,7 @@ function totalUee(sv,gc,l,mp,particle::Float64,τep::Float64,t::Float64)::Float6
 end
 
 function uepintegral!(u::Float64,sv,t::Float64,tprime::Float64,gc,mp,particle::Float64,τep::Float64)::Float64
-    #1/τee*FDChange*exp(-((t-tprime)/τee)-((t-tprime)/τep))*DOS(E)*E
-    τee=tau_ee(E::Float64,sv,gc,mp)
+    τee=tau_ee(E,sv,gc)
     return 1/τep*FDChange(u,sv,particle,gc)*exp(((t-tprime)/τee)-((t-tprime)/τep))*sv.DOS(u)*u
 end
 
@@ -98,6 +96,20 @@ function totalUep(sv,gc,l,mp,particle::Float64,τep::Float64,t::Float64)::Float6
     return sol.u
 end
 
-export particleconstant
+function dTeldt()
+    if sim.ElecPhon=="NL"
+        sv.g=Equations.gep_nonlinear(sv,gc,mp)
+    end
+
+
+end
+
+function ETTMTraj()
+    du[1]=dTeldt()
+    du[2]=dTphdt()
+    du[3]=NonEqFD.differential()
+end
+
+export tau_ee
 
 end

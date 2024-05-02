@@ -2,6 +2,7 @@ using Integrals,Plots,SpecialFunctions,DelimitedFiles,Interpolations,Roots,LaTeX
 using OrdinaryDiffEq,BenchmarkTools
 
 include("Structs.jl")
+
 using .Structs
 
 function tau_0(mp,sv)
@@ -9,7 +10,7 @@ function tau_0(mp,sv)
 end
 
 function tau_ee(E,sv,gc)
-    return sv.τ*sv.μ^2 /((E-sv.μ)^2 +(pi*gc.kB*sv.Tel)^2)
+    return sv.τ*sv.μ^2 /((E-sv.μ)^2 +(pi*gc.kB*sv.Tel[1])^2)
 end
 
 function DensityOfStates(mp,sv,Scale::Float64)
@@ -28,7 +29,7 @@ function NumberOfElectrons(Tel,μ,sv,gc)::Float64
 end
 
 function NumberOfElectrons(sv,gc,μ)::Float64
-    int(u,p)=sv.DOS(u)*FermiDirac(u,sv.Tel,μ,gc)
+    int(u,p)=sv.DOS(u)*FermiDirac(u,sv.Tel[1],μ,gc)
     prob=IntegralProblem(int,sv.lb,sv.ub)
     sol=solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5)
     return sol.u
@@ -53,7 +54,7 @@ function FermiDirac(E::Float64,Tel,μ,gc)::Float64
 end
 
 function FermiDirac(E::Float64,sv,gc)::Float64
-    return 1/(exp((E-sv.μ)/(gc.kB*sv.Tel))+1)
+    return 1/(exp((E-sv.μ)/(gc.kB*sv.Tel[1]))+1)
 end
 
 function probint(sv,E_h::Float64,E_e::Float64,gc)::Float64
@@ -122,30 +123,34 @@ function prefactor(sv,gc,mp,l,E::Float64,particle::Float64,internalFD::Float64
     return num/denom
 end
 
-function differential(sv,gc,l,mp,E::Float64,t::Float64,particle::Float64,τ::Float64,internalFD,B::Float64)
+function differential(sv,gc,l,mp,E::Float64,t::Float64,particle::Float64)
+
+    τ=tau_ee(E,sv,gc)
+    
+    int(u,p)=FDChange(u,sv,particle,gc,l)*sv.DOS(u)*u
+    prob=IntegralProblem(int,sv.μ-(3*l.hv),sv.μ+(3*l.hv))
+    sol=solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5)
+
+    
+    B=-4*log(2)/l.FWHM^2
     C=(1/τ)+(8*l.delay*log(2)/l.FWHM^2)
-    A=prefactor(sv,gc,mp,l,E,particle,internalFD,τ,t,B,C)
+    A=prefactor(sv,gc,mp,l,E,particle,sol.u,τ,t,B,C)
+
     f1=2*A*sqrt(complex(B))*exp(((2*B*t)+C)^2/(4*B)-(t/τ))/sqrt(pi)
     f2=A*exp(-t/τ)*(erfi(C/(2*sqrt(complex(B))))-erfi(((2*B*t)+C)/(2*sqrt(complex(B)))))/τ
-    
     return f1+f2
 end
 
 function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
     ,ERange::StepRangeLen,FD::Array{Float64},tstep::Float64)
 
-    sv.Tel=Ttraj[trunc(Int,t*10)+1]
+    sv.Tel[1]=Ttraj[trunc(Int,t*10)+1]
     sv.μ=ChemicalPotential(sv,gc)
     particle=particleconstant(sv,l,gc)
-    B=-4*log(2)/l.FWHM^2
-
-    int(u,p)=FDChange(u,sv,particle,gc,l)*sv.DOS(u)*u
-    prob=IntegralProblem(int,sv.μ-(3*l.hv),sv.μ+(3*l.hv))
-    sol=solve(prob,HCubatureJL(initdiv=2);reltol=1e-10,abstol=1e-10)
-    internalFD=sol.u
+    
 
     Threads.@threads for i in eachindex(ERange)
-        if ERange[i]<=sv.μ
+        #= if ERange[i]<=sv.μ
             τ=excholerelax(ERange[i],sv,gc)
         elseif ERange[i]>sv.μ
             τ=excelecrelax(ERange[i],sv,gc)
@@ -155,7 +160,8 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
             FD[i]+=0.0
         else
             FD[i]+=dFDdt
-        end
+        end =#
+        FD[i]+=differential(sv,gc,l,mp,ERange[i],t,particle)*tstep
     end
 
 end
@@ -198,10 +204,10 @@ function excholerelax(E,sv,gc)
 end
 
 function main()
-    l,mp,sim,gc,sv=Structs.parameterbuilder()
+    l,mp,sim,gc,sv=Structs.parameterbuilder("InputFiles/Au_Input.txt")
     Ttraj=parse.(Float64,chop.(readdlm("../PhD Code/Gold/0D/0D_3.1_10F_5fsNoep.csv",skipstart=1)[:,2],tail=1))
     DensityOfStates(mp,sv,1.0)
-    ERange=range(-4+mp.FE,4+mp.FE,step=0.01)
+    ERange=range(-4+mp.FE,4+mp.FE,step=0.1)
     
     sv.NumElec=NumberOfElectrons(0.0,mp.FE,sv,gc)
     sv.τ=tau_0(mp,sv)
