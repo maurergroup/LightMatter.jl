@@ -185,7 +185,7 @@ end
 
 function excelecrelax(E,sv,gc)
     int(u,p)=(1-FermiDirac(u,sv,gc))*sv.DOS(u)*scatterer(E-u,sv,gc,sv.lb,sv.μ)
-    prob=IntegralProblem(int,sv,μ,E)
+    prob=IntegralProblem(int,sv.μ,E)
     sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-5,reltol=1e-5)
     return sol.u*2*pi/gc.hbar
 end
