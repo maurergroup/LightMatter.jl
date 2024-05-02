@@ -150,7 +150,12 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
         elseif ERange[i]>sv.μ
             τ=excelecrelax(ERange[i],sv,gc)
         end
-        FD[i]+=differential(sv,gc,l,mp,ERange[i],t,particle,τ,internalFD,B)*tstep
+        dFDdt=differential(sv,gc,l,mp,ERange[i],t,particle,τ,internalFD,B)*tstep
+        if isnan(dFDdt)
+            return 0.0
+        else
+            FD[i]+=dFDdt
+        end
     end
 
 end
@@ -196,7 +201,7 @@ function main()
     l,mp,sim,gc,sv=Structs.parameterbuilder("InputFiles/Au_Input.txt")
     Ttraj=parse.(Float64,chop.(readdlm("../PhD Code/Gold/0D/0D_3.1_10F_5fsNoep.csv",skipstart=1)[:,2],tail=1))
     DensityOfStates(mp,sv,1.0)
-    ERange=range(-4+mp.FE,4+mp.FE,step=0.01)
+    ERange=range(-4+mp.FE,4+mp.FE,step=0.1)
     
     sv.NumElec=NumberOfElectrons(0.0,mp.FE,sv,gc)
     sv.τ=tau_0(mp,sv)
