@@ -9,7 +9,7 @@ Gep=L #Electron-phonon coupling
 EF=NL #Chemical potential/Fermi Energy
 
 #Values for system variables
-AbsLen=1.27e-8 #Extinction coefficent in m
+ExtCof=1.27e-8 #Extinction coefficent in m
 FE=5.53#Reference fermi energy for your density of states in eV
 gamma=71.0 #Specific heat capacity of electrons in J m^-3 K^-2 (Linear Cel)
 DebyeT=165.0 #Debye temperature of the material in K
