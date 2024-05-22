@@ -59,7 +59,7 @@ end
 function Units(Input)
     Input["g"]=ustrip(uconvert(u"eV/nm^3/fs/K", Input["g"]u"W/m^3/K"))
     Input["gamma"]=ustrip(uconvert(u"eV/nm^3/K^2",Input["gamma"]u"J/m^3/K^2"))
-    Input["AbsLen"]=ustrip(uconvert(u"nm",Input["AbsLen"]u"m"))
+    Input["ExtCof"]=ustrip(uconvert(u"nm",Input["ExtCof"]u"m"))
     Input["AtomDens"]=ustrip(uconvert(u"nm^-3",Input["AtomDens"]u"m^-3"))
     Input["FWHM"]=ustrip(uconvert(u"fs",Input["FWHM"]u"s"))
     Input["Fluence"]=ustrip(uconvert(u"eV/nm^2",Input["Fluence"]u"J/m^2"))
@@ -100,7 +100,7 @@ function parameterbuilder(InputFile::String)
     laser=LaserParam(FWHM=Input["FWHM"],ϕ=Input["Fluence"],delay=Input["LaserOff"],
     hv=Input["PhotEn"])
 
-    matpat=MaterialParam(α=1/Input["AbsLen"],n=Input["AtomDens"],
+    matpat=MaterialParam(α=1/Input["ExtCof"],n=Input["AtomDens"],
     θ=Input["DebyeT"],ne=Input["Freeelec"],effmass=Input["Effmass"],FE=Input["FE"],
     ω=Input["Plasma"],DOSFile=Input["DOS"],γ=Input["gamma"],κ=Input["RTKappa"]
     ,L=Input["Length"],dz=Input["dz"],λ=0.0)

@@ -57,7 +57,7 @@ function FermiDirac(E::Float64,sv,gc)::Float64
 end
 
 function probint(sv,E_h::Float64,E_e::Float64,gc)::Float64
-    return sv.DOS(E_h)*sv.DOS(E_e)*FermiDirac(E_h,sv,gc)*(1-FermiDirac(E_e,sv,gc))#*gaussian(E_e-E_h)
+    return sv.DOS(E_h)*FermiDirac(E_h,sv,gc)*(1-FermiDirac(E_e,sv,gc))
 end
 
 function particlenumber(vec::Vector{Float64},sv,ERange::StepRangeLen)::Float64
@@ -122,6 +122,17 @@ function prefactor(sv,gc,mp,l,E::Float64,particle::Float64,internalFD::Float64
     return num/denom
 end
 
+function gaussian(σ,ϵ)
+    return 1/(σ*sqrt(2*pi))*exp(-ϵ^2/(2σ^2))
+end
+
+function convint(μ,E,FDext,σ)
+    int(u,p)=gaussian(σ,E-u)*FDext(u)
+    prob=IntegralProblem(int,μ-15,μ+15)
+    sol=solve(prob,HCubatureJL(initdiv=10000);reltol=1e-10,abstol=1e-10)
+    return sol.u
+end
+
 function differential(sv,gc,l,mp,E::Float64,t::Float64,particle::Float64,τ::Float64,internalFD,B::Float64)
     C=(1/τ)+(8*l.delay*log(2)/l.FWHM^2)
     A=prefactor(sv,gc,mp,l,E,particle,internalFD,τ,t,B,C)
@@ -136,7 +147,7 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
     sv.Tel[1]=Ttraj[trunc(Int,t*10)+1]
     sv.μ=ChemicalPotential(sv,gc)
     particle=particleconstant(sv,l,gc)
-    #τ=tau_ee.(ERange,Ref(sv),Ref(gc))
+    τ=tau_ee.(ERange,Ref(sv),Ref(gc))
     B=-4*log(2)/l.FWHM^2
 
     int(u,p)=FDChange(u,sv,particle,gc,l)*sv.DOS(u)*u
@@ -145,7 +156,8 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
     internalFD=sol.u
 
     Threads.@threads for i in eachindex(ERange)
-        if ERange[i]<=sv.μ
+        FD[i]+=differential(sv,gc,l,mp,ERange[i],t,particle,τ[i],internalFD,B)*tstep
+        #= if ERange[i]<=sv.μ
             τ=excholerelax(ERange[i],sv,gc)
         elseif ERange[i]>sv.μ
             τ=excelecrelax(ERange[i],sv,gc)
@@ -155,7 +167,7 @@ function difftest(sv,gc,l,mp,Ttraj::Vector{Float64},t::Float64
             return 0.0
         else
             FD[i]+=dFDdt
-        end
+        end =#
     end
 
 end
@@ -169,67 +181,39 @@ function Fermivector(ERange::StepRangeLen,sv,gc)
     return Fermi
 end
 
-function limitscheck(ϵ,ω,sv,gc)
-    if sv.lb<=ϵ+ω<=sv.ub
-        return sv.DOS(ϵ)*FermiDirac(ϵ,sv,gc)*(1-FermiDirac(ϵ+ω,sv,gc))*sv.DOS(ϵ+ω)
-    else 
-        return 0.0
-    end
-end
-function scatterer(ω,sv,gc,b1,b2)
-    int(u,p)=limitscheck(u,ω,sv,gc)
-    prob=IntegralProblem(int,b1,b2)
-    sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-6,reltol=1e-6)
-    return sol.u
-end
-
-function excelecrelax(E,sv,gc)
-    int(u,p)=(1-FermiDirac(u,sv,gc))*sv.DOS(u)*scatterer(E-u,sv,gc,sv.lb,sv.μ)
-    prob=IntegralProblem(int,sv.μ,E)
-    sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-5,reltol=1e-5)
-    return sol.u*2*pi/gc.hbar
-end
-
-function excholerelax(E,sv,gc)
-    int(u,p)=FermiDirac(u,sv,gc)*sv.DOS(u)*scatterer(u-E,sv,gc,sv.lb,sv.ub)
-    prob=IntegralProblem(int,E,sv.μ)
-    sol=solve(prob,HCubatureJL(initdiv=2),abstol=1e-5,reltol=1e-5)
-    return sol.u*2*pi/gc.hbar
-end
-
 function main()
     l,mp,sim,gc,sv=Structs.parameterbuilder("InputFiles/Au_Input.txt")
     Ttraj=parse.(Float64,chop.(readdlm("../PhD Code/Gold/0D/0D_3.1_10F_5fsNoep.csv",skipstart=1)[:,2],tail=1))
     DensityOfStates(mp,sv,1.0)
-    ERange=range(-4+mp.FE,4+mp.FE,step=0.1)
+    ERange=range(-4+mp.FE,4+mp.FE,step=0.001)
     
     sv.NumElec=NumberOfElectrons(0.0,mp.FE,sv,gc)
     sv.τ=tau_0(mp,sv)
 
     FD=zeros(length(ERange))
-    tstop=10.0
+    tstop=300.0
     tstep=1.0
-    Diffpoints=[2,4,6,8,10]
+    Diffpoints=[350]
     Diffout=Array{Number}(undef,length(FD),length(Diffpoints))
     trange=range(0.0,tstop,step=tstep)
     counter=1
     for t in trange
         println(t)
         difftest(sv,gc,l,mp,Ttraj,t,ERange,FD,tstep)
-        if t in Diffpoints
+        #= if t in Diffpoints
             Diffout[:,counter]=FD
             counter+=1
-        end
+        end =#
     end
     #ThermFermi=Fermivector(ERange,sv,gc)
     #plot(ERange,Diffout,label=["300" "350" "400" "500"])
     #p2=plot(ERange,FD.+ThermFermi)
     #plot(p1,p2)
-    output=hcat(ERange,Diffout)
-    writedlm("NewSecondelectest.csv",' ')
-    io=open("NewSecondelectest.csv","a")
+    output=hcat(ERange.-sv.μ,FD)
+    writedlm("NoneqTest.csv",' ')
+    io=open("NoneqTest.csv","a")
     for row in eachrow(output)
-        println(io,row)
+        println(io,join(row," "))
     end
     close(io)
 end
