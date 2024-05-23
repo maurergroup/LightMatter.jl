@@ -16,11 +16,11 @@ function (::Gaussian)(lp)
     return temp
 end
 
-function dTel(;name)
+function dTel(var;name)
     @parameters g γ 
-    @variables Tph(t) S(t) Tel(t) 
+    @variables Tph(t) S(t) var(t) 
     
-    eqs = D(Tel) ~ (-g*(Tel-Tph) + S)/(γ*Tel)
+    eqs = D(var) ~ (-g*(var-Tph) + S)/(γ*var)
 
     ODESystem(eqs,t;name)
 
@@ -43,7 +43,8 @@ function Laser()
 end
 
 function dTel_factory(;name)
-    @named dTeldt = dTel()
+    Tel=:variable
+    @named dTeldt = dTel(Tel)
     laser=Laser()
     connections=[dTeldt.S ~ laser]
     compose(ODESystem(connections,t;name),dTeldt)
@@ -52,7 +53,7 @@ end
 function main()
     @named Tph_eq = dTph() 
     @named Tel_eq=dTel_factory()
-
+    println(unknowns(Tel_eq))
     connections=[Tel_eq.dTeldt.Tph ~ Tph_eq.Tph
                 Tph_eq.Tel ~ Tel_eq.dTeldt.Tel]
     

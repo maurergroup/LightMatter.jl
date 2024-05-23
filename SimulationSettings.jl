@@ -13,6 +13,7 @@ end
 end
 
 @kwdef struct simulation_settings <: simulation
+    Template::String
     nonlinear::Nonlinear
     interactions::Interactions
     Output_file_name::String

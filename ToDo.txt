@@ -9,3 +9,5 @@ Simulating the equations
 Implement an additional method to test ease
 
 Build some test sets
+
+Add DrWatson and DynamicalSystems implementation
