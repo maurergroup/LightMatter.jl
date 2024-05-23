@@ -1,4 +1,4 @@
-function Units(dict::Dict)
+function Unit_conversion(dict::Dict)
     dict["g"]=ustrip(uconvert(u"eV/nm^3/fs/K",dict["g"]u"W/m^3/K"))
     dict["Gamma"]=ustrip(uconvert(u"eV/nm^3/K^2",dict["Gamma"]u"J/m^3/K^2"))
     dict["ExtCof"]=ustrip(uconvert(u"nm",dict["ExtCof"]u"m"))
@@ -24,5 +24,5 @@ function generate_inputs(file::String)::Dict
         end
     end
     Input=Dict(IO[i,1]=>IO[i,2] for i in 1:size(IO,1))
-    return Units(Input)
+    return Unit_conversion(Input)
 end

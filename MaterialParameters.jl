@@ -13,6 +13,7 @@
     DOSFile::String #File location of the DOS data
     λ::Float64 #Second momentum of spectral function
     g::Float64 # Linear Electron-phonon coupling constant
+    ballistic::Real # Ballistic length of electrons
 end
 
 function define_material_parameters(;extcof,fermien,gamma,debye,noatoms,

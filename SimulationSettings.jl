@@ -15,7 +15,6 @@ end
 @kwdef struct simulation_settings <: simulation
     nonlinear::Nonlinear
     interactions::Interactions
-    Dimension::Int8
     Output_file_name::String
     Simulation_End_Time::Float64
 end
