@@ -1,7 +1,10 @@
-using ModelingToolkit, DynamicQuantities
+using ModelingToolkit
 using ModelingToolkit: D_nounits as D, t_nounits as t
 
-using DifferentialEquations,Plots # For testing
+using DifferentialEquations,Plots,IfElse,Dierckx,DelimitedFiles # For testing
+
+using .SimulationDimensions,.SymbolicsInterpolation
+
 
 #Define types and strcts, each laser subtype is a functor for the ODE to build for the laser so new lasers require new subtypes
 abstract type Laser end
@@ -40,19 +43,19 @@ end
 end
 
 function define_laser_system(;lasertype::String,fwhm::Real,fluence::Real,
-    photon_en::Real,offset::Real,reflectivity=0.0::Real)
+    photon_en::Real,offset::Real,reflectivity=0.0::Real,transport="Optical"::String)
     if lasertype == "Gaussian"
         return Gaussian(FWHM=fwhm,Offset=offset,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        Reflectivity=reflectivity,Transport=transport)
     elseif lasertype == "Lorentzian"
         return Lorentzian(FWHM=fwhm,Offset=offset,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        Reflectivity=reflectivity,Transport=transport)
     elseif lasertype == "Secant"
         return Secant(FWHM=fwhm,Offset=offset,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        Reflectivity=reflectivity,Transport=transport)
     elseif lasertype == "Rectangular"
         return Rectangular(FWHM=fwhm,Offset=offset,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        Reflectivity=reflectivity,Transport=transport)
     else
         print("The laser type you chose is currently implemented, the current options
         are Gaussian, Lorentzian, Secant and Rectangular")
@@ -80,65 +83,85 @@ function define_laser_system(dict;lasertype=dict.laser::Laser_Type,fwhm=dict.FWH
     end
 end
 
-function LaserBuilder(;laser::LaserType,sim::simulation,mp::simulation,dims=Homogenous::Dimension)
-    temporal = laser(laser)
-    power = Power(laser)
-    if typeof(dims) == Homogenous
-        return temporal*power
-    else
-        spatial = spatial_Laser(laser,dims,matpat)
-        return temporal*spatial*power
-    end
+function LaserBuilder(laser::LaserType,DOS,dims=Homogenous()::Dimension)
+    @variables S(t)
+    temporal = laser(DOS)
+    power = Power()
+    spatial = spatial_Laser(laser,dims)
+    return S ~ temporal*spatial*power
 end
 
-function Power(laser)
-    return (1-laser.Reflectivity)*laser.Fluence
+function Power()
+    @parameters R ϕ
+    return (1-R)*ϕ
 end
 
 #The various temporal profiles
-function (::Gaussian)(laser::LaserType)    
-    return sqrt(4*log(2)/pi)/laser.FWHM*exp(-4*log(2)*(t-(2*laser.FWHM)-laser.Offset)^2/laser.FWHM^2)
+function (::Gaussian)(DOS)
+    @parameters FWHM Offset    
+    return sqrt(4*log(2)/pi)/DOS(FWHM)*exp(-4*log(2)*(t-(2*FWHM)-Offset)^2/FWHM^2)
 end
 
-function (::Secant)(laser::LaserType)
-    sec = sech(2*log(1+sqrt(2))*((t-(2*laser.FWHM)-laser.Offset)/laser.FWHM))^2
-   return log(1+sqrt(2))/laser.FWHM * sec
+function (::Secant)()
+    @parameters FWHM Offset   
+    sec = sech(2*log(1+sqrt(2))*((t-(2*FWHM)-Offset)/FWHM))^2
+   return log(1+sqrt(2))/FWHM * sec
 end
 
-function (::Lorentzian)(laser::LaserType)
-    lorent = (1+(4/(1+sqrt(2))*((t-(2*laser.FWHM)-laser.Offset)/laser.FWHM)^2))^-2
-    return 4*sqrt(sqrt(2)-1)/(pi*laser.FWHM)*lorent
+function (::Lorentzian)()
+    @parameters FWHM Offset
+    lorent = (1+(4/(1+sqrt(2))*((t-(2*FWHM)-Offset)/FWHM)^2))^-2
+    return 4*sqrt(sqrt(2)-1)/(pi*FWHM)*lorent
 end
 
-function (::Rectangular)(laser::LaserType)
-    return IfElse.ifelse(laser.Offset≤t≤laser.Offset+4*laser.FWHM,1/(4*laser.FWHM),0.0)
+function (::Rectangular)()
+    @parameters FWHM Offset
+    return IfElse.ifelse(t≤Offset+4*FWHM,IfElse.ifelse(Offset≤t,1/(4*FWHM),0.0),0.0)
 end
 
-function spatial_Laser(laser::LaserType,slab::Dimension,matpat::MaterialParameters)
-    z_laser = spatial_z_Laser(laser::LaserType,slab::Dimension,matpat::MaterialParameters)
-    xy_laser = spatial_xy_Laser(laser::LaserType,slab::Dimension,matpat::MaterialParameters)
+function spatial_Laser(laser::LaserType,slab::Dimension)
+    z_laser = spatial_z_Laser(laser,slab)
+    xy_laser = spatial_xy_Laser(slab)
     return z_laser.*xy_laser
 end
 
-function spatial_z_Laser(laser::LaserType,slab::Dimension,matpat::MaterialParameters)
-    grid = get_zgrid(slab)
+function spatial_z_Laser(laser::LaserType,slab::Dimension)
+    @parameters zgrid Z 
     if laser.Transport == "Ballistic"
-        return 1/(matpat.ballistic*exp(-slab.Length/matpat.ballistic)).*exp.(-grid./matpat.ballistic)
+        @parameters δb
+        if typeof(slab) == Homogenous
+            return 1/δb
+        else
+            return 1/(δb*(1-exp(-Z/δb))).*exp.(-zgrid./δb)
+        end
     elseif laser.Transport == "Optical"
-        return 1/(matpat.ballistic*exp(-slab.Length/matpat.ballistic)).*exp.(-grid./matpat.ballistic)
+        @parameters ϵ
+        if typeof(slab) == Homogenous
+            return 1/ϵ
+        else
+            return 1/(ϵ*(1-exp(-Z/ϵ))).*exp.(-zgrid./ϵ)
+        end
     elseif laser.Transport == "Combined"
-        return 1/((matpat.ballistic+matpat.ϵ)*exp(-slab.Length/(matpat.ballistic+matpat.ϵ))).*exp.(-grid./(matpat.ballistic+matpat.ϵ))
+        @parameters δb ϵ
+        if typeof(slab) == Homogenous
+            return 1/(δb+ϵ)
+        else
+            return 1/((δb+ϵ)*(1-exp(-Z/(δb+ϵ)))).*exp.(-zgrid./(δb+ϵ))
+        end
     end
 end
 
-function spatial_xy_Laser(laser::LaserType,slab::Dimension,matpat::MaterialParameters)
-    grid = get_xygrid(slab)
-    if slab.Dimension == 2
-        return 1/(pi*length(grid)^2).*exp.(-grid.^2 ./length(grid^2))
-    elseif slab.Dimension == 3
-        xgrid = [x[1] for x in grid]
-        ygrid = [x[2] for x in grid]
-        return 1/(pi*length(grid)^2).*exp.(-(xgrid.+ygrid).^2 ./length(grid^2))
+function spatial_xy_Laser(slab::Dimension)
+    @parameters X
+    if typeof(slab) == Cylindrical
+        @parameters xygrid
+        return 1/(pi*X^2).*exp.(-xygrid.^2 ./X^2)
+    elseif typeof(slab) == Cubic
+        @parameters xgrid ygrid Y
+        return 1/(pi^2*X^2*Y^2).*exp.((-xgrid.^2 ./X^2)+(-ygrid.^2 ./Y^2))
+    else
+        return 1
+    end
 end
 
 function get_zgrid(slab)
@@ -162,3 +185,17 @@ function get_xygrid(slab)
         return xyvalues[1,:]
     end
 end
+
+function get_interpolate(xvals,yvals)
+    return Spline1D(xvals,yvals,bc="nearest")
+end
+
+function generate_DOS(File::String,FE)
+    TotalDOS::Matrix{Float64}=readdlm(File,skipstart=3)
+    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2])
+end
+
+DOS=generate_DOS("DOS/Au_DOS.dat",9.9)
+laser=define_laser_system(;lasertype="Gaussian",fwhm=50,fluence=10,
+photon_en=3.1,offset=300)
+LaserBuilder(laser,DOS)
