@@ -61,9 +61,9 @@ end
     Generates an interpolation object that represents the DOS and shifted to the
     new Fermi energy
 """
-function generate_DOS(File::String,FE)
+function generate_DOS(File::String,FE,n)
     TotalDOS::Matrix{Float64}=readdlm(File,skipstart=3)
-    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2])
+    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2].*n)
 end
 """
     The Fermi energy in this model is defined as the energy difference between the

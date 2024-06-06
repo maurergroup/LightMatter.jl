@@ -97,9 +97,9 @@ function Power()
 end
 
 #The various temporal profiles
-function (::Gaussian)(DOS)
+function (::Gaussian)()
     @parameters FWHM Offset    
-    return sqrt(4*log(2)/pi)/DOS(FWHM)*exp(-4*log(2)*(t-(2*FWHM)-Offset)^2/FWHM^2)
+    return sqrt(4*log(2)/pi)/FWHM*exp(-4*log(2)*(t-(2*FWHM)-Offset)^2/FWHM^2)
 end
 
 function (::Secant)()
@@ -185,17 +185,3 @@ function get_xygrid(slab)
         return xyvalues[1,:]
     end
 end
-
-function get_interpolate(xvals,yvals)
-    return Spline1D(xvals,yvals,bc="nearest")
-end
-
-function generate_DOS(File::String,FE)
-    TotalDOS::Matrix{Float64}=readdlm(File,skipstart=3)
-    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2])
-end
-
-DOS=generate_DOS("DOS/Au_DOS.dat",9.9)
-laser=define_laser_system(;lasertype="Gaussian",fwhm=50,fluence=10,
-photon_en=3.1,offset=300)
-LaserBuilder(laser,DOS)

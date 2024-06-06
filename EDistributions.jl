@@ -1,7 +1,7 @@
-using Symbolics, SymbolicNumericIntegration,ModelingToolkit,Dierckx
+using Symbolics, SymbolicNumericIntegration,ModelingToolkit,Dierckx,DelimitedFiles
 using .SymbolicsInterpolation
 
-function get_interpolate(xvals::Vector{Real},yvals::Vector{Real})
+function get_interpolate(xvals,yvals)
     return Spline1D(xvals,yvals,bc="nearest")
 end
 """
@@ -19,13 +19,7 @@ function FermiDirac()
     return 1/(exp((E-μ)/kB*Tel)+1)
 end
 
-function dFDdT()
-    @parameters kB Tel μ
-    @variables E
-    GlobalScope(E)
-    GlobalScope(kB)
-    GlobalScope(Tel)
-    GlobalScope(μ)
+function dFDdT(kB,Tel,μ,E)
     e = exp((E-μ)/kB*Tel)
     return (E-μ)*e/(kB*Tel^2*(e+1)^2)
 end
@@ -33,12 +27,7 @@ end
 function integrationtest(DOS)
     @variables E
     GlobalScope(E)
-    return SymbolicNumericIntegration.integrate(dFDdT()*DOS(E)*E,E,symbolic=false)
+    return SymbolicNumericIntegration.integrate(dFDdT()*DOS(E)*E,(E,0,20),symbolic=false)
 end
 
 DOS=generate_DOS("DOS/Au_DOS.dat",9.9)
-@parameters kB Tel μ
-kB=>8.615e-5
-Tel=>3000
-μ=>9.9
-println(integrationtest(DOS))
