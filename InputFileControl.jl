@@ -1,28 +1,31 @@
 function Unit_conversion(dict::Dict)
-    dict["g"]=ustrip(uconvert(u"eV/nm^3/fs/K",dict["g"]u"W/m^3/K"))
-    dict["Gamma"]=ustrip(uconvert(u"eV/nm^3/K^2",dict["Gamma"]u"J/m^3/K^2"))
-    dict["ExtCof"]=ustrip(uconvert(u"nm",dict["ExtCof"]u"m"))
-    dict["AtomDens"]=ustrip(uconvert(u"nm^-3",dict["AtomDens"]u"m^-3"))
-    dict["FWHM"]=ustrip(uconvert(u"fs",dict["FWHM"]u"s"))
-    dict["Fluence"]=ustrip(uconvert(u"eV/nm^2",dict["Fluence"]u"J/m^2"))
-    dict["LaserOff"]=ustrip(uconvert(u"fs",dict["LaserOff"]u"s"))
-    dict["RTKappa"]=ustrip(uconvert(u"eV/nm/K/fs",dict["RTKappa"]u"W/m/K"))
-    dict["SimEnd"]=ustrip(uconvert(u"fs",dict["SimEnd"]u"s"))
-    dict["Length"]=ustrip(uconvert(u"nm",dict["Length"]u"m"))
-    dict["dz"]=ustrip(uconvert(u"nm",dict["dz"]u"m"))
-    dict["Plasma"]=dict["Plasma"]/(6.582e-1*2*pi) #Plasma/2pihbar
+    dict["g"]=ustrip(uconvert(u"eV/nm^3/fs/K",dict["g"]))
+    dict["Gamma"]=ustrip(uconvert(u"eV/nm^3/K^2",dict["Gamma"]))
+    dict["ExtCof"]=ustrip(uconvert(u"nm",dict["ExtCof"]))
+    dict["AtomDens"]=ustrip(uconvert(u"nm^-3",dict["AtomDens"]))
+    dict["FWHM"]=ustrip(uconvert(u"fs",dict["FWHM"]))
+    dict["Fluence"]=ustrip(uconvert(u"eV/nm^2",dict["Fluence"]))
+    dict["LaserOff"]=ustrip(uconvert(u"fs",dict["LaserOff"]))
+    dict["RTKappa"]=ustrip(uconvert(u"eV/nm/K/fs",dict["RTKappa"]))
+    dict["SimEnd"]=ustrip(uconvert(u"fs",dict["SimEnd"]))
+    dict["Length"]=ustrip(uconvert(u"nm",dict["Length"]))
+    dict["dz"]=ustrip(uconvert(u"nm",dict["dz"]))
+    dict["Plasma"]=ustrip(dict["Plasma"])
 end
 
-function generate_inputs(file::String)::Dict
-    IO = readdlm(file,'=',comments=true,comment_char='#')
+function generate_inputs(file::String)
+    IO = readdlm(file,':',comments=true,comment_char='#')
     for (x,y) in enumerate(IO[:,2])
         if typeof(y) == SubString{String}
             IO[x,2]=strip(IO[x,2],' ')
         end
-        if lowercase(y) == "true" || lowercase(y) =="false"
-            y=parse(Bool,lowercase(y))
+        if IO[x,3] != ""
+            IO[x,2] = y* uparse(IO[x,3])
         end
     end
     Input=Dict(IO[i,1]=>IO[i,2] for i in 1:size(IO,1))
-    return Unit_conversion(Input)
+    Unit_conversion(Input)
+    println(Input["Plasma"])
 end
+#Test=generate_inputs("InputFiles/Au_Input.txt")
+generate_inputs("InputFiles/Au_Input.txt")

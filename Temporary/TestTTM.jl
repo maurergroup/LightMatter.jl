@@ -1,5 +1,5 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,.SymbolicsInterpolation,DelimitedFiles,Integrals
-using Unitful,NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools
+using Unitful,NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools,SymbolicIndexingInterface
 using ModelingToolkit: t_nounits as t, D_nounits as D 
 
 abstract type Laser end
@@ -63,8 +63,7 @@ function Laser(lp::Gaussian)
 end
 
 function dTel_factory(DOS::Spline1D,lp::Gaussian;name)
-    @parameters kB
-    @variables μ(t)
+    @parameters kB μ 
     @named dTeldt = dTel()
     laser=Laser(lp)
     connections=[dTeldt.S ~ laser,
@@ -133,6 +132,14 @@ function find_chemicalpotential(no_part::Float64,Tel::Float64,μ::Float64,DOS::S
 end
 @register_symbolic find_chemicalpotential(no_part::Num,Tel::Num,μ::Num,DOS::Spline1D,kB::Num)
 
+function condition_chempot(u,t,integrator)
+    integrator.iter % 1 == 0
+end
+
+function affect_chempot!(integ,u,p,ctx::Tuple{Spline1D,Float64})
+    integ.p[p.μ] = find_chemicalpotential(ctx[2],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
+end
+
 function unitconversion(stct::params)
     stct.g = ustrip(uconvert(u"eV/nm^3/fs/K",stct.g*u"W/m^3/K"))
     stct.Cph = ustrip(uconvert(u"eV/nm^3/K",stct.Cph*u"J/m^3/K"))
@@ -146,25 +153,27 @@ function unitconversion(stct::params)
 end
 
 function main()
-    @parameters no_part
+    
     param = params(2.3e16,2.5e6,1.27e-8,1.380649e-23,5.9e28,10.0,200e-15,50e-15)
     param = unitconversion(param)
     param.Offset = param.Offset-(2*param.FWHM)
-    DOS=generate_DOS("DOS/Au_DOS.dat",0.0,param.n) 
+    DOS=generate_DOS("DOS/Au_DOS.dat",0.0,param.n)
     lp = Gaussian(FWHM=param.FWHM,Offset=param.Offset,Fluence=param.ϕ,hv=3.1,spatial=[0],R=0.0)
+    param_storage=[]
+
     @named Tph_eq = dTph() 
     @named Tel_eq=dTel_factory(DOS,lp)
+    no_part = get_noparticles(0.0,1e-16,DOS,param.kB)
+    chempot = (t>=0.0) => (update_chempot!,[Tel_eq.dTeldt.Tel=>:Tel],
+    [Tel_eq.μ=>:μ,Tel_eq.kB=>:kB],[Tel_eq.μ],(DOS,no_part))
     connections=[Tel_eq.dTeldt.Tph ~ Tph_eq.Tph,
-                Tph_eq.Tel ~ Tel_eq.dTeldt.Tel,
-                Tel_eq.μ ~ find_chemicalpotential(no_part,Tel_eq.dTeldt.Tel,Tel_eq.μ,DOS,Tel_eq.kB)]
+                Tph_eq.Tel ~ Tel_eq.dTeldt.Tel]
     connected = compose(ODESystem(connections,t,name=:connected
-                ,defaults=Pair{Num,Any}[Tel_eq.dTeldt.g => Tph_eq.g])
-                ,Tel_eq,Tph_eq)
+                ,defaults=Pair{Num,Any}[Tel_eq.dTeldt.g => Tph_eq.g],discrete_events=chempot),Tel_eq,Tph_eq)
     connected_simp=structural_simplify(connected)
+
     u0=[Tel_eq.dTeldt.Tel => 300.0,
-        Tph_eq.Tph => 300.0,
-        Tel_eq.dTeldt.S => 0.0,
-        Tel_eq.μ => 0.0]
+        Tph_eq.Tph => 300.0]
     p=[Tph_eq.g => param.g,
       Tph_eq.Cph => param.Cph,
       Tel_eq.ϵ => param.ϵ,
@@ -172,9 +181,10 @@ function main()
       Tel_eq.ϕ => param.ϕ,
       Tel_eq.Offset => param.Offset,
       Tel_eq.FWHM => param.FWHM,
-      no_part => get_noparticles(0.0,1e-16,DOS,param.kB)]
-    prob=ODEProblem(connected_simp,u0,(0.0,400),p)
-    sol=solve(prob,GRK4T(autodiff=false),abstol=1e-2,reltol=1e-2)
+      Tel_eq.μ => 0.0]
+
+    prob=ODEProblem(connected_simp,u0,(0.0,400.0),p)
+    sol=solve(prob,Tsit5(),abstol=1e-2,reltol=1e-2)
     plot(sol)
 end
 
