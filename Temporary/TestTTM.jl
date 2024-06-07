@@ -12,9 +12,19 @@ abstract type Laser end
     R::Real
 end
 
-function get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64})
-    return Spline1D(xvals,yvals,bc="nearest")
+mutable struct params
+    g::Float64
+    Cph::Float64
+    ϵ::Float64
+    kB::Float64
+    n::Float64
+    ϕ::Float64
+    Offset::Float64
+    FWHM::Float64
 end
+
+get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
+
 
 function generate_DOS(File::String,FE,n)
     TotalDOS::Matrix{Float64}=readdlm(File,skipstart=3)
@@ -48,12 +58,12 @@ function dTph(;name)
 end
 
 function Laser(lp::Gaussian)
-    @parameters  ϵ ϕ
+    @parameters ϵ ϕ
     return  lp()*ϕ/ϵ
 end
 
 function dTel_factory(DOS::Spline1D,lp::Gaussian;name)
-    @parameters kB 
+    @parameters kB
     @variables μ(t)
     @named dTeldt = dTel()
     laser=Laser(lp)
@@ -72,7 +82,7 @@ function HeatCapacity_int(u::Float64,p::Tuple{Float64,Float64,Float64,Spline1D})
     return abs(dFDdT(p[1],p[2],p[3],u)*p[4](u)*u)
 end
 
-function HeatCapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::Spline1D)::Float64
+function HeatCapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::Spline1D)
     p=(kB,Tel,μ,DOS)
     int(u,p) = HeatCapacity_int(u,p)
     return solve(IntegralProblem(int,(μ-10,μ+10),p),HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
@@ -90,10 +100,6 @@ function get_noparticles_int(y::Vector{Float64},u::Vector{Float64},p::Tuple{Floa
     Threads.@threads for i in 1:n
         y[i:n:end] .= FermiDirac.(@view(u[i:n:end]),p[1],p[2],p[3]).*p[4](@view(u[i:n:end]))
     end
-end
-
-function get_noparticles_int(u::Float64,p::Tuple{Float64,Float64,Float64,Spline1D})
-    return FermiDirac(u,p[1],p[2],p[3])*p[4](u)
 end
 
 function get_noparticles_int(y::Vector{ForwardDiff.Dual},u::Vector{Float64},p::Tuple{ForwardDiff.Dual,Float64,Float64,Spline1D})
@@ -115,32 +121,19 @@ function get_noparticles(μ::ForwardDiff.Dual,Tel::Float64,DOS::Spline1D,kB::Flo
     return solve(IntegralProblem(int,(ForwardDiff.value(μ)-10,ForwardDiff.value(μ)+10),p),QuadGKJL();reltol=1e-3,abstol=1e-3).u
 end
 
-function FermiDirac(E::Float64,μ::Float64,Tel::Float64,kB::Float64)::Float64
-    return 1/(exp((E-μ)/(kB*Tel))+1)
-end
+FermiDirac(E::Float64,μ::Float64,Tel::Float64,kB::Float64) = 1/(exp((E-μ)/(kB*Tel))+1)
 
-function FermiDirac(E::Float64,μ::ForwardDiff.Dual,Tel::Float64,kB::Float64)::ForwardDiff.Dual
-    return 1/(exp((E-μ)/(kB*Tel))+1)
-end
+FermiDirac(E::Float64,μ::ForwardDiff.Dual,Tel::Float64,kB::Float64) = 1/(exp((E-μ)/(kB*Tel))+1)
+
 
 function find_chemicalpotential(no_part::Float64,Tel::Float64,μ::Float64,DOS::Spline1D,kB::Float64)
     f(u,p) = no_part - get_noparticles(u,Tel,DOS,kB)
-    return solve(NonlinearProblem(f,μ),NewtonRaphson();abstol=1e-3,reltol=1e-3).u
+    sol = solve(NonlinearProblem(f,μ),SimpleKlement();abstol=1e-3,reltol=1e-3)
+    return sol.u
 end
 @register_symbolic find_chemicalpotential(no_part::Num,Tel::Num,μ::Num,DOS::Spline1D,kB::Num)
 
-mutable struct parameters
-    g::Float64
-    Cph::Float64
-    ϵ::Float64
-    kB::Float64
-    n::Float64
-    ϕ::Float64
-    Offset::Float64
-    FWHM::Float64
-end
-
-function unitconversion(stct::parameters)
+function unitconversion(stct::params)
     stct.g = ustrip(uconvert(u"eV/nm^3/fs/K",stct.g*u"W/m^3/K"))
     stct.Cph = ustrip(uconvert(u"eV/nm^3/K",stct.Cph*u"J/m^3/K"))
     stct.ϵ = ustrip(uconvert(u"nm",stct.ϵ*u"m"))
@@ -154,37 +147,35 @@ end
 
 function main()
     @parameters no_part
-    params = parameters(2.3e16,2.5e6,1.27e-8,1.380649e-23,5.9e28,10.0,200e-15,50e-15)
-    params = unitconversion(params)
-    params.Offset = params.Offset-(2*params.FWHM)
-    DOS=generate_DOS("DOS/Au_DOS.dat",0.0,params.n)
-    lp = Gaussian(FWHM=params.FWHM,Offset=params.Offset,Fluence=params.ϕ,hv=3.1,spatial=[0],R=0.0)
+    param = params(2.3e16,2.5e6,1.27e-8,1.380649e-23,5.9e28,10.0,200e-15,50e-15)
+    param = unitconversion(param)
+    param.Offset = param.Offset-(2*param.FWHM)
+    DOS=generate_DOS("DOS/Au_DOS.dat",0.0,param.n) 
+    lp = Gaussian(FWHM=param.FWHM,Offset=param.Offset,Fluence=param.ϕ,hv=3.1,spatial=[0],R=0.0)
     @named Tph_eq = dTph() 
     @named Tel_eq=dTel_factory(DOS,lp)
     connections=[Tel_eq.dTeldt.Tph ~ Tph_eq.Tph,
                 Tph_eq.Tel ~ Tel_eq.dTeldt.Tel,
                 Tel_eq.μ ~ find_chemicalpotential(no_part,Tel_eq.dTeldt.Tel,Tel_eq.μ,DOS,Tel_eq.kB)]
-    
     connected = compose(ODESystem(connections,t,name=:connected
                 ,defaults=Pair{Num,Any}[Tel_eq.dTeldt.g => Tph_eq.g])
                 ,Tel_eq,Tph_eq)
     connected_simp=structural_simplify(connected)
-    #equations(connected_simp)
     u0=[Tel_eq.dTeldt.Tel => 300.0,
         Tph_eq.Tph => 300.0,
         Tel_eq.dTeldt.S => 0.0,
         Tel_eq.μ => 0.0]
-    p=[Tph_eq.g => params.g,
-      Tph_eq.Cph => params.Cph,
-      Tel_eq.ϵ => params.ϵ,
-      Tel_eq.kB => params.kB,
-      Tel_eq.ϕ => params.ϕ,
-      Tel_eq.Offset => params.Offset,
-      Tel_eq.FWHM => params.FWHM,
-      no_part => get_noparticles(0.0,300.0,DOS,params.kB)]
+    p=[Tph_eq.g => param.g,
+      Tph_eq.Cph => param.Cph,
+      Tel_eq.ϵ => param.ϵ,
+      Tel_eq.kB => param.kB,
+      Tel_eq.ϕ => param.ϕ,
+      Tel_eq.Offset => param.Offset,
+      Tel_eq.FWHM => param.FWHM,
+      no_part => get_noparticles(0.0,1e-16,DOS,param.kB)]
     prob=ODEProblem(connected_simp,u0,(0.0,400),p)
-    sol=solve(prob,Rosenbrock23(autodiff=false),abstol=1e-3,reltol=1e-3,dtmin=0.1)
-    display(plot(sol))
+    sol=solve(prob,GRK4T(autodiff=false),abstol=1e-2,reltol=1e-2)
+    plot(sol)
 end
 
 main()
