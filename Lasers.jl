@@ -3,7 +3,9 @@ using ModelingToolkit: D_nounits as D, t_nounits as t
 
 using DifferentialEquations,Plots,IfElse,Dierckx,DelimitedFiles # For testing
 
-using .SimulationDimensions,.SymbolicsInterpolation
+using .SymbolicsInterpolation
+
+include("SimulationSetup.jl")
 
 
 #Define types and strcts, each laser subtype is a functor for the ODE to build for the laser so new lasers require new subtypes
@@ -83,12 +85,11 @@ function define_laser_system(dict;lasertype=dict.laser::Laser_Type,fwhm=dict.FWH
     end
 end
 
-function LaserBuilder(laser::LaserType,DOS,dims=Homogenous()::Dimension)
-    @variables S(t)
-    temporal = laser(DOS)
+function LaserBuilder(laser::LaserType,dims=Homogenous()::Dimension)
+    temporal = laser()
     power = Power()
     spatial = spatial_Laser(laser,dims)
-    return S ~ temporal*spatial*power
+    return temporal*spatial*power
 end
 
 function Power()

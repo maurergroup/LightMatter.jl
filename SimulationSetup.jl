@@ -1,5 +1,4 @@
-module SimulationSetup
-using StaticArrays #For the Dimensionality
+using StaticArrays,Dierckx #For the Dimensionality
 abstract type Simulation end #Overarching type that holds all simulation settings
 
 @kwdef struct Interaction <:Simulation #Holds Booleans for how different systems interact
@@ -10,7 +9,7 @@ end
 
 @kwdef struct ParameterApproximation <:Simulation #Holds Booleans for the parameter approximations
     ChemicalPotential::Bool
-    ElectronPhonon_Coupling::Bool
+    ElectronPhononCoupling::Bool
     ElectronHeatCapacity::Bool
 end
 
@@ -20,7 +19,7 @@ end
     NonEqElectrons::Bool
 end
 
-@kwdef struct Simulation_Settings <: Simulation #Struct containing all the settings for the simulation
+@kwdef struct SimulationSettings <: Simulation #Struct containing all the settings for the simulation
     ParameterApprox::ParameterApproximation
     Interactions::Interaction
     Systems::SystemComponents
@@ -215,5 +214,3 @@ end
 
 export Simulation,MaterialParameters,Dimension,Simulation_Settings
 export define_simulation_settings,define_simulation_dimensions,define_material_parameters
-
-end
