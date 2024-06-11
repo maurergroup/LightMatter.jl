@@ -1,15 +1,15 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,.SymbolicsInterpolation,DelimitedFiles,Integrals
-using Unitful,NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools,SymbolicIndexingInterface
+using Unitful,NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools
 using ModelingToolkit: t_nounits as t, D_nounits as D 
 
 abstract type Laser end
-@kwdef struct Gaussian <: Laser 
+@kwdef struct Gaussian <: LaserType 
     FWHM::Real
     Offset::Real
-    Fluence::Real
+    Power::Real
     hv::Real
-    spatial::Array{Float64}
-    R::Real
+    Reflectivity::Real
+    Transport::String
 end
 
 mutable struct params
@@ -63,7 +63,7 @@ function Laser(lp::Gaussian)
 end
 
 function dTel_factory(DOS::Spline1D,lp::Gaussian;name)
-    @parameters kB μ 
+    @parameters kB μ
     @named dTeldt = dTel()
     laser=Laser(lp)
     connections=[dTeldt.S ~ laser,
@@ -132,10 +132,6 @@ function find_chemicalpotential(no_part::Float64,Tel::Float64,μ::Float64,DOS::S
 end
 @register_symbolic find_chemicalpotential(no_part::Num,Tel::Num,μ::Num,DOS::Spline1D,kB::Num)
 
-function condition_chempot(u,t,integrator)
-    integrator.iter % 1 == 0
-end
-
 function affect_chempot!(integ,u,p,ctx::Tuple{Spline1D,Float64})
     integ.p[p.μ] = find_chemicalpotential(ctx[2],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
 end
@@ -158,7 +154,8 @@ function main()
     param = unitconversion(param)
     param.Offset = param.Offset-(2*param.FWHM)
     DOS=generate_DOS("DOS/Au_DOS.dat",0.0,param.n)
-    lp = Gaussian(FWHM=param.FWHM,Offset=param.Offset,Fluence=param.ϕ,hv=3.1,spatial=[0],R=0.0)
+    lp = Gaussian(FWHM=param.FWHM,Offset=param.Offset,Power=param.ϕ,hv=3.1,Reflectivity=0.0,
+    Transport="Optical")
     param_storage=[]
 
     @named Tph_eq = dTph() 

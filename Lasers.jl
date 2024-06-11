@@ -1,7 +1,7 @@
 using ModelingToolkit
 using ModelingToolkit: D_nounits as D, t_nounits as t
 
-using DifferentialEquations,Plots,IfElse,Dierckx,DelimitedFiles # For testing
+using DifferentialEquations,Plots,IfElse,Dierckx,DelimitedFiles,ForwardDiff # For testing
 
 using .SymbolicsInterpolation
 
@@ -85,14 +85,14 @@ function define_laser_system(dict;lasertype=dict.laser::Laser_Type,fwhm=dict.FWH
     end
 end
 
-function LaserBuilder(laser::LaserType,dims=Homogenous()::Dimension)
+function laser_factory(laser::LaserType,dims=Homogenous()::Dimension)
     temporal = laser()
-    power = Power()
-    spatial = spatial_Laser(laser,dims)
+    power = intensity()
+    spatial = spatial_laser(laser,dims)
     return temporal*spatial*power
 end
 
-function Power()
+function intensity()
     @parameters R ϕ
     return (1-R)*ϕ
 end
@@ -120,13 +120,13 @@ function (::Rectangular)()
     return IfElse.ifelse(t≤Offset+4*FWHM,IfElse.ifelse(Offset≤t,1/(4*FWHM),0.0),0.0)
 end
 
-function spatial_Laser(laser::LaserType,slab::Dimension)
-    z_laser = spatial_z_Laser(laser,slab)
-    xy_laser = spatial_xy_Laser(slab)
+function spatial_laser(laser::LaserType,slab::Dimension)
+    z_laser = spatial_z_laser(laser,slab)
+    xy_laser = spatial_xy_laser(slab)
     return z_laser.*xy_laser
 end
 
-function spatial_z_Laser(laser::LaserType,slab::Dimension)
+function spatial_z_laser(laser::LaserType,slab::Dimension)
     @parameters zgrid Z 
     if laser.Transport == "Ballistic"
         @parameters δb
@@ -152,7 +152,7 @@ function spatial_z_Laser(laser::LaserType,slab::Dimension)
     end
 end
 
-function spatial_xy_Laser(slab::Dimension)
+function spatial_xy_laser(slab::Dimension)
     @parameters X
     if typeof(slab) == Cylindrical
         @parameters xygrid
