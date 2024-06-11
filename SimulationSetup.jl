@@ -9,6 +9,7 @@ end
     ChemicalPotential::Bool
     ElectronPhononCoupling::Bool
     ElectronHeatCapacity::Bool
+    PhononHeatCapacity::Bool
 end
 
 @kwdef struct SystemComponents <:Simulation #Which ODE's you want to solve
@@ -42,10 +43,10 @@ end
 end
 
 @kwdef struct MaterialParameters <: Simulation #Holds all material parameters
-    ϵ::Float64 #Extinction Coefficient
-    FE::Float64 #Fermi Energy
+    ϵ::Float64 #Extinction coefficient
+    FE::Float64 #Fermi energy
     γ::Float64 #Specific electronic heat capacity
-    θ::Float64 #Debye Temperature
+    θ::Float64 #Debye temperature
     n::Float64 #Number of atoms per volume
     ω::Float64 #Plasma frequency
     κ::Float64 #Room temperature thermal conductivity
@@ -53,8 +54,9 @@ end
     effmass::Float64 #Effective mass of conduction electrons
     DOS::Spline1D #File location of the DOS data
     λ::Float64 #Second momentum of spectral function
-    g::Float64 # Linear Electron-phonon coupling constant
+    g::Float64 # Linear electron-phonon coupling constant
     Ballistic::Real # Ballistic length of electrons
+    Cph::Real #Constant heat capacity for phonons
 end
 
 """
@@ -62,7 +64,7 @@ end
     file built within InputFileControl.jl
 """
 function define_simulation_settings(;nlchempot=false,nlelecphon=false,nlelecheat=false,noneqelec=true,elecelecint=true,elecphonint=true,
-    electemp=true,phonontemp=true,output="./Default_file.jld2",simendtime=1000)
+    phononheatcapacity=true,electemp=true,phonontemp=true,output="./Default_file.jld2",simendtime=1000)
     
     if noneqelec==false
         if elecelecint==true
@@ -72,7 +74,8 @@ function define_simulation_settings(;nlchempot=false,nlelecphon=false,nlelecheat
         end
     end
 
-    nl=ParameterApproximation(ChemicalPotential=nlchempot,ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat)
+    nl=ParameterApproximation(ChemicalPotential=nlchempot,ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
+    PhononHeatCapacity=phononheatcapacity)
 
     interact=Interaction(ElectronElectron=elecelecint,ElectronPhonon=elecphonint)
     
@@ -86,7 +89,7 @@ end
 
 function define_simulation_settings(dict::Dict;nlchempot=dict["ChemPot"],nlelecphon=dict["ElecPhonCoup"],nlelecheat=dict["ElecHeatCapac"],
     noneqelec=dict["NoneqElec"],elecelecint=dict["Elec-Elec"],elecphonint=dict["Elec-Phon"],output=dict["Output"],electemp=dict["Tel"],
-    phonontemp=dict["Tph"],simendtime=dict["SimTime"])
+    phonontemp=dict["Tph"],simendtime=dict["SimTime"],phononheatcapacity=dict["PhononHeatCapac"])
     
     if noneqelec==false
         if elecelecint==true
@@ -96,7 +99,8 @@ function define_simulation_settings(dict::Dict;nlchempot=dict["ChemPot"],nlelecp
         end
     end
 
-    nl=ParameterApproximation(ChemicalPotential=nlchempot,ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat)
+    nl=ParameterApproximation(ChemicalPotential=nlchempot,ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
+    PhononHeatCapacity=phononheatcapacity)
 
     interact=Interaction(ElectronElectron=elecelecint,ElectronPhonon=elecphonint)
     
@@ -184,26 +188,26 @@ end
     file built within InputFileControl.jl
 """
 function define_material_parameters(;extcof,gamma,debye,noatoms,plasma,thermalcond,elecperatom,eleceffmass,dos,secmomspecfun,elecphon,
-    ballistic)
+    ballistic,cph)
     
     fermien=0.0
     DOS = generate_DOS(dos,noatoms)
 
     matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,ω=plasma,κ=thermalcond,ne=elecperatom,
-    effmass=eleceffmass,DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic)
+    effmass=eleceffmass,DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph)
 
     return matpat
 end
 
 function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict["Gamma"],debye=dict["Debye"],noatoms=dict["AtomDens"],
     plasma=dict["Plasma"],thermalcond=dict["RTKappa"],elecperatom=dict["ne"],eleceffmass=dict["EffMass"],dos=dict["DOS"],
-    secmomspecfun=Dict["SpectralFunc"],elecphon=Dict["g"],ballistic=dict["BallisticLength"])
+    secmomspecfun=Dict["SpectralFunc"],elecphon=Dict["g"],ballistic=dict["BallisticLength"],cph=dict["Cph"])
 
     fermien=0.0
     DOS = generate_DOS(dos,fermien)
 
     matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,ω=plasma,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic)
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph,cph)
 
     return matpat
 end
