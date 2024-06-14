@@ -67,11 +67,7 @@ function define_simulation_settings(;nlchempot=false,nlelecphon=false,nlelecheat
     phononheatcapacity=true,electemp=true,phonontemp=true,output="./Default_file.jld2",simendtime=1000)
     
     if noneqelec==false
-        if elecelecint==true
-            throw(ErrorException("Electron-Electron Interactions should only 
-            be true if there are non-equilibrium electrons to interact with. 
-            Set elecelecint=false"))
-        end
+        elecelecint=false
     end
 
     nl=ParameterApproximation(ChemicalPotential=nlchempot,ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,

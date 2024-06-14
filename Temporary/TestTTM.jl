@@ -1,9 +1,11 @@
-using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,.SymbolicsInterpolation,DelimitedFiles,Integrals
-using Unitful,NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools
+using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
+using NonlinearSolve,ForwardDiff,QuadGK,StaticArrays,BenchmarkTools,Unitful
 using ModelingToolkit: t_nounits as t, D_nounits as D 
 
+include("../SymbolicsInterpolation.jl")
+
 abstract type Laser end
-@kwdef struct Gaussian <: LaserType 
+@kwdef struct Gaussian <: Laser
     FWHM::Real
     Offset::Real
     Power::Real
@@ -38,10 +40,9 @@ function (::Gaussian)()
 end
 
 function dTel(;name)
-    @parameters g 
-    @variables Tph(t) S(t) Tel(t) HC(t)
+    @variables S(t) Tel(t) HC(t) EP(t)
 
-    eqs = D(Tel) ~ (-g*(Tel-Tph) + S)/HC
+    eqs = D(Tel) ~ (-EP + S)/HC
 
     ODESystem(eqs,t;name)
 
@@ -63,11 +64,13 @@ function Laser(lp::Gaussian)
 end
 
 function dTel_factory(DOS::Spline1D,lp::Gaussian;name)
-    @parameters kB μ
+    @parameters kB μ g
+    @variables Tph(t)
     @named dTeldt = dTel()
     laser=Laser(lp)
     connections=[dTeldt.S ~ laser,
-                 dTeldt.HC ~ HeatCapacity(kB,dTeldt.Tel,μ,DOS)]
+                 dTeldt.HC ~ HeatCapacity(kB,dTeldt.Tel,μ,DOS),
+                 dTeldt.EP ~ g*(dTeldt.Tel-Tph)]
     compose(ODESystem(connections,t;name),dTeldt)
 end
 
@@ -132,7 +135,7 @@ function find_chemicalpotential(no_part::Float64,Tel::Float64,μ::Float64,DOS::S
 end
 @register_symbolic find_chemicalpotential(no_part::Num,Tel::Num,μ::Num,DOS::Spline1D,kB::Num)
 
-function affect_chempot!(integ,u,p,ctx::Tuple{Spline1D,Float64})
+function update_chempot!(integ,u,p,ctx::Tuple{Spline1D,Float64})
     integ.p[p.μ] = find_chemicalpotential(ctx[2],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
 end
 
@@ -163,10 +166,10 @@ function main()
     no_part = get_noparticles(0.0,1e-16,DOS,param.kB)
     chempot = (t>=0.0) => (update_chempot!,[Tel_eq.dTeldt.Tel=>:Tel],
     [Tel_eq.μ=>:μ,Tel_eq.kB=>:kB],[Tel_eq.μ],(DOS,no_part))
-    connections=[Tel_eq.dTeldt.Tph ~ Tph_eq.Tph,
+    connections=[Tel_eq.Tph ~ Tph_eq.Tph,
                 Tph_eq.Tel ~ Tel_eq.dTeldt.Tel]
     connected = compose(ODESystem(connections,t,name=:connected
-                ,defaults=Pair{Num,Any}[Tel_eq.dTeldt.g => Tph_eq.g],discrete_events=chempot),Tel_eq,Tph_eq)
+                ,defaults=Pair{Num,Any}[Tel_eq.g => Tph_eq.g],discrete_events=chempot),Tel_eq,Tph_eq)
     connected_simp=structural_simplify(connected)
 
     u0=[Tel_eq.dTeldt.Tel => 300.0,
@@ -182,7 +185,7 @@ function main()
 
     prob=ODEProblem(connected_simp,u0,(0.0,400.0),p)
     sol=solve(prob,Tsit5(),abstol=1e-2,reltol=1e-2)
-    plot(sol)
+    plot(sol,idxs=[Tel_eq.dTeldt.EP,Tel_eq.dTeldt.S])
 end
 
 main()

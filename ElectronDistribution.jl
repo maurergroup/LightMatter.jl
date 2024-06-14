@@ -1,6 +1,3 @@
-include("SimulationVariables.jl")
-
-
 function athem_factory(DOS::Spline1D,ERange::Vector{<:Real},laser::Num)
     @parameters totalDis(t)
     @named dneqFD = athem_template()

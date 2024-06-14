@@ -1,13 +1,3 @@
-using ModelingToolkit
-using ModelingToolkit: D_nounits as D, t_nounits as t
-
-using DifferentialEquations,Plots,IfElse,Dierckx,DelimitedFiles,ForwardDiff # For testing
-
-using .SymbolicsInterpolation
-
-include("SimulationSetup.jl")
-
-
 #Define types and strcts, each laser subtype is a functor for the ODE to build for the laser so new lasers require new subtypes
 abstract type Laser end
 abstract type LaserType end
