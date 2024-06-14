@@ -78,7 +78,7 @@ function run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
 
     tspan=(0.0,500.0)
     prob=ODEProblem(connected_eq,u0,tspan,p)
-    sol=solve(prob,Tsit5();abstol=1e-5,reltol=1e-5)
+    sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
     return sol
 end
 
