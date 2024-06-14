@@ -38,7 +38,7 @@ end
 function nonlinear_electronheatcapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::Spline1D)
     p=(kB,Tel,μ,DOS)
     int(u,p) = electronheatcapacity_int(u,p)
-    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
 end
 @register_symbolic nonlinear_electronheatcapacity(kB::Num,Tel::Num,μ::Num,DOS::Spline1D)
 
@@ -63,18 +63,24 @@ end
 function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,DOS::Spline1D,Tel::Float64,μ::Float64,Tph::Float64)
     prefac=pi*kB*λ/DOS(μ)/hbar
     p=(kB,Tel,μ,DOS)
-    int = BatchIntegralFunction(electronphononcoupling_int,zeros(0))
+    #= int = BatchIntegralFunction(electronphononcoupling_int,zeros(0))
     g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),QuadGKJL();reltol=1e-5,abstol=1e-5).u
-    return g
-    #return -g*(Tel-Tph)
+    return -g*(Tel-Tph) =#
+    int(u,p) = electronphononcoupling_int(u,p)
+    g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
+    return -g*(Tel-Tph)
 end
 @register_symbolic nonlinear_electronphononcoupling(hbar::Num,kB::Num,λ::Num,DOS::Spline1D,Tel::Num,μ::Num,Tph::Num)
 
-function electronphononcoupling_int(y::Vector{Float64},u::Vector{Float64},p::Tuple{Float64,Float64,Float64,Spline1D})
+#= function electronphononcoupling_int(y::Vector{Float64},u::Vector{Float64},p::Tuple{Float64,Float64,Float64,Spline1D})
     n=Threads.nthreads()
     Threads.@threads for i in 1:n
         @inbounds y[i:n:end] .= p[4].(@view(u[i:n:end])).^2 .*-1 .*dFDdE.(p[1],p[2],p[3],@view(u[i:n:end]))
     end
+end =#
+
+function electronphononcoupling_int(u::Float64,p::Tuple{Float64,Float64,Float64,Spline1D})
+    return p[4](u)^2*-dFDdE(p[1],p[2],p[3],u)
 end
 
 function t_electron_sourceterm(sim::SimulationSettings,laser::Num)
