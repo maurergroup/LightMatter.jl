@@ -1,3 +1,7 @@
+"""
+    This the base factory function that constructs the electronic temperature ODE. All variables and
+    functionality for the electronic temperature ODE should be set up within this function call.
+"""
 function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser::Num=Num(0.0),;name)
     @variables Tel(t)
     @named dTel = t_elec_template()
@@ -8,7 +12,14 @@ function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser
                   dTel.Tel ~ Tel]
     compose(ODESystem(connections,t;name),dTel)
 end
-
+"""
+    This is the template for the electonic temperature ODE. It contains a source term where 
+    energy injection functions are defined, a spatial term for thermal conducitivity within the
+    electronic system. An electron-phonon coupling term for how the electronic temperature interacts
+    with the lattice temperature and then the heat capcaity of the electronic system. All variables
+    are then later replaced by their relative function for the current simulation. Any functionality
+    that is unwanted during a simulation must be set to 0.0 during setup, not ignored.
+"""
 function t_elec_template(;name)
     @variables Tel(t) Source(t) ElecPhon(t) HeatCapacity(t) Spatial(t)
 
@@ -16,7 +27,11 @@ function t_elec_template(;name)
 
     ODESystem(eqs,t;name)
 end
-
+"""
+    Defines and returns the requested equation for the electronic heat capacity. Uses the Boolean
+    flag to determine whether a linear approximation or non-linear term is utilised and sets up
+    the relative equation.
+"""
 function t_electron_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
         @parameters kB μ
@@ -30,18 +45,28 @@ function t_electron_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
         return γ*Tel
     end
 end
-
-function electronheatcapacity_int(u::Float64,p::Tuple{Float64,Float64,Float64,Spline1D})
-    return dFDdT(p[1],p[2],p[3],u)*p[4](u)*u
-end
-
-function nonlinear_electronheatcapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::Spline1D)
+"""
+    The non-linear electronic heat capacity equation. It evaluates the integrand using a serial solver.
+    The integrand limits are temperature dependent to account for errors due to discontinuties at high
+    energy values. To-Do: Check limits work for many materials.
+"""
+function nonlinear_electronheatcapacity(kB::Real,Tel::Real,μ::Real,DOS::Spline1D)
     p=(kB,Tel,μ,DOS)
     int(u,p) = electronheatcapacity_int(u,p)
     return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
 end
 @register_symbolic nonlinear_electronheatcapacity(kB::Num,Tel::Num,μ::Num,DOS::Spline1D)
-
+"""
+    The integrand for the non-linear electronic heat capacity using a parameter tuple 
+    p=(kB, Tel, μ, DOS). The integrand is currently out-of-place.
+"""
+function electronheatcapacity_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
+    return dFDdT(p[1],p[2],p[3],u)*p[4](u)*u
+end
+"""
+    Defines and returns the requested equation for the electron-phonon coupling. Uses the Boolean
+    flag to determine whether a constant or non-constant g value is used.
+"""
 function t_electron_phononcoupling(mp::MaterialParameters,sim::SimulationSettings)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
@@ -59,30 +84,33 @@ function t_electron_phononcoupling(mp::MaterialParameters,sim::SimulationSetting
         return 0.0
     end
 end
-
-function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,DOS::Spline1D,Tel::Float64,μ::Float64,Tph::Float64)
+"""
+    The non-constant electron-phonon coupling equation.. It evaluates the integrand using a serial 
+    solver. The integrand limits are temperature dependent to account for errors due to 
+    discontinuties at high energy values. To-Do: Check limits work for many materials.
+"""
+function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::Spline1D,Tel::Real,μ::Real,Tph::Real)
     prefac=pi*kB*λ/DOS(μ)/hbar
     p=(kB,Tel,μ,DOS)
-    #= int = BatchIntegralFunction(electronphononcoupling_int,zeros(0))
-    g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),QuadGKJL();reltol=1e-5,abstol=1e-5).u
-    return -g*(Tel-Tph) =#
     int(u,p) = electronphononcoupling_int(u,p)
     g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
     return -g*(Tel-Tph)
 end
 @register_symbolic nonlinear_electronphononcoupling(hbar::Num,kB::Num,λ::Num,DOS::Spline1D,Tel::Num,μ::Num,Tph::Num)
-
-#= function electronphononcoupling_int(y::Vector{Float64},u::Vector{Float64},p::Tuple{Float64,Float64,Float64,Spline1D})
-    n=Threads.nthreads()
-    Threads.@threads for i in 1:n
-        @inbounds y[i:n:end] .= p[4].(@view(u[i:n:end])).^2 .*-1 .*dFDdE.(p[1],p[2],p[3],@view(u[i:n:end]))
-    end
-end =#
-
-function electronphononcoupling_int(u::Float64,p::Tuple{Float64,Float64,Float64,Spline1D})
+"""
+    The integrand for the non-constant electron-phonon coupling parameter using a parameter tuple 
+    p=(kB, Tel, μ, DOS). The integrand is currently out-of-place.
+"""
+function electronphononcoupling_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
     return p[4](u)^2*-dFDdE(p[1],p[2],p[3],u)
 end
-
+"""
+    Defines and returns the requested equation for how energy is inputed into the system.
+    Currently the only options are either AthEM or the laser directly so checks whether non-
+    equilibrium electrons are enabled and defaults to the AthEM method otherwise uses the laser.
+    The laser is currently brought into the function because using a variable and connecting later
+    leads to un-assignable parameters. To-Do: Review once Simulation Builder is complete
+"""
 function t_electron_sourceterm(sim::SimulationSettings,laser::Num)
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronElectron == true
