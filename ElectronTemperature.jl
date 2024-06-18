@@ -14,7 +14,7 @@ function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser
 end
 """
     This is the template for the electonic temperature ODE. It contains a source term where 
-    energy injection functions are defined, a spatial term for thermal conducitivity within the
+    energy injection functions are defined, a spatial term for thermal conductiivity within the
     electronic system. An electron-phonon coupling term for how the electronic temperature interacts
     with the lattice temperature and then the heat capcaity of the electronic system. All variables
     are then later replaced by their relative function for the current simulation. Any functionality

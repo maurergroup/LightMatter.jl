@@ -9,11 +9,11 @@ function get_FermiEnergy(File::String)
     return abs(TotalDOS[Nonzero,1])
 end
 """
-    Converts a file lcoation for the DOS into an interpolation object. It assumes that the DOS file
+    Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
 function generate_DOS(File::String,n)
-    TotalDOS::Matrix{Real}=readdlm(File,skipstart=3)
+    TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 """
@@ -22,7 +22,8 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::Vector{<:Real},yvals::Vector{<:Real}) = Spline1D(xvals,yvals,bc="nearest")
+get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
+@register_symbolic get_interpolate(xvals::Vector{Num},yvals::Vector{Num})::Spline1D
 """
     A callback function used to update the chemical potential with temperature. Is used when 
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
@@ -78,3 +79,4 @@ function get_internalenergy(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
     return solve(IntegralProblem(int,(μ-10,μ+10),p),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
 end
+@register_symbolic get_internalenergy(μ::Num,Dis::Spline1D,DOS::Spline1D)
