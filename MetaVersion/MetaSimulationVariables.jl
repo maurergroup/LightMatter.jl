@@ -23,7 +23,6 @@ end
     enough to capture all thermal and non-thermal behaviour.
 """
 get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
-@register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
 """
     A callback function used to update the chemical potential with temperature. Is used when 
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
@@ -80,4 +79,3 @@ function get_internalenergy(μ::Real,Dis::Spline1D,DOS::Spline1D)
     sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
     return sol
 end
-@register_symbolic get_internalenergy(μ::Num,Dis::Spline1D,DOS::Spline1D)

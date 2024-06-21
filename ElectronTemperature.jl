@@ -23,7 +23,7 @@ end
 function t_elec_template(;name)
     @variables Tel(t) Source(t) ElecPhon(t) HeatCapacity(t) Spatial(t)
 
-    eqs = D(Tel) ~ (Source .+ Spatial .+ ElecPhon)./HeatCapacity
+    eqs = Tel ~ (Source .+ Spatial .+ ElecPhon)./HeatCapacity
 
     ODESystem(eqs,t;name)
 end

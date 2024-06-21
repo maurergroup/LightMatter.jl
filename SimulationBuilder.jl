@@ -22,7 +22,7 @@ end
 
 function equation_builder(sim,mp,laser)
     @named Phonon_temp=t_phonon_factory(mp,sim)
-    @named Electron_temp = t_electron_factory(mp,sim,laser)
+    @named Electron_temp = t_electron_factory(mp,sim)
     no_part = get_thermalparticles(0.0,1e-16,mp.DOS,8.617e-5)
     connections=[Electron_temp.Tph ~ Phonon_temp.Tph,
                 Electron_temp.Tel ~ Phonon_temp.Tel]
