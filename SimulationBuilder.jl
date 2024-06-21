@@ -66,4 +66,4 @@ function main()
     plot(p1,p2,layout=[2,1],plot_title="Rectangular Laser Results")
 end
 
-main()
+#main()

@@ -10,7 +10,7 @@ function t_phonon_factory(mp::MaterialParameters,sim::SimulationSettings;name)
     @named dTph = t_phonon_template()
     connections=[dTph.Source ~ t_phonon_sourceterm(sim),
                  dTph.HeatCapacity ~ t_phonon_heatcapacity(mp,sim),
-                 dTph.ElecPhon ~ :(-1*t_electron_phononcoupling(mp,sim)),
+                 dTph.ElecPhon ~ -t_electron_phononcoupling(mp,sim),
                  dTph.Tph ~ Tph]
     compose(ODESystem(connections,t;name),dTph)
 end
