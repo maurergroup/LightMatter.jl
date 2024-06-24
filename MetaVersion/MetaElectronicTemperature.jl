@@ -1,19 +1,16 @@
-function electrontemperature_factory(mp::MaterialParameters,cons::Constants,sim::SimulationSettings,laser::Expr,dim::Dimension)
-    HeatCapacity = electrontemperature_heatcapacity(mp,cons,sim)
-    ElecPhon = electronphonon_coupling(mp,cons,sim)
+function electrontemperature_factory(sim::SimulationSettings,laser::Expr,dim::Dimension)
+    HeatCapacity = electrontemperature_heatcapacity(sim)
+    ElecPhon = electronphonon_coupling(sim)
     Source = electrontemperature_source(sim,laser)
     Spatial = electrontemperature_conductivity(dim::Dimension)
     return build_electrontemperature(Source,Spatial,ElecPhon,HeatCapacity)
 end
 
 function build_electrontemperature(Source,Spatial,ElecPhon,HeatCapacity)
-    arg1=(Source,Spatial,ElecPhon)
-    numer = :(+($(arg1...)))
-    arg2=(numer,HeatCapacity)
-    return :(/($(arg2...)))
+    return Expr(:call,:/,Expr(:call,:+,Source,Spatial,ElecPhon),HeatCapacity)
 end
 
-function electrontemperature_heatcapacity(mp::MaterialParameters,cons::Constants,sim::SimulationSettings)
+function electrontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
         return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ,mp.DOS))
     else
@@ -34,7 +31,7 @@ function electronheatcapacity_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
     return dFDdT(p[1],p[2],p[3],u)*p[4](u)*u
 end
 
-function electronphonon_coupling(mp,cons,sim)
+function electronphonon_coupling(sim)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
             return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS,Tel,μ,Tph))
@@ -64,7 +61,7 @@ end
 function electrontemperature_source(sim::SimulationSettings,laser::Expr)
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronElectron == true
-            return :(electronelectronscattering())
+            return neqelectron_electrontransfer()
         else
             return 0.0
         end
@@ -77,6 +74,6 @@ function electrontemperature_conductivity(dim::Dimension)
     if typeof(dim) == Homogenous
         return 0.0
     else 
-        return :(electronicthermalconudctivity())
+        return :(electronicthermalconductivity())
     end
 end

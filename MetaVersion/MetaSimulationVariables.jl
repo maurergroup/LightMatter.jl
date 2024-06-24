@@ -74,8 +74,14 @@ end
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergy(μ::Real,Dis::Spline1D,DOS::Spline1D)
+function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
+    sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
+    return sol
+end
+
+function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    int(u,p) = FermiDirac(Tel,μ,kB,u) * DOS(u) * u
     sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
     return sol
 end

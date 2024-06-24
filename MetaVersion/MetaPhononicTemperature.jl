@@ -1,18 +1,15 @@
-function phonontemperature_factory(mp::MaterialParameters,cons::Constants,sim::SimulationSettings)
-    HeatCapacity = phonontemperature_heatcapacity(mp,cons,sim)
-    ElecPhon = Expr(:call,:*,-1,electronphonon_coupling(mp,cons,sim))
+function phonontemperature_factory(sim::SimulationSettings)
+    HeatCapacity = phonontemperature_heatcapacity(sim)
+    ElecPhon = Expr(:call,:*,-1,electronphonon_coupling(sim))
     Source = phonontemperature_source(sim)
     return build_phonontemperature(Source,ElecPhon,HeatCapacity)
 end
 
 function build_phonontemperature(Source,ElecPhon,HeatCapacity)
-    arg1=(Source,ElecPhon)
-    numer = :(+($(arg1...)))
-    arg2=(numer,HeatCapacity)
-    return :(/($(arg2...)))
+    return Expr(:call,:/,Expr(:call,:+,Source,ElecPhon),HeatCapacity)
 end
 
-function phonontemperature_heatcapacity(mp::MaterialParameters,cons::Constants,sim::SimulationSettings)
+function phonontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.PhononHeatCapacity == true
         return :(nonlinear_phononheatcapacity(Tph,mp.n,cons.kB,mp.θ))
     else
