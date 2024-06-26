@@ -1,4 +1,4 @@
-using StaticArrays,Dierckx,ForwardDiff,DelimitedFiles,Integrals,OrdinaryDiffEq,Plots,NonlinearSolve
+using StaticArrays,Dierckx,ForwardDiff,DelimitedFiles,Integrals,OrdinaryDiffEq,Plots,Roots,Cubature,RecursiveArrayTools,NonlinearSolve
 
 include("MetaSimulationSetup.jl")
 include("MetaLasers.jl")
@@ -19,28 +19,42 @@ function setup()
     return sim,mp,las,laser,cons,dim
 end
 
-#= function simulation(du,u,p,t)
-    du[1] = Tel_eq(u[1],u[2],0.0,p[1],p[2],p[3],t)
-    du[2] = Tph_eq(u[1],u[2],0.0,p[2],p[3],t)
-end =#
+function simulation(du,u,p,t)
+    println(t)
+    du.x[1][1] = Tel_eq(u.x[1][1],u.x[2][1],t,p[1],p[2],p[3],p[4],u.x[3])
+    du.x[2][1] = Tph_eq(u.x[1][1],u.x[2][1],t,p[1],p[3],p[4])
+    du.x[3][:] = neq_eq(u.x[3],u.x[1][1],u.x[2][1],t,p[1],p[5],p[2],p[3],p[4])
+end
+
+function condition(u,t,integrator)
+    true
+end
+
+function update_chempot!(integrator)
+    integrator.p[1] = find_chemicalpotential(integrator.p[5],integrator.u.x[1][1],integrator.p[1],integrator.p[3].DOS,integrator.p[4].kB)
+end
 
 function run_dynamics(p)
-    u0 = zeros(length(mp.egrid))
-    simulation(u,p,t) = neq_eq(u,300.0,300.0,0.0,mp,cons,las,t,noe)
+    u0 = ArrayPartition([300.0],[300.0],zeros(length(mp.egrid)))
     prob=ODEProblem(simulation,u0,(-200,200),p)
-    sol = solve(prob,Tsit5();abstol=1e-5,reltol=1e-5,saveat=1.0)
+    if sim.ParameterApprox.ChemicalPotential == true
+        chempot = DiscreteCallback(condition,update_chempot!)
+        sol = solve(prob,Tsit5();callback=chempot,abstol=1e-3,reltol=1e-3,saveat=1.0)
+    elseif sim.ParameterApprox.ChemicalPotential == false
+        sol = solve(prob,Tsit5();abstol=1e-3,reltol=1e-3,saveat=1.0)
+    end
     return sol
 end
 
 
 sim,mp,las,laser,cons,dim = setup()
-#= Tel_expr = electrontemperature_factory(sim,laser,dim)
+Tel_expr = electrontemperature_factory(sim,laser,dim)
 Tph_expr = phonontemperature_factory(sim)
-Tel_eq = eval(:((Tel,Tph,μ,las,mp,cons,t) -> $Tel_expr))
-Tph_eq = eval(:((Tel,Tph,μ,mp,cons,t) -> $Tph_expr)) =#
+Tel_eq = eval(:((Tel,Tph,t,μ,las,mp,cons,fneq) -> $Tel_expr))
+Tph_eq = eval(:((Tel,Tph,t,μ,mp,cons) -> $Tph_expr))
 noe = get_thermalparticles(0.0,1e-16,mp.DOS,cons.kB)
 neq_expr = athemdistribution_factory(sim,laser)
-neq_eq = eval(:((fneq,Tel,Tph,μ,mp,cons,las,t,no_part) -> $neq_expr))
-p=(las,mp,cons,noe)
+neq_eq = eval(:((fneq,Tel,Tph,t,μ,no_part,las,mp,cons) -> $neq_expr))
+p=[0.0,las,mp,cons,noe]
 sol = run_dynamics(p)
 

@@ -79,7 +79,6 @@ end
     γ::Real #Specific electronic heat capacity
     θ::Real #Debye temperature
     n::Real #Number of atoms per volume
-    ω::Real #Plasma frequency
     κ::Real #Room temperature thermal conductivity
     ne::Real #Number of electrons per atom
     effmass::Real #Effective mass of conduction electrons
@@ -88,7 +87,8 @@ end
     g::Real # Linear electron-phonon coupling constant
     Ballistic::Real # Ballistic length of electrons
     Cph::Real #Constant heat capacity for phonons
-    egrid::Vector{Float64}
+    egrid::Vector{Float64} # Energy grid to solve neq electrons on
+    τ::Real #Scalar value for the Fermi Liquid Theory relaxation time
 end
 """
     Generates the simulation_settings struct with user inputs and defaults or user settings and a dictionary generated from an input
@@ -220,9 +220,10 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
+    tau = 128/(sqrt(3)*pi^2*plasma)
 
-    matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,ω=plasma,κ=thermalcond,ne=elecperatom,
-    effmass=eleceffmass,DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=collect(range(-3*las.hv,3*las.hv,step=0.05)))
+    matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=collect(range(-3*las.hv,3*las.hv,step=0.05)),τ = tau)
 
     return matpat
 end

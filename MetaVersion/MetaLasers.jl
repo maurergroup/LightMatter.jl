@@ -17,7 +17,7 @@ end
     R::Real
     Transport::String
 end
-@kwdef struct Secant <: Laser
+@kwdef struct HyperbolicSecant <: Laser
     FWHM::Real
     Power::Real
     hv::Real
@@ -43,15 +43,15 @@ function define_laser_system(Laser::Symbol;fwhm::Real,fluence::Real,
     elseif Laser == :Lorentzian
         return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R,Transport=transport)
-    elseif Laser == :Secant
-        return Secant(FWHM=fwhm,Power=fluence,hv=photon_en,
+    elseif Laser == :HyperbolicSecant
+        return HyperbolicSecant(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R,Transport=transport)
     elseif Laser == :Rectangular
         return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R,Transport=transport)
     else
         print("The laser type you chose is currently not implemented, the current options
-        are Gaussian, Lorentzian, Secant and Rectangular")
+        are Gaussian, Lorentzian, HyperbolicSecant and Rectangular")
     end
 end
 
@@ -64,15 +64,15 @@ function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
     elseif Laser == "Lorentzian"
         return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R)
-    elseif Laser == "Secant"
-        return Secant(FWHM=fwhm,Power=fluence,hv=photon_en,
+    elseif Laser == "HyperbolicSecant"
+        return HyperbolicSecant(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R)
     elseif Laser == "Rectangular"
         return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R)
     else
         print("The laser type you chose is currently implemented, the current options
-        are Gaussian, Lorentzian, Secant and Rectangular")
+        are Gaussian, Lorentzian, HyperbolicSecant and Rectangular")
     end
 end
 """
@@ -100,9 +100,9 @@ function (::Gaussian)()
     return :(sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*t^2/las.FWHM^2))
 end
 """
-    Normalised Hyperbolic Secant temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
+    Normalised Hyperbolic HyperbolicSecant temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
 """
-function (::Secant)()
+function (::HyperbolicSecant)()
    return :(log(1+sqrt(2))/las.FWHM * sech(2*log(1+sqrt(2))*(t/las.FWHM))^2)
 end
 """

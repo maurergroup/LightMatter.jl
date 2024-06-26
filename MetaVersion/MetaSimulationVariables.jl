@@ -36,31 +36,20 @@ end
     electronic temperature.
 """
 function find_chemicalpotential(no_part::Real,Tel::Real,μ::Real,DOS::Spline1D,kB::Real)
-    f(u,p) = no_part - get_thermalparticles(u,Tel,DOS,kB)
-    return solve(NonlinearProblem(f,μ),SimpleKlement();abstol=1e-3,reltol=1e-3).u
-end
-"""
-    Finds the number of particles within a thermal system using the DOS and current temperature.
-    This is solved to initially find no_part using T=1e-16 (as 0.0 leads to a discontinuity)
-    and during finding the chemical potential. 
-"""
-function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
-    p=(μ,Tel,kB,DOS)
-    int(u,p) = get_thermalparticles_int(u,p)
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),HCubatureJL(initdiv=10);abstol=1e-3,reltol=1e-3).u
+    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB)
+    return solve(ZeroProblem(f,μ),Order16();atol=1e-2,rtol=1e-2)
 end
 
-function get_thermalparticles(μ::ForwardDiff.Dual,Tel::Real,DOS::Spline1D,kB::Real)
+function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p=(μ,Tel,kB,DOS)
-    int(u,p) = get_thermalparticles_int(u,p)
-    return solve(IntegralProblem(int,(ForwardDiff.value(μ)-10,ForwardDiff.value(μ)+10),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
+    int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
+    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();abstol=1e-3,reltol=1e-3).u
 end
-"""
-    The integrand for finding the number of thermal particles. Using a parameter tuple with 
-    components p=(μ,Tel,kB,DOS)
-"""
-function get_thermalparticles_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
-    return FermiDirac(u,p[1],p[2],p[3])*p[4](u)
+
+function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i])
+    end
 end
 """
     Determines the number of particles in any system using an interpolation of the system and
@@ -76,12 +65,17 @@ end
 """
 function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
-    sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
-    return sol
+    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-6,abstol=1e-6).u
 end
 
 function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
-    int(u,p) = FermiDirac(Tel,μ,kB,u) * DOS(u) * u
-    sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
-    return sol
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(internalenergy_int,zeros(0))
+    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-6,abstol=1e-6).u
+end
+
+function internalenergy_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i]) *u[i]
+    end
 end

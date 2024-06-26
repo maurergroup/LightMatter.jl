@@ -31,7 +31,7 @@ end
 function phonontemperature_source(sim::SimulationSettings)
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronPhonon == true
-            return :(electronphononscattering())
+            return neqelectron_phonontransfer()
         else
             return 0.0
         end
