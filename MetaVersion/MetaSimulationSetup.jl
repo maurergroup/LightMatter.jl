@@ -83,6 +83,7 @@ end
     ne::Real #Number of electrons per atom
     effmass::Real #Effective mass of conduction electrons
     DOS::Spline1D #File location of the DOS data
+    DOS_nil::Spline1D
     λ::Real #Second momentum of spectral function
     g::Real # Linear electron-phonon coupling constant
     Ballistic::Real # Ballistic length of electrons
@@ -219,11 +220,14 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     ,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0)
     
     fermien=get_FermiEnergy(dos)
-    DOS = generate_DOS(dos,noatoms)
-    tau = 128/(sqrt(3)*pi^2*plasma)
+    DOS = generate_DOS(dos,noatoms,fermien)
+    DOSnil = generate_DOSnil(dos,noatoms)
+    tau = 0.546#128/(sqrt(3)*pi^2*plasma)
+    erange = collect(range(-4*las.hv.+fermien,4*las.hv.+fermien,step=0.05))
 
     matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=collect(range(-3*las.hv,3*las.hv,step=0.05)),τ = tau)
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,
+    DOS_nil = DOSnil)
 
     return matpat
 end

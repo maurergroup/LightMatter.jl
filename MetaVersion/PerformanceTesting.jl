@@ -70,5 +70,3 @@ function main()
     println(Tel," ",μ)
     @btime find_relaxeddistribution($goal,$no_part,$DOS,8.617e-5) =#
 end
-
-main()

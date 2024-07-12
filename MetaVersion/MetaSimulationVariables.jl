@@ -12,7 +12,12 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,n)
+function generate_DOS(File::String,n,FE)
+    TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
+    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2].*n)
+end
+
+function generate_DOSnil(File::String,n)
     TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
@@ -22,7 +27,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
+get_interpolate(xvals::Vector{<:Any},yvals::Vector{<:Any}) = Spline1D(xvals,yvals,bc="nearest")
 """
     A callback function used to update the chemical potential with temperature. Is used when 
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
@@ -37,18 +42,18 @@ end
 """
 function find_chemicalpotential(no_part::Real,Tel::Real,μ::Real,DOS::Spline1D,kB::Real)
     f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB)
-    return solve(ZeroProblem(f,μ),Order16();atol=1e-2,rtol=1e-2)
+    return solve(ZeroProblem(f,μ),Order1();atol=1e-3,rtol=1e-3)
 end
 
 function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p=(μ,Tel,kB,DOS)
     int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();abstol=1e-3,reltol=1e-3).u
+    return solve(IntegralProblem(int,(-Inf,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
 end
 
 function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
     Threads.@threads for i in 1:length(u)
-        @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i])
+        y[i] = FermiDirac(p[2],p[1],p[3],u[i])*p[4](u[i])
     end
 end
 """
@@ -57,7 +62,7 @@ end
 """
 function get_noparticles(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
+    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=100);reltol=1e-5,abstol=1e-5).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
@@ -65,13 +70,13 @@ end
 """
 function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-6,abstol=1e-6).u
+    return solve(IntegralProblem(int,(μ-10,μ+10)),CubatureJLh();reltol=1e-5,abstol=1e-5).u
 end
 
 function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p = (μ,Tel,kB,DOS)
     int = BatchIntegralFunction(internalenergy_int,zeros(0))
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-6,abstol=1e-6).u
+    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
 end
 
 function internalenergy_int(y,u,p)

@@ -12,7 +12,7 @@ end
 
 function electrontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
-        return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ,mp.DOS))
+        return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ-mp.FE,mp.DOS_nil))
     else
         return :(mp.γ*Tel)
     end
@@ -21,7 +21,7 @@ end
 function nonlinear_electronheatcapacity(kB::Real,Tel::Real,μ::Real,DOS::Spline1D)
     p=(kB,Tel,μ,DOS)
     int(u,p) = electronheatcapacity_int(u,p)
-    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=50);reltol=1e-3,abstol=1e-3).u
 end
 """
     The integrand for the non-linear electronic heat capacity using a parameter tuple 
@@ -34,7 +34,7 @@ end
 function electronphonon_coupling(sim)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
-            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS,Tel,μ,Tph))
+            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS_nil,Tel,μ-mp.FE,Tph))
         else
             return :(-mp.g*(Tel-Tph))
         end

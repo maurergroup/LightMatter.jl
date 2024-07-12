@@ -2,7 +2,7 @@
 
 julia_version = "1.10.3"
 manifest_format = "2.0"
-project_hash = "541563027b685c1ed8c37d0ab717cf6f1cdba547"
+project_hash = "1daf2f02c1422dc9a6246f439fc63dc24b96ffc2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fa0822e5baee6e23081c2685ae27265dabee23d8"
@@ -1828,6 +1828,12 @@ version = "1.0.3"
 git-tree-sha1 = "874e8867b33a00e784c8a7e4b60afe9e037b74e1"
 uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
 version = "1.1.0"
+
+[[deps.SimpleDiffEq]]
+deps = ["DiffEqBase", "LinearAlgebra", "MuladdMacro", "Parameters", "RecursiveArrayTools", "Reexport", "StaticArrays"]
+git-tree-sha1 = "afd610e15259e1c42e6b578d306a1c0cdf386533"
+uuid = "05bca326-078c-5bf0-a5bf-ce7c7982d7fd"
+version = "1.11.1"
 
 [[deps.SimpleNonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "DiffEqBase", "DiffResults", "DifferentiationInterface", "FastClosures", "FiniteDiff", "ForwardDiff", "LinearAlgebra", "MaybeInplace", "PrecompileTools", "Reexport", "SciMLBase", "Setfield", "StaticArraysCore"]
