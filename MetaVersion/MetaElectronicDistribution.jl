@@ -38,7 +38,7 @@ function athem_particleconservation(DOS::Spline1D,Δfneqe,Δfneqh,egrid::Vector{
     elDis = get_interpolate(egrid,Δfneqe)
     hDis = get_interpolate(egrid,Δfneqh)
     f(u,p) = get_noparticles(μ,hDis,DOS) - u*get_noparticles(μ,elDis,DOS)
-    return solve(NonlinearProblem(f,1.0),SimpleKlement();abstol=1e-3,reltol=1e-3).u
+    return solve(NonlinearProblem(f,1.0),Klement();abstol=1e-3,reltol=1e-3).u
 end
 
 function athem_excitation_internalenergy(Δfneqtot::Vector{Float64},DOS::Spline1D,egrid::Vector{Float64},μ::Real)

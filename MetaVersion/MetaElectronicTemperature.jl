@@ -34,7 +34,7 @@ end
 function electronphonon_coupling(sim)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
-            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS_nil,Tel,μ-mp.FE,Tph))
+            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS_nil,Tel,μ-mp.FE,Tph,0.0))
         else
             return :(-mp.g*(Tel-Tph))
         end
@@ -43,8 +43,8 @@ function electronphonon_coupling(sim)
     end
 end
 
-function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::Spline1D,Tel::Real,μ::Real,Tph::Real)
-    prefac=pi*kB*λ/DOS(μ)/hbar
+function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::Spline1D,Tel::Real,μ::Real,Tph::Real,FE::Real)
+    prefac=pi*kB*λ/DOS(FE)/hbar
     p=(kB,Tel,μ,DOS)
     int(u,p) = electronphononcoupling_int(u,p)
     g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
