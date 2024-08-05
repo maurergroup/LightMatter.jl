@@ -75,7 +75,8 @@ end
 """
 @kwdef struct MaterialParameters <: Simulation #Holds all material parameters
     ϵ::Real #Extinction coefficient
-    FE::Real #Fermi energy
+    μ::Real # centred at 0.0
+    FE::Real # centred at the difference between top and bottom of valence bands for FLT relaxation
     γ::Real #Specific electronic heat capacity
     θ::Real #Debye temperature
     n::Real #Number of atoms per volume
@@ -230,8 +231,8 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     tau = 0.546#128/(sqrt(3)*pi^2*plasma)
     erange = collect(range(-2*las.hv,2*las.hv,step=0.01))
 
-    matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau)
+    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien)
 
     return matpat
 end

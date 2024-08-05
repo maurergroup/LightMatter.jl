@@ -36,7 +36,6 @@ function t_electron_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
         @parameters kB μ
         @variables  Tel(t)
-        println(typeof(μ))
         return nonlinear_electronheatcapacity(kB,Tel,μ,mp.DOS)
     else
         @parameters γ 

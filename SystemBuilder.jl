@@ -1,26 +1,14 @@
 
-function build_system(sim,mp,laser,las,con,initaltemps=Dict("Nil"=>0.0)::Dict)
+function build_system(sim,mp,laser,las,cons,initialtemps=Dict("Nil"=>0.0)::Dict)
     sys = get_systems(mp,sim,laser)
     connections = generate_variableconnections(sys)
-    defaults = generate_parameterconnections(sys)
+    default_params = generate_parameterconnections(sys)
     u0 = generate_initalconditions(sys,initialtemps)
-    p = generate_parametervalues(sys,mp,las,cons,sim)
-    return connected_sys,u0
-end
-
-function equation_builder(sim,mp,laser)
-    @named Phonon_temp=t_phonon_factory(mp,sim)
-    @named Electron_temp = t_electron_factory(mp,sim)
-    no_part = get_thermalparticles(0.0,1e-16,mp.DOS,8.617e-5)
-    connections=[Electron_temp.Tph ~ Phonon_temp.Tph,
-                Electron_temp.Tel ~ Phonon_temp.Tel]
-    chempot = (t>=0.0) => (update_chempot!,[Electron_temp.dTel.Tel=>:Tel],
-    [Electron_temp.μ=>:μ,Electron_temp.kB=>:kB],[Electron_temp.μ],(mp.DOS,no_part))
-    connected = compose(ODESystem(connections,t,name=:connected,defaults=Pair{Num,Any}[Phonon_temp.kB => Electron_temp.kB
-    ,Phonon_temp.λ=>Electron_temp.λ,Phonon_temp.hbar=>Electron_temp.hbar,Phonon_temp.μ=>Electron_temp.μ],discrete_events=chempot)
-    ,Electron_temp,Phonon_temp)
-    connected_simp=structural_simplify(connected)
-    return connected_simp,Electron_temp,Phonon_temp
+    p = generate_parametervalues(sys,mp,las,cons)
+    events = generate_callbacks(sim,sys,mp,cons)
+    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys[1],sys[2])
+    connected_sys = structural_simplify(connected)
+    return connected_sys,sys,u0,p
 end
 
 function get_systems(mp,sim,laser)
@@ -34,7 +22,6 @@ function get_systems(mp,sim,laser)
         push!(sys,Phonon_temp)
     end
     if sim.Systems.NonEqElectrons == true
-
     end
     return sys
 end 
@@ -65,7 +52,7 @@ function generate_parameterconnections(sys)
                 for y in 1:length(parameters(sys[j]))
                     if Symbol(parameters(sys[i])[x])==Symbol(parameters(sys[j])[y])
                         sym = Symbol(parameters(sys[i])[x])
-                        push!(defaults,getproperty(sys[i],sym) => getproperty(sys[j],sym))
+                        push!(defaults,getproperty(sys[j],sym) => getproperty(sys[i],sym))
                     end
                 end
             end
@@ -87,30 +74,45 @@ function generate_initalconditions(sys,initialtemps)
     return u0
 end
 
-function generate_parametervalues(sys,mp,las,cons,sim)
+function generate_parametervalues(sys,mp,las,cons)
+    params = Vector{Symbol}(undef,0)
     p=Vector{Pair{Num,Any}}(undef,0)
     for i in eachindex(sys)
         for x in parameters(sys[i])
-            if !isassigned(first.p,x)
-                
+            sym=Symbol(x)
+            if sym ∉ params
+                push!(params,sym)
+                if sym in fieldnames(typeof(mp))
+                    push!(p,getproperty(sys[i],sym)=>getproperty(mp,sym))
+                elseif sym in fieldnames(typeof(cons))
+                    push!(p,getproperty(sys[i],sym)=>getproperty(cons,sym))
+                elseif sym in fieldnames(typeof(las))
+                    push!(p,getproperty(sys[i],sym)=>getproperty(las,sym))
+                end
+            end
+        end
+    end
     return p
 end
 
-function run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
-    u0=[Tel_eq.Tel=>300.0,
-        Tph_eq.Tph=>300.0]
-    p=[Tel_eq.kB => 8.617e-5,
-    Tel_eq.μ => 0.0,
-    Tel_eq.λ => mp.λ,
-    Tel_eq.hbar => 0.6582,
-    Tel_eq.FWHM => las.FWHM,
-    Tel_eq.ϵ => mp.ϵ,
-    Tel_eq.ϕ => las.Power,
-    Tel_eq.R => las.Reflectivity,
-    Tph_eq.n => mp.n,
-    Tph_eq.θ => mp.θ]
+function generate_callbacks(sim,sys,mp,cons)
+    events=[]
+    if sim.ParameterApprox.ChemicalPotential == true
+        if sim.Systems.NonEqElectrons==false
+            for eq in sys
+                if nameof(eq)==:Electron_temp
+                    no_part=get_thermalparticles(mp.μ,1e-18,mp.DOS,cons.kB)
+                    chempot = (t>=0.0) => (update_chempot!,[eq.dTel.Tel=>:Tel],
+                    [eq.μ=>:μ,eq.kB=>:kB],[eq.μ],(mp.DOS,no_part))
+                    push!(events,chempot)
+                end
+            end
+        end
+    end
+    return events
+end
 
-    tspan=(-250.0,250.0)
+function run_dynamics(connected_eq,u0,tspan,p)
     prob=ODEProblem(connected_eq,u0,tspan,p)
     sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
     return sol

@@ -9,6 +9,7 @@ include("Lasers.jl")
 include("ElectronTemperature.jl")
 include("PhononTemperature.jl")
 include("ElectronDistribution.jl")
+include("SystemBuilder.jl")
 
 
 function setup()
@@ -22,23 +23,15 @@ function setup()
     return sim,mp,las,laser,dim,cons
 end
 
-function run_dynamics(connected_eq,u0,tspan)
-
-    prob=ODEProblem(connected_eq,u0,tspan,p)
-    sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
+function main()
+    sim,mp,las,laser,dim,cons=setup()
+    #= tspan=(-250.0,250.0)
+     initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
+    connected_sys,sys,u0,p=build_system(sim,mp,laser,las,cons,initialtemps)
+    equations(connected_sys)
+    sol=run_dynamics(connected_sys,u0,tspan,p)
+    return sol,sys =#
+    connected_eq,Tel_eq,Tph_eq = equation_builder(sim,mp,laser)
+    sol = run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
     return sol
 end
-
-function main()
-    sim,mp,las,laser,dim=setup()
-    connected_eq,Tel_eq,Tph_eq=equation_builder(sim,mp,laser)
-    sol=run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
-    p1=plot(sol,title="Temperature Profile",ylabel="Temperature / K",label=["Tel" "Tph"]
-    ,linewidth=3,titlefont=12)
-    p2=plot(sol,idxs=[Tel_eq.dTel.Source],title="Laser Profile",ylabel="Power",
-    xlabel="Time / fs",label="Rectangular",linewidth=3,titlefont=12)
-    plot(p1,p2,layout=[2,1],plot_title="Rectangular Laser Results")
-end
-
-#main()
-sim,mp,las,laser,dim,cons=setup()
