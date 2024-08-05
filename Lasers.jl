@@ -6,30 +6,30 @@
 abstract type Laser <: Simulation end
 @kwdef struct Gaussian <: Laser
     FWHM::Real
-    Power::Real
+    ϕ::Real
     hv::Real
-    Reflectivity::Real
+    R::Real
     Transport::String
 end
 @kwdef struct Rectangular <: Laser  
     FWHM::Real
-    Power::Real
+    ϕ::Real
     hv::Real
-    Reflectivity::Real
+    R::Real
     Transport::String
 end
 @kwdef struct Secant <: Laser
     FWHM::Real
-    Power::Real
+    ϕ::Real
     hv::Real
-    Reflectivity::Real
+    R::Real
     Transport::String
 end
 @kwdef struct Lorentzian <: Laser
     FWHM::Real
-    Power::Real
+    ϕ::Real
     hv::Real
-    Reflectivity::Real
+    R::Real
     Transport::String
 end
 """
@@ -39,17 +39,17 @@ end
 function define_laser_system(Laser::Symbol;fwhm::Real,fluence::Real,
     photon_en::Real,reflectivity=0.0::Real,transport="Optical"::String)
     if Laser == :Gaussian
-        return Gaussian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity,Transport=transport)
+        return Gaussian(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity,Transport=transport)
     elseif Laser == :Lorentzian
-        return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity,Transport=transport)
+        return Lorentzian(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity,Transport=transport)
     elseif Laser == :Secant
-        return Secant(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity,Transport=transport)
+        return Secant(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity,Transport=transport)
     elseif Laser == :Rectangular
-        return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity,Transport=transport)
+        return Rectangular(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity,Transport=transport)
     else
         print("The laser type you chose is currently not implemented, the current options
         are Gaussian, Lorentzian, Secant and Rectangular")
@@ -60,17 +60,17 @@ function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
     fluence=dict.Fluence::Real,photon_en=Dict.hv::Real,reflectivity=dict.Reflectivity::Real)
 
     if Laser == "Gaussian"
-        return Gaussian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        return Gaussian(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity)
     elseif Laser == "Lorentzian"
-        return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        return Lorentzian(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity)
     elseif Laser == "Secant"
-        return Secant(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        return Secant(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity)
     elseif Laser == "Rectangular"
-        return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
-        Reflectivity=reflectivity)
+        return Rectangular(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        R=reflectivity)
     else
         print("The laser type you chose is currently implemented, the current options
         are Gaussian, Lorentzian, Secant and Rectangular")

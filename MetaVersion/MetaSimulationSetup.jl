@@ -223,7 +223,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     DOS = generate_DOS(dos,noatoms,fermien)
     DOSnil = generate_DOSnil(dos,noatoms)
     tau = 0.546#128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-4*las.hv.+fermien,4*las.hv.+fermien,step=0.05))
+    erange = collect(range(-2*las.hv.+fermien,2*las.hv.+fermien,step=0.01))
 
     matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,

@@ -1,0 +1,44 @@
+ #Version of the simulation
+Type=E2TM #E2TM or 2TM depending on which you want
+Dims=0 #Dimensionality of the material, 0D or 1D
+
+#Settings for linear/non-linear variables
+#L = linear and NL = non-linear
+Cel=L #Electronic Heat Capacity
+Gep=L #Electron-phonon coupling
+EF=NL #Chemical potential/Fermi Energy
+
+#Values for system variables
+AbsLen=1.27e-8 #Extinction coefficent in m
+FE=5.53#Reference fermi energy for your density of states in eV
+gamma=71.0 #Specific heat capacity of electrons in J m^-3 K^-2 (Linear Cel)
+DebyeT=165.0 #Debye temperature of the material in K
+Tel=300.0 #Initial temperature for the electrons in K
+Tph=300.0 #Initial temperature for the phonons in K
+AtomDens=5.9e28 # Atomic Denisty of the material in m^-3
+Freeelec=1 #Number of free electrons per atom
+Effmass=1.1 #Effective mass of electrons in electron mass units
+g=2.3e16 #Electron-phonon coupling constant in W m^-3 K^-1 (Linear Gep)
+Plasma=9.03 #Plasma Frequency of the metal in hbar*omega
+#1D Settings
+RTKappa=320.0 #W^-1 m^-1 K^-1 Thermal conductivity at 300K of your material
+Length=400.0E-9 #Length of sample in m
+dz=1E-9 #Step size of sample in m
+
+#Laser Parameters
+Shape=Gaus #Shape of the laser pulse
+FWHM=50.0e-15 #FWHM of the laser pulse in s
+PhotEn=3.1 #Photon energy of the laser pulse in eV
+Fluence=10.0 #Fluence of the laser pulse in J m^-2 
+Abs=y #Whether the Fluence is absorbed or not (y/n)
+R=0.99 #Reflectivity of the sample
+
+#Simulation Settings
+SimEnd=0.5e-12 #Time span of the simulation in s
+LaserOff=0.3E-12 #Offset of the laser pulse in s (recommend no less than FWHM)
+
+#File Locations
+DOS=DOS/Au_DOS.dat #File name and location of the Density of states file
+Output=AuTest.jdl2# Name and location of the output file
+LongOutput=Carpene_Au.csv
+

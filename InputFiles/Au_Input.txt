@@ -39,6 +39,6 @@ LaserOff:0.3E-12:s #Offset of the laser pulse in s (recommend no less than FWHM)
 
 #File Locations
 DOS:DOS/Au_DOS.dat #File name and location of the Density of states file
-Output:../Gold/SurfaceTest.csv # Name and location of the output file
+Output:./AuAthEM.jld2 # Name and location of the output file
 LongOutput:Carpene_Au.csv
 

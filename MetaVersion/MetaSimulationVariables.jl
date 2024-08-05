@@ -48,7 +48,7 @@ end
 function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p=(μ,Tel,kB,DOS)
     int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
-    return solve(IntegralProblem(int,(-Inf,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
+    return solve(IntegralProblem(int,(0.0,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
 end
 
 function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
@@ -62,7 +62,7 @@ end
 """
 function get_noparticles(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=100);reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(0.0,μ+10)),HCubatureJL(initdiv=100);reltol=1e-5,abstol=1e-5).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
@@ -70,13 +70,13 @@ end
 """
 function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
-    return solve(IntegralProblem(int,(μ-10,μ+10)),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(0.0,μ+10)),CubatureJLh();reltol=1e-5,abstol=1e-5).u
 end
 
 function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p = (μ,Tel,kB,DOS)
     int = BatchIntegralFunction(internalenergy_int,zeros(0))
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(0.0,μ+10),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
 end
 
 function internalenergy_int(y,u,p)

@@ -2,7 +2,7 @@
     This the base factory function that constructs the electronic temperature ODE. All variables and
     functionality for the electronic temperature ODE should be set up within this function call.
 """
-function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser::Num=Num(0.0),;name)
+function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser::Num;name)
     @variables Tel(t)
     @named dTel = t_elec_template()
     connections =[dTel.HeatCapacity ~ t_electron_heatcapacity(mp,sim),
@@ -36,7 +36,7 @@ function t_electron_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
         @parameters kB μ
         @variables  Tel(t)
-
+        println(typeof(μ))
         return nonlinear_electronheatcapacity(kB,Tel,μ,mp.DOS)
     else
         @parameters γ 
@@ -50,7 +50,7 @@ end
     The integrand limits are temperature dependent to account for errors due to discontinuties at high
     energy values. To-Do: Check limits work for many materials.
 """
-function nonlinear_electronheatcapacity(kB::Real,Tel::Real,μ::Real,DOS::Spline1D)
+function nonlinear_electronheatcapacity(kB,Tel,μ,DOS::Spline1D)
     p=(kB,Tel,μ,DOS)
     int(u,p) = electronheatcapacity_int(u,p)
     return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u

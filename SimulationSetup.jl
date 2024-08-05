@@ -2,6 +2,7 @@
     Type that all abstract types will derive from
 """
 abstract type Simulation end #Overarching type that holds all simulation settings
+abstract type Laser <: Simulation end # Holds all Lasers
 """
     Booleans for interactions between different ODE systems are held within this struct.
     They are used as flags to determine whether couplings should evaluate to a function
@@ -78,15 +79,23 @@ end
     γ::Real #Specific electronic heat capacity
     θ::Real #Debye temperature
     n::Real #Number of atoms per volume
-    ω::Real #Plasma frequency
     κ::Real #Room temperature thermal conductivity
     ne::Real #Number of electrons per atom
     effmass::Real #Effective mass of conduction electrons
-    DOS::Spline1D #File location of the DOS data
+    DOS::Spline1D #The DOS
     λ::Real #Second momentum of spectral function
     g::Real # Linear electron-phonon coupling constant
     Ballistic::Real # Ballistic length of electrons
     Cph::Real #Constant heat capacity for phonons
+    egrid::Vector{Float64} # Energy grid to solve neq electrons on
+    τ::Real #Scalar value for the Fermi Liquid Theory relaxation time
+end
+"""
+    Struct that holds constants
+"""
+struct Constants
+    kB::Real
+    hbar::Real
 end
 """
     Generates the simulation_settings struct with user inputs and defaults or user settings and a dictionary generated from an input
@@ -213,14 +222,16 @@ end
     Builds the material parameter struct with user parameters or user settings and a dictionary generated from an input
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
-function define_material_parameters(;extcof=0.0,gamma=0.0,debye=0.0,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0
+function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0
     ,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0)
     
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
+    tau = 0.546#128/(sqrt(3)*pi^2*plasma)
+    erange = collect(range(-2*las.hv,2*las.hv,step=0.01))
 
-    matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,ω=plasma,κ=thermalcond,ne=elecperatom,
-    effmass=eleceffmass,DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph)
+    matpat=MaterialParameters(ϵ=extcof,FE=fermien,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau)
 
     return matpat
 end
