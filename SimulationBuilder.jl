@@ -1,7 +1,6 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
 using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse
-using ModelingToolkit: t_nounits as t, D_nounits as D 
-
+using ModelingToolkit: t_nounits as t, D_nounits as D
 include("SymbolicsInterpolation.jl")
 include("SimulationVariables.jl")
 include("SimulationSetup.jl")
@@ -32,6 +31,8 @@ function main()
     sol=run_dynamics(connected_sys,u0,tspan,p)
     return sol,sys =#
     connected_eq,Tel_eq,Tph_eq = equation_builder(sim,mp,laser)
-    sol = run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
+    sol = run_dynamics(connected_eq,u0,tspan,p)
     return sol
 end
+
+sim,mp,las,laser,dim,cons=setup()
