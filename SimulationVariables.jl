@@ -22,7 +22,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
+get_interpolate(xvals::AbstractVector,yvals::AbstractVector) = Spline1D(xvals,yvals,bc="nearest")
 @register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
 """
     A callback function used to update the chemical potential with temperature. Is used when 

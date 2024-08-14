@@ -6,7 +6,7 @@ function build_system(sim,mp,laser,las,cons,initialtemps=Dict("Nil"=>0.0)::Dict)
     u0 = generate_initalconditions(sys,initialtemps)
     p = generate_parametervalues(sys,mp,las,cons)
     events = generate_callbacks(sim,sys,mp,cons)
-    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys[1],sys[2])
+    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys)
     connected_sys = structural_simplify(connected)
     return connected_sys,sys,u0,p
 end
@@ -114,6 +114,6 @@ end
 
 function run_dynamics(connected_eq,u0,tspan,p)
     prob=ODEProblem(connected_eq,u0,tspan,p)
-    sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
-    return sol
+    #sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
+    return prob
 end

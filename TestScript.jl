@@ -1,6 +1,7 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
 using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse
 using ModelingToolkit: t_nounits as t, D_nounits as D
+
 include("SymbolicsInterpolation.jl")
 include("SimulationVariables.jl")
 include("SimulationSetup.jl")
@@ -9,7 +10,6 @@ include("ElectronTemperature.jl")
 include("PhononTemperature.jl")
 include("ElectronDistribution.jl")
 include("SystemBuilder.jl")
-
 
 function setup()
     las=define_laser_system(:Gaussian,fwhm=50,fluence=243,photon_en=3.1)
@@ -22,14 +22,21 @@ function setup()
     return sim,mp,las,laser,dim,cons
 end
 
-function main()
-    sim,mp,las,laser,dim,cons=setup()
-    tspan=(-250.0,250.0)
-    initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-    connected_sys,sys,u0,p=build_system(sim,mp,laser,las,cons,initialtemps)
-    #return connected_sys,sys,u0,p
-    sol=run_dynamics(connected_sys,u0,tspan,p)
-    return sol,sys
-end
-sol,sys=main()
-#connected_sys,sys,u0,p=main()
+sim,mp,las,laser,dim,cons=setup()
+egl=length(mp.egrid)
+@variables fneq(t)[1:egl]
+@named test_eq = athem_factory(mp.DOS,laser,egl)
+simp = structural_simplify(test_eq)
+#= 
+u0=[simp.fneq=>zeros(length(mp.egrid))]
+p=[simp.μ=>mp.μ,
+simp.egrid=>mp.egrid,
+simp.FWHM=>las.FWHM,
+simp.kB=>cons.kB,
+simp.hv=>las.hv,
+simp.ϵ=>mp.ϵ,
+simp.ϕ=>las.ϕ,
+simp.Tel=>300.0,
+simp.R=>las.R]
+prob=ODEProblem(simp,u0,(-250.0,250.0),p) =#
+#sol=solve(prob,Rosenbrock23();abstol=1e-3,reltol=1e-3)
