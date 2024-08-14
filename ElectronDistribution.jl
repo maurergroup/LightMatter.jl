@@ -3,15 +3,14 @@
     functionality for the on-equilibrium electron ODE should be set up within this function call.
 """
 function athem_factory(DOS::Spline1D,laser::Num,egl::Int;name)
-    @variables fneq(t)[1:egl]
-    @parameters egrid[1:egl] μ Tel kB hv
+    @variables (fneq(t))[1:egl]
 
     @named dfneq = athem_template(egl)
     
-    connections = [dfneq.Source .~ athem_excitation(egrid,μ,Tel,kB,fneq,hv,DOS).*laser,
-                   dfneq.fneq .~ fneq]
+    connections = [dfneq.Source ~ athem_excitation_wrapper(DOS,egl,laser),
+                   dfneq.fneq ~ fneq]
 
-    connections = Symbolics.scalarize.(reduce(vcat,Symbolics.scalarize.(connections)))
+    #connections = Symbolics.scalarize.(reduce(vcat,Symbolics.scalarize.(connections)))
 
     compose(ODESystem(connections,t;name),dfneq)
 end
@@ -23,11 +22,17 @@ end
     to 0.0 during setup, not ignored.
 """
 function athem_template(egl::Int;name)
-    @variables Source(t)[1:egl] fneq(t)[1:egl]# (neqelel(t))[1:egl] (neqelph(t))[1:egl]
+    @variables (fneq(t))[1:egl] (Source(t))[1:egl]#(neqelel(t))[1:egl] (neqelph(t))[1:egl]
 
-    eqs = D(fneq) .~ Source# .+ neqelel .+ neqelph
+    eqs = D(fneq) ~ Source# .+ neqelel .+ neqelph
 
     ODESystem(eqs,t;name)
+end
+
+function athem_excitation_wrapper(DOS,egl,laser)
+    @variables (fneq(t))[1:egl]
+    @parameters (egrid)[1:egl] μ Tel kB hv
+    return athem_excitation(egrid,μ,Tel,kB,fneq,hv,DOS).*laser
 end
 
 function athem_excitation(egrid::AbstractVector,μ::Real,Tel::Real,kB::Real,fneq::AbstractVector,hv::Real,DOS::Spline1D)

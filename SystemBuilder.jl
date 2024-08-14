@@ -114,6 +114,6 @@ end
 
 function run_dynamics(connected_eq,u0,tspan,p)
     prob=ODEProblem(connected_eq,u0,tspan,p)
-    #sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
-    return prob
+    sol=solve(prob,Tsit5();abstol=1e-3,reltol=1e-3)
+    return sol
 end

@@ -22,14 +22,29 @@ function setup()
     return sim,mp,las,laser,dim,cons
 end
 
+function equation_builder(sim,mp,laser)
+    @named Phonon_temp=t_phonon_factory(mp,sim)
+    @named Electron_temp = t_electron_factory(mp,sim,laser)
+    no_part = get_thermalparticles(0.0,1e-16,mp.DOS,8.617e-5)
+    connections=[Electron_temp.Tph ~ Phonon_temp.Tph,
+                Electron_temp.Tel ~ Phonon_temp.Tel]
+    chempot = (t>=0.0) => (update_chempot!,[Electron_temp.dTel.Tel=>:Tel],
+    [Electron_temp.μ=>:μ,Electron_temp.kB=>:kB],[Electron_temp.μ],(mp.DOS,no_part))
+    connected = compose(ODESystem(connections,t,name=:connected,defaults=Pair{Num,Any}[Phonon_temp.kB => Electron_temp.kB
+    ,Phonon_temp.λ=>Electron_temp.λ,Phonon_temp.hbar=>Electron_temp.hbar,Phonon_temp.μ=>Electron_temp.μ],discrete_events=chempot)
+    ,Electron_temp,Phonon_temp)
+    connected_simp=structural_simplify(connected)
+    return connected_simp,Electron_temp,Phonon_temp
+end
+
 function main()
     sim,mp,las,laser,dim,cons=setup()
     tspan=(-250.0,250.0)
     initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
     connected_sys,sys,u0,p=build_system(sim,mp,laser,las,cons,initialtemps)
-    #return connected_sys,sys,u0,p
     sol=run_dynamics(connected_sys,u0,tspan,p)
-    return sol,sys
+    return sol
 end
-sol,sys=main()
-#connected_sys,sys,u0,p=main()
+
+sol=main()
+

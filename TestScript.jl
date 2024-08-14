@@ -27,8 +27,8 @@ egl=length(mp.egrid)
 @variables fneq(t)[1:egl]
 @named test_eq = athem_factory(mp.DOS,laser,egl)
 simp = structural_simplify(test_eq)
-#= 
-u0=[simp.fneq=>zeros(length(mp.egrid))]
+
+#= u0=[simp.fneq=>zeros(length(mp.egrid))]
 p=[simp.μ=>mp.μ,
 simp.egrid=>mp.egrid,
 simp.FWHM=>las.FWHM,
