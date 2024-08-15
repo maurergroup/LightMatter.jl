@@ -22,7 +22,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::Vector{Float64},yvals::Vector{Float64}) = Spline1D(xvals,yvals,bc="nearest")
+get_interpolate(xvals::AbstractVector,yvals::AbstractVector) = Spline1D(xvals,yvals,bc="nearest")
 @register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
 """
     A callback function used to update the chemical potential with temperature. Is used when 
@@ -37,24 +37,20 @@ end
     electronic temperature.
 """
 function find_chemicalpotential(no_part::Real,Tel::Real,μ::Real,DOS::Spline1D,kB::Real)
-    f(u,p) = no_part - get_thermalparticles(u,Tel,DOS,kB)
-    return solve(NonlinearProblem(f,μ),SimpleKlement();abstol=1e-3,reltol=1e-3).u
-end
-"""
-    Finds the number of particles within a thermal system using the DOS and current temperature.
-    This is solved to initially find no_part using T=1e-16 (as 0.0 leads to a discontinuity)
-    and during finding the chemical potential. 
-"""
-function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
-    p=(μ,Tel,kB,DOS)
-    int(u,p) = get_thermalparticles_int(u,p)
-    return solve(IntegralProblem(int,(μ-10,μ+10),p),HCubatureJL(initdiv=10);abstol=1e-3,reltol=1e-3).u
+    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB)
+    return solve(ZeroProblem(f,μ),Order1();atol=1e-3,rtol=1e-3)
 end
 
-function get_thermalparticles(μ::ForwardDiff.Dual,Tel::Real,DOS::Spline1D,kB::Real)
+function get_thermalparticles(μ,Tel::Real,DOS::Spline1D,kB::Real)
     p=(μ,Tel,kB,DOS)
-    int(u,p) = get_thermalparticles_int(u,p)
-    return solve(IntegralProblem(int,(ForwardDiff.value(μ)-10,ForwardDiff.value(μ)+10),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
+    int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
+    return solve(IntegralProblem(int,(0.0,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
+end
+
+function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
+    Threads.@threads for i in 1:length(u)
+        y[i] = FermiDirac(p[2],p[1],p[3],u[i])*p[4](u[i])
+    end
 end
 """
     The integrand for finding the number of thermal particles. Using a parameter tuple with 
@@ -67,17 +63,40 @@ end
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticles(μ::Real,Dis::Spline1D,DOS::Spline1D)
+function get_noparticlesspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
+    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=50);reltol=1e-3,abstol=1e-3).u
+end
+
+function get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)::Real
+    integrand = Dis.*DOS(egrid)
+    prob = SampledIntegralProblem(integrand,egrid)
+    return solve(prob,SimpsonsRule()).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergy(μ::Real,Dis::Spline1D,DOS::Spline1D)
+function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
-    sol = solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=2);reltol=1e-3,abstol=1e-3).u
-    return sol
+    return solve(IntegralProblem(int,(-10.0+μ,10.0+μ)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+end
+
+function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(internalenergy_int,zeros(0))
+    return solve(IntegralProblem(int,(-10.0,10.0),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+end
+
+function internalenergy_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i]) *u[i]
+    end
 end
 @register_symbolic get_internalenergy(μ::Num,Dis::Spline1D,DOS::Spline1D)
+
+function get_internalenergy_grid(Dis,DOS,egrid)
+    integrand = Dis.*DOS(egrid).*egrid
+    prob = SampledIntegralProblem(integrand,egrid)
+    return solve(prob,SimpsonsRule()).u
+end

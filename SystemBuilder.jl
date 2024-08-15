@@ -1,12 +1,13 @@
 
-function build_system(sim,mp,laser,las,cons,initialtemps=Dict("Nil"=>0.0)::Dict)
+function build_system(sim,mp,las,cons,dim,initialtemps=Dict("Nil"=>0.0)::Dict)
+    laser=laser_factory(las,dim)
     sys = get_systems(mp,sim,laser)
     connections = generate_variableconnections(sys)
     default_params = generate_parameterconnections(sys)
     u0 = generate_initalconditions(sys,initialtemps)
     p = generate_parametervalues(sys,mp,las,cons)
     events = generate_callbacks(sim,sys,mp,cons)
-    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys[1],sys[2])
+    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys)
     connected_sys = structural_simplify(connected)
     return connected_sys,sys,u0,p
 end

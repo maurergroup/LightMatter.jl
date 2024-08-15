@@ -1,5 +1,5 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
-using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse
+using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse,Cubature
 using ModelingToolkit: t_nounits as t, D_nounits as D
 include("SymbolicsInterpolation.jl")
 include("SimulationVariables.jl")
@@ -26,11 +26,10 @@ function main()
     sim,mp,las,laser,dim,cons=setup()
     tspan=(-250.0,250.0)
     initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-    connected_sys,sys,u0,p=build_system(sim,mp,laser,las,cons,initialtemps)
-    equations(connected_sys)
+    connected_sys,sys,u0,p=build_system(sim,mp,las,cons,dim,initialtemps)
     sol=run_dynamics(connected_sys,u0,tspan,p)
-    return sol,sys =#
-    connected_eq,Tel_eq,Tph_eq = equation_builder(sim,mp,laser)
-    sol = run_dynamics(connected_eq,Tel_eq,Tph_eq,las,mp)
     return sol
 end
+
+sol=main()
+

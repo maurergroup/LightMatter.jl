@@ -229,8 +229,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
     tau = 0.546#128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-2*las.hv,2*las.hv,step=0.1))
-
+    erange = grid_builder(0.0,-3*las.hv,3*las.hv,0.0005, 0.0002)
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien)
 
@@ -248,4 +247,25 @@ function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict[
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph,cph)
 
     return matpat
+end
+
+function grid_builder(mid, left, right, step, α)
+    v = Vector{typeof(mid + α*step)}()
+    let s = step, a = mid - s
+        while a ≥ left
+            push!(v, a)
+            s += α
+            a -= s
+        end
+    end
+    reverse!(v)
+    push!(v, mid)
+    let s = step, a = mid + s
+        while a ≤ right
+            push!(v, a)
+            s += α
+            a += s
+        end
+    end
+    v
 end
