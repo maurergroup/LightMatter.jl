@@ -3,9 +3,10 @@
     functionality for the on-equilibrium electron ODE should be set up within this function call.
 """
 function athem_factory(DOS::Spline1D,laser::Num,egl::Int;name)
+    @parameters (egrid)[1:egl] μ Tel kB hv
     @named dfneq = athem_template(egl)
     
-    connections = [dfneq.Source ~ athem_excitation_wrapper(DOS,egl,laser,dfneq.fneq)]
+    connections = [dfneq.Source ~ athem_excitation(egrid,μ,Tel,kB,dfneq.fneq,hv,DOS).*laser]
 
     compose(ODESystem(connections,t;name),dfneq)
 end
@@ -24,11 +25,6 @@ function athem_template(egl::Int;name)
     ODESystem(eqs,t;name)
 end
 
-function athem_excitation_wrapper(DOS,egl,laser,fneq)
-    @parameters (egrid)[1:egl] μ Tel kB hv
-    return athem_excitation(egrid,μ,Tel,kB,fneq,hv,DOS).*laser
-end
-
 function athem_excitation(egrid::AbstractVector,μ::Real,Tel::Real,kB::Real,fneq::AbstractVector,hv::Real,DOS::Spline1D)
 
     ftot = fneq.+FermiDirac(egrid,μ,Tel,kB)
@@ -37,9 +33,9 @@ function athem_excitation(egrid::AbstractVector,μ::Real,Tel::Real,kB::Real,fneq
     Δfe = fgr_electron_generation(egrid,DOS,ftotspl,hv)
     Δfh = fgr_hole_generation(egrid,DOS,ftotspl,hv)
 
-    pc_sf = fgr_particleconservation(DOS,Δfh,Δfe,egrid,μ)
+    pc_sf = get_noparticles(Δfe,DOS,egrid) / get_noparticles(Δfh,DOS,egrid)
     Δfshape = (Δfe.*pc_sf).-Δfh
-    inten = fgr_excitation_internalenergy(Δfshape,DOS,egrid,μ)
+    inten = get_internalenergy_grid(Δfshape,DOS,egrid)
 
     return Δfshape./inten
 end
@@ -50,23 +46,11 @@ end
 
 
 function fgr_hole_generation(egrid::AbstractVector,DOS::Spline1D,ftotspl::Spline1D,hv::Real)
-    return DOS.(egrid.+hv).*ftotspl.(egrid).*(1 .-ftotspl.(egrid.+hv))
+    return DOS(egrid.+hv).*ftotspl(egrid).*(1 .-ftotspl(egrid.+hv))
 end
 
 function fgr_electron_generation(egrid::AbstractVector,DOS::Spline1D,ftotspl::Spline1D,hv::Real)
-    return DOS.(egrid.-hv).*ftotspl.(egrid.-hv).*(1 .-ftotspl.(egrid))
-end
-
-function fgr_particleconservation(DOS::Spline1D,fneqh::AbstractVector,fneqe::AbstractVector,egrid::AbstractVector,μ::Real)
-    elDis = get_interpolate(egrid,fneqe)
-    hDis = get_interpolate(egrid,fneqh)
-    f(u,p) = get_noparticles(μ,hDis,DOS) - u*get_noparticles(μ,elDis,DOS)
-    return solve(NonlinearProblem(f,1.0),Klement();abstol=1e-3,reltol=1e-3).u
-end
-
-function fgr_excitation_internalenergy(Δfneq::AbstractVector,DOS::Spline1D,egrid::AbstractVector,μ::Real)
-    fneqspl = get_interpolate(egrid,Δfneq)
-    return get_internalenergyspl(μ,fneqspl,DOS)
+    return DOS(egrid.-hv).*ftotspl(egrid.-hv).*(1 .-ftotspl(egrid))
 end
 
 #= function athem_electronelectron(sim::SimulationSettings,egl::Int)
@@ -102,3 +86,8 @@ function dFDdT(kB::Float64,Tel::Float64,μ::Float64,E::Float64)::Real
 end
 
 FermiDirac(egrid,μ,Tel,kB)= 1 ./(exp.((egrid.-μ)./(kB*Tel)).+1)
+
+
+
+
+

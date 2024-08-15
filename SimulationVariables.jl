@@ -63,9 +63,15 @@ end
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticles(μ::Real,Dis::Spline1D,DOS::Spline1D)
+function get_noparticlesspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(0.0,μ+10)),HCubatureJL(initdiv=100);reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=50);reltol=1e-3,abstol=1e-3).u
+end
+
+function get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)::Real
+    integrand = Dis.*DOS(egrid)
+    prob = SampledIntegralProblem(integrand,egrid)
+    return solve(prob,SimpsonsRule()).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
@@ -73,7 +79,7 @@ end
 """
 function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
     int(u,p) = Dis(u) * DOS(u) * u
-    return solve(IntegralProblem(int,(-10.0+μ,10.0+μ)),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(-10.0+μ,10.0+μ)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
 end
 
 function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
@@ -88,3 +94,9 @@ function internalenergy_int(y,u,p)
     end
 end
 @register_symbolic get_internalenergy(μ::Num,Dis::Spline1D,DOS::Spline1D)
+
+function get_internalenergy_grid(Dis,DOS,egrid)
+    integrand = Dis.*DOS(egrid).*egrid
+    prob = SampledIntegralProblem(integrand,egrid)
+    return solve(prob,SimpsonsRule()).u
+end

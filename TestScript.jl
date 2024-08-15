@@ -1,6 +1,9 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
-using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse
+using BenchmarkTools,ForwardDiff,StaticArrays,IfElse,Cubature
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using Logging: global_logger
+using TerminalLoggers: TerminalLogger
+global_logger(TerminalLogger())
 
 include("SymbolicsInterpolation.jl")
 include("SimulationVariables.jl")
@@ -21,21 +24,27 @@ function setup()
     return sim,mp,las,dim,cons
 end
 
-sim,mp,las,dim,cons=setup()
-egl=length(mp.egrid)
-#= @variables fneq(t)[1:egl]
-@named test_eq = athem_factory(mp.DOS,laser,egl)
-simp = structural_simplify(test_eq)
+function main()
+    sim,mp,las,dim,cons=setup()
+    egl = length(mp.egrid)
+    fneq=zeros(egl)
+    laser=laser_factory(las,dim)
 
-u0=[simp.dfneq.fneq=>zeros(length(mp.egrid))]
-p=[simp.μ=>mp.μ,
-simp.egrid=>mp.egrid,
-simp.FWHM=>las.FWHM,
-simp.kB=>cons.kB,
-simp.hv=>las.hv,
-simp.ϵ=>mp.ϵ,
-simp.ϕ=>las.ϕ,
-simp.Tel=>300.0,
-simp.R=>las.R]
-prob=ODEProblem(simp,u0,(-250.0,250.0),p)
-sol=solve(prob,Rosenbrock23(autodiff=false);abstol=1e-3,reltol=1e-3) =#
+    @named test_eq = athem_factory(mp.DOS,laser,egl)
+    simp = structural_simplify(test_eq)
+
+    u0=[simp.dfneq.fneq=>@SVector zeros(egl)]
+    p=[simp.μ=>mp.μ,
+    simp.egrid=>mp.egrid,
+    simp.FWHM=>las.FWHM,
+    simp.kB=>cons.kB,
+    simp.hv=>las.hv,
+    simp.ϵ=>mp.ϵ,
+    simp.ϕ=>las.ϕ,
+    simp.Tel=>300.0,
+    simp.R=>las.R]
+    prob=ODEProblem(simp,u0,(-250.0,250.0),p)
+    @btime solve(prob,RK4();abstol=1e-5,reltol=1e-5,dtmin=0.1,save_everystep=false)
+end
+
+main()
