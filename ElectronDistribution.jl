@@ -5,12 +5,10 @@
 function athem_factory(DOS::Spline1D,laser::Num,egl::Int;name)
     @variables (ftot(t))[1:egl] = zeros(egl)
     @named dneqFD = athem_template(egl)
-    ftot = calculate_electron_distributions(dneqFD.fneq,egl)
-    #= @named dflaser = athem_excitation(DOS,ftot,egl,laser)
-    connections = [dneqFD.Source ~ dflaser.Δflas] =#
-    connections = [dneqFD.Source ~ athem_excitation(ftot,DOS,laser,egl)]
-    #compose(ODESystem(connections,t;name),dneqFD,dflaser)
-    compose(ODESystem(connections,t;name),dneqFD)
+    @named source =  athem_excitation(dneqFD.fneq,DOS,laser,egl)
+    connections = [dneqFD.Source ~ source.excite]
+
+    compose(ODESystem(connections,t;name),dneqFD,source)
 end
 """
     This is the template for the non-equilibrium electron ODE. It contains a source term where 
@@ -29,57 +27,20 @@ function athem_template(egl::Int;name)
     ODESystem(eqs,t;name)
 end
 
-function calculate_electron_distributions(fneq::Symbolics.Arr{Num, 1},egl::Int)
-    @parameters begin
-        egrid[1:egl] = zeros(egl)
-        kB = 8.617e-5 
-        μ = 0.0 
-        Tel = 300.0
-    end
-    feq = FermiDirac(egrid,μ,Tel,kB)
-    ftot = fneq + feq
-    return ftot
-end
+function athem_excitation(fneq,DOS::Spline1D,laser::Num,egl::Int;name)
+    @variables Δfneqh(t)[1:egl] Δfneqe(t)[1:egl] pc_sf(t) δ(t) ftot(t)[1:egl] excite(t)[1:egl] Δfshape(t)[1:egl]
+    @parameters egrid[1:egl] μ kB Tel hv
 
-#= function athem_excitation(DOS,ftot,egl::Int,laser;name)
-    @variables begin
-        Δfh(t)[1:egl]
-        Δfe(t)[1:egl]
-        pc_sf(t)
-        δ(t)
-        Δflas(t)[1:egl]
-        Δfshape(t)[1:egl]
-    end 
-    @parameters begin
-        egrid[1:egl] = zeros(egl) 
-        μ = 0.0
-        kB = 8.617e-5
-        Tel = 300.0
-        hv = 1.0
-        ϕ = 1.0
-        ϵ = 1.0
-        FWHM = 50.0
-        R = 0.0
-    end 
-
-    eqs = [Δfe ~ fgr_electron_generation(egrid,DOS,ftot,hv),
-          Δfh ~ fgr_hole_generation(egrid,DOS,ftot,hv),
-          pc_sf ~ fgr_particleconservation(DOS,Δfh,Δfe,egrid,μ),
-          Δfshape ~ (Δfe*pc_sf)-Δfh,
-          δ ~ laser/fgr_excitation_internalenergy(Δfshape,DOS,egrid,μ),
-          Δflas ~ δ*Δfshape]
-
+    eqs = [ftot .~ fneq .+ FermiDirac(egrid,μ,Tel,kB)
+            Δfneqh .~ fgr_hole_generation(egrid,DOS,ftot,hv)
+            Δfneqe .~ fgr_electron_generation(egrid,DOS,ftot,hv)
+            pc_sf ~ fgr_particleconservation(DOS,Δfneqh,Δfneqe,egrid,μ)
+            Δfshape .~ (Δfneqe*pc_sf) .- Δfneqh
+            δ ~ laser/fgr_excitation_internalenergy(Δfshape,DOS,egrid,μ)
+            excite .~ δ*Δfshape]
+    
     ODESystem(eqs,t;name)
-end =#
-
-function athem_excitation(ftot,DOS::Spline1D,laser::Num,egl::Int)
-    @variables Δfneqh(t)[1:egl] Δfneqe(t)[1:egl] pc_sf(t) δ(t)
-    @parameters egrid[1:egl] μ kB Tel hv ϕ ϵ FWHM R
-    Δfneqh = fgr_hole_generation(egrid,DOS,ftot,hv)
-    Δfneqe = fgr_electron_generation(egrid,DOS,ftot,hv)
-    pc_sf = fgr_particleconservation(DOS,Δfneqh,Δfneqe,egrid,μ)
-    δ = laser/fgr_excitation_internalenergy((Δfneqe*pc_sf) - Δfneqh,DOS,egrid,μ)
-    return δ*((Δfneqe*pc_sf) - Δfneqh)
+    
 end
 
 function fgr_hole_generation(egrid::Vector{Float64},DOS::Spline1D,ftot::Vector{Float64},hv::Real)
@@ -151,9 +112,4 @@ function dFDdT(kB::Float64,Tel::Float64,μ::Float64,E::Float64)::Real
 end
 
 FermiDirac(E::Real,μ::Union{Real,ForwardDiff.Dual},Tel::Real,kB::Real)= 1/(exp((E-μ)/(kB*Tel))+1)
-#= FermiDirac(E::Vector{Float64},μ::Real,Tel::Real,kB::Real) = 1 ./(exp.((E-μ)./(kB*Tel))+1)
-@register_array_symbolic FermiDirac(E::AbstractVector,μ::Num,Tel::Num,kB::Num)::Vector{Float64} begin
-    size = (length(E),)
-    eltype = eltype(E)
-end =#
 FermiDirac(egrid,μ::Num,Tel::Num,kB::Num)= 1 ./(exp.((egrid.-μ)./(kB*Tel)).+1)
