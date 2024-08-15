@@ -229,8 +229,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
     tau = 0.546#128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-2*las.hv,2*las.hv,step=0.1))
-
+    erange = build_erange(las.hv)
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien)
 
@@ -248,4 +247,9 @@ function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict[
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph,cph)
 
     return matpat
+end
+
+function build_erange(hv)
+    grid = sort(unique(vcat(range(0.0,hv,length=200),range(hv,2*hv,length=100),range(2*hv,3*hv,length=50))))
+    return sort(unique(vcat(grid,grid*-1)))
 end

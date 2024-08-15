@@ -18,17 +18,16 @@ function setup()
     elecperatom=1,eleceffmass=1.1,dos="DOS/Au_DOS.dat",secmomspecfun=23e-6,elecphon=1.44e-7,ballistic=0.0,cph=0.015)
     cons=Constants(8.617e-5,0.6582)
     dim = Homogenous()
-    laser=laser_factory(las,dim)
-    return sim,mp,las,laser,dim,cons
+    return sim,mp,las,dim,cons
 end
 
-sim,mp,las,laser,dim,cons=setup()
+sim,mp,las,dim,cons=setup()
 egl=length(mp.egrid)
-@variables fneq(t)[1:egl]
+#= @variables fneq(t)[1:egl]
 @named test_eq = athem_factory(mp.DOS,laser,egl)
 simp = structural_simplify(test_eq)
 
-#= u0=[simp.fneq=>zeros(length(mp.egrid))]
+u0=[simp.dfneq.fneq=>zeros(length(mp.egrid))]
 p=[simp.μ=>mp.μ,
 simp.egrid=>mp.egrid,
 simp.FWHM=>las.FWHM,
@@ -38,5 +37,5 @@ simp.ϵ=>mp.ϵ,
 simp.ϕ=>las.ϕ,
 simp.Tel=>300.0,
 simp.R=>las.R]
-prob=ODEProblem(simp,u0,(-250.0,250.0),p) =#
-#sol=solve(prob,Rosenbrock23();abstol=1e-3,reltol=1e-3)
+prob=ODEProblem(simp,u0,(-250.0,250.0),p)
+sol=solve(prob,Rosenbrock23(autodiff=false);abstol=1e-3,reltol=1e-3) =#

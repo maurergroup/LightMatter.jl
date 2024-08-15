@@ -6,7 +6,7 @@ function eq_factory(length;name)
 
     @named dy = y_eq_template(length)
 
-    connections = [dy.rhs ~ rhs_function_wrapper(length),
+    connections = [dy.rhs ~ rhs_function_wrapper(dy.y,length),
                    dy.y ~ y]
     
     compose(ODESystem(connections,t;name),dy)
@@ -20,12 +20,10 @@ function y_eq_template(length;name)
     ODESystem(eqs,t;name)
 end
 
-function rhs_function_wrapper(length)
-    @variables y(t)[1:length]
+function rhs_function_wrapper(y,length)
     @parameters a b
 
-    #return rhs_function(y,a,b,t)
-    return ((y*a).+b)./(t)
+    return rhs_function(y,a,b,t)
 end
 
 function rhs_function(y::AbstractVector,a::Real,b::Real,t::Real)

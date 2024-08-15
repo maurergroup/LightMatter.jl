@@ -3,14 +3,9 @@
     functionality for the on-equilibrium electron ODE should be set up within this function call.
 """
 function athem_factory(DOS::Spline1D,laser::Num,egl::Int;name)
-    @variables (fneq(t))[1:egl]
-
     @named dfneq = athem_template(egl)
     
-    connections = [dfneq.Source ~ athem_excitation_wrapper(DOS,egl,laser),
-                   dfneq.fneq ~ fneq]
-
-    #connections = Symbolics.scalarize.(reduce(vcat,Symbolics.scalarize.(connections)))
+    connections = [dfneq.Source ~ athem_excitation_wrapper(DOS,egl,laser,dfneq.fneq)]
 
     compose(ODESystem(connections,t;name),dfneq)
 end
@@ -29,8 +24,7 @@ function athem_template(egl::Int;name)
     ODESystem(eqs,t;name)
 end
 
-function athem_excitation_wrapper(DOS,egl,laser)
-    @variables (fneq(t))[1:egl]
+function athem_excitation_wrapper(DOS,egl,laser,fneq)
     @parameters (egrid)[1:egl] μ Tel kB hv
     return athem_excitation(egrid,μ,Tel,kB,fneq,hv,DOS).*laser
 end
@@ -67,12 +61,12 @@ function fgr_particleconservation(DOS::Spline1D,fneqh::AbstractVector,fneqe::Abs
     elDis = get_interpolate(egrid,fneqe)
     hDis = get_interpolate(egrid,fneqh)
     f(u,p) = get_noparticles(μ,hDis,DOS) - u*get_noparticles(μ,elDis,DOS)
-    return solve(NonlinearProblem(f,1.0),SimpleKlement();abstol=1e-3,reltol=1e-3).u
+    return solve(NonlinearProblem(f,1.0),Klement();abstol=1e-3,reltol=1e-3).u
 end
 
 function fgr_excitation_internalenergy(Δfneq::AbstractVector,DOS::Spline1D,egrid::AbstractVector,μ::Real)
     fneqspl = get_interpolate(egrid,Δfneq)
-    return get_internalenergy(μ,fneqspl,DOS)
+    return get_internalenergyspl(μ,fneqspl,DOS)
 end
 
 #= function athem_electronelectron(sim::SimulationSettings,egl::Int)

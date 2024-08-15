@@ -1,5 +1,6 @@
 
-function build_system(sim,mp,laser,las,cons,initialtemps=Dict("Nil"=>0.0)::Dict)
+function build_system(sim,mp,las,cons,dim,initialtemps=Dict("Nil"=>0.0)::Dict)
+    laser=laser_factory(las,dim)
     sys = get_systems(mp,sim,laser)
     connections = generate_variableconnections(sys)
     default_params = generate_parameterconnections(sys)
