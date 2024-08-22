@@ -18,7 +18,7 @@ end
     R::Real
     Transport::String
 end
-@kwdef struct Secant <: Laser
+@kwdef struct HyperbolicSecant <: Laser
     FWHM::Real
     ϕ::Real
     hv::Real
@@ -66,7 +66,7 @@ function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
         return Lorentzian(FWHM=fwhm,ϕ=fluence,hv=photon_en,
         R=reflectivity)
     elseif Laser == "Secant"
-        return Secant(FWHM=fwhm,ϕ=fluence,hv=photon_en,
+        return HyperbolicSecant(FWHM=fwhm,ϕ=fluence,hv=photon_en,
         R=reflectivity)
     elseif Laser == "Rectangular"
         return Rectangular(FWHM=fwhm,ϕ=fluence,hv=photon_en,
@@ -105,7 +105,7 @@ end
 """
     Normalised Hyperbolic Secant temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
 """
-function (::Secant)()
+function (::HyperbolicSecant)()
     @parameters FWHM 
     sec = sech(2*log(1+sqrt(2))*(t/FWHM))^2
    return log(1+sqrt(2))/FWHM * sec

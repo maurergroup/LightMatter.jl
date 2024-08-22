@@ -29,8 +29,12 @@ get_interpolate(xvals::AbstractVector,yvals::AbstractVector) = Spline1D(xvals,yv
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
      and number of particles.
 """
-function update_chempot!(integ,u,p,ctx::Tuple{Spline1D,Real})
+function update_chempotTTM!(integ,u,p,ctx::Tuple{Spline1D,Real})
     integ.p[p.μ] = find_chemicalpotential(ctx[2],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
+end
+
+function update_chempotAthEM!(integ,u,p,ctx::Tuple{Spline1D})
+    integ.p[p.μ] = find_chemicalpotential(integ.u[u.n],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
 end
 """
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
@@ -42,30 +46,19 @@ function find_chemicalpotential(no_part::Real,Tel::Real,μ::Real,DOS::Spline1D,k
 end
 
 function get_thermalparticles(μ,Tel::Real,DOS::Spline1D,kB::Real)
-    p=(μ,Tel,kB,DOS)
-    int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
-    return solve(IntegralProblem(int,(0.0,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
-end
-
-function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
-    Threads.@threads for i in 1:length(u)
-        y[i] = FermiDirac(p[2],p[1],p[3],u[i])*p[4](u[i])
-    end
-end
-"""
-    The integrand for finding the number of thermal particles. Using a parameter tuple with 
-    components p=(μ,Tel,kB,DOS)
-"""
-function get_thermalparticles_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
-    return FermiDirac(u,p[1],p[2],p[3])*p[4](u)
+    int(u,p) = FermiDirac(u,μ,Tel,kB)*DOS(u)
+    return solve(IntegralProblem(int,(μ-20,μ+20)),HCubatureJL(initdiv=50);abstol=1e-6,reltol=1e-6).u
 end
 """
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticlesspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
-    int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(μ-10,μ+10)),HCubatureJL(initdiv=50);reltol=1e-3,abstol=1e-3).u
+function get_noparticlesspl(μ::Real,Dis::Spline1D,DOS::Spline1D,n0)
+    int_neg(u,p) = (Dis(u).-1)*DOS(u)
+    uroot_neg = solve(IntegralProblem(int_neg,(-Inf,0.0)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+    int_pos(u,p) = Dis(u)*DOS(u)
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+    return uroot_neg+uroot_pos+n0
 end
 
 function get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)::Real
@@ -73,30 +66,94 @@ function get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector
     prob = SampledIntegralProblem(integrand,egrid)
     return solve(prob,SimpsonsRule()).u
 end
+
+function get_n0(DOS,μ)
+    int(u,p) = DOS(u)
+    prob=IntegralProblem(int,(-Inf,μ))
+    return solve(prob,HCubatureJL(initdiv=100),reltol=1e-5,abstol=1e-5).u
+end
+
+function p_T(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(p_T_int,zeros(0))
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+end
+@register_symbolic p_T(μ::Num,Tel::Num,DOS::Spline1D,kB::Num)
+function p_T_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = dFDdT(p[3],p[2],p[1],u[i]).*p[4].(u[i])
+    end
+end
+
+function p_μ(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(p_μ_int,zeros(0))
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+end
+@register_symbolic p_μ(μ::Num,Tel::Num,DOS::Spline1D,kB::Num)
+function p_μ_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = dFDdμ(p[3],p[2],p[1],u[i]).*p[4].(u[i])
+    end
+end
+
 """
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
-    int(u,p) = Dis(u) * DOS(u) * u
-    return solve(IntegralProblem(int,(-10.0+μ,10.0+μ)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D,u0::Real)
+    int_neg(u,p) = (Dis(u).-1)*DOS(u)*u
+    uroot_neg = solve(IntegralProblem(int_neg,(-Inf,0.0)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+    int_pos(u,p) = Dis(u)*DOS(u)*u
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),CubatureJLh();reltol=1e-3,abstol=1e-3).u
+    return uroot_neg+uroot_pos+u0
 end
 
 function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
     p = (μ,Tel,kB,DOS)
     int = BatchIntegralFunction(internalenergy_int,zeros(0))
-    return solve(IntegralProblem(int,(-10.0,10.0),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+    return solve(IntegralProblem(int,(-Inf,10.0),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
 end
-
+@register_symbolic get_internalenergy(μ::Num,Tel::Num,DOS::Spline1D,kB::Num)
 function internalenergy_int(y,u,p)
     Threads.@threads for i in 1:length(u)
         @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i]) *u[i]
     end
 end
-@register_symbolic get_internalenergy(μ::Num,Dis::Spline1D,DOS::Spline1D)
+
 
 function get_internalenergy_grid(Dis,DOS,egrid)
     integrand = Dis.*DOS(egrid).*egrid
     prob = SampledIntegralProblem(integrand,egrid)
     return solve(prob,SimpsonsRule()).u
+end
+
+function get_u0(DOS,μ)
+    int(u,p) = DOS(u)*u
+    prob=IntegralProblem(int,(-Inf,μ))
+    return solve(prob,HCubatureJL(initdiv=100),reltol=1e-5,abstol=1e-5).u
+end
+
+function c_T(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(c_T_int,zeros(0))
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+end
+@register_symbolic c_T(μ::Num,Tel::Num,DOS::Spline1D,kB::Num)
+function c_T_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = dFDdT(p[3],p[2],p[1],u[i]).*p[4].(u[i]) *u[i]
+    end
+end
+
+function c_μ(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
+    p = (μ,Tel,kB,DOS)
+    int = BatchIntegralFunction(c_μ_int,zeros(0))
+    return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+end
+@register_symbolic c_μ(μ::Num,Tel::Num,DOS::Spline1D,kB::Num)
+function c_μ_int(y,u,p)
+    Threads.@threads for i in 1:length(u)
+        @inbounds y[i] = dFDdμ(p[3],p[2],p[1],u[i]).*p[4].(u[i]) *u[i]
+    end
 end

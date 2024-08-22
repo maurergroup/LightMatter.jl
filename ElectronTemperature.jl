@@ -4,15 +4,24 @@
 """
 function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser::Num;name)
     @variables Tel(t)
-    @named dTel = t_elec_template()
-    connections =[dTel.HeatCapacity ~ t_electron_heatcapacity(mp,sim),
-                  dTel.ElecPhon ~ t_electron_phononcoupling(mp,sim),
-                  dTel.Spatial ~ 0.0,
-                  dTel.Source ~ t_electron_sourceterm(sim,laser),
-                  dTel.Tel ~ Tel]
-    compose(ODESystem(connections,t;name),dTel)
+    if sim.Systems.NonEqElectrons==false
+        @named dTel = ttm_elec_template()
+        connections =[dTel.HeatCapacity ~ t_electron_heatcapacity(mp,sim),
+                    dTel.ElecPhon ~ t_electron_phononcoupling(mp,sim),
+                    dTel.Spatial ~ 0.0,
+                    dTel.Source ~laser,
+                    dTel.Tel ~ Tel]
+        compose(ODESystem(connections,t;name),dTel)
+    elseif sim.Systems.NonEqElectrons==true
+        egl = length(mp.egrid)
+        @variables fneq(t)[1:egl] Tel(t) n(t)
+        @parameters τ FE egrid[1:egl] μ kB u0 
+        @named dTel = athem_elec_template(mp.DOS)
+        connections =[dTel.Δu ~ electronelectron_internalenergy(mp.DOS,egl)]
+        compose(ODESystem(connections,defaults=Pair{Num,Any}[dTel.kB => kB,dTel.μ => μ],t;name),dTel)
+    end
 end
-"""
+"""``
     This is the template for the electonic temperature ODE. It contains a source term where 
     energy injection functions are defined, a spatial term for thermal conductiivity within the
     electronic system. An electron-phonon coupling term for how the electronic temperature interacts
@@ -20,7 +29,7 @@ end
     are then later replaced by their relative function for the current simulation. Any functionality
     that is unwanted during a simulation must be set to 0.0 during setup, not ignored.
 """
-function t_elec_template(;name)
+function ttm_elec_template(;name)
     @variables Tel(t) Source(t) ElecPhon(t) HeatCapacity(t) Spatial(t)
 
     eqs = D(Tel) ~ (Source .+ Spatial .+ ElecPhon)./HeatCapacity
@@ -103,23 +112,27 @@ end
 function electronphononcoupling_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
     return p[4](u)^2*-dFDdE(p[1],p[2],p[3],u)
 end
-"""
-    Defines and returns the requested equation for how energy is inputed into the system.
-    Currently the only options are either AthEM or the laser directly so checks whether non-
-    equilibrium electrons are enabled and defaults to the AthEM method otherwise uses the laser.
-    The laser is currently brought into the function because using a variable and connecting later
-    leads to un-assignable parameters. To-Do: Review once Simulation Builder is complete
-"""
-function t_electron_sourceterm(sim::SimulationSettings,laser::Num)
-    if sim.Systems.NonEqElectrons == true
-        if sim.Interactions.ElectronElectron == true
-            @variables uee(t)
-            return uee
-        else
-            return 0.0
-        end
-    else
-        return laser
-    end
+
+function athem_elec_template(DOS;name)
+    @variables Tel(t) Δu(t) Δn(t)
+    @parameters kB μ 
+
+    eqs = D(Tel) ~ 1/(c_T(μ,Tel,DOS,kB)*p_μ(μ,Tel,DOS,kB)-p_T(μ,Tel,DOS,kB)*c_μ(μ,Tel,DOS,kB))*(p_μ(μ,Tel,DOS,kB)*Δu-c_μ(μ,Tel,DOS,kB)*Δn)
+
+    ODESystem(eqs,t;name)
 end
 
+function electronelectron_internalenergy(DOS,egl)
+    @variables fneq(t)[1:egl] Tel(t) n(t)
+    @parameters τ FE egrid[1:egl] μ kB u0 
+    feq = FermiDirac(egrid,μ,Tel,kB)
+    ee_dis = athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS)
+    relax_dis = ee_dis./flt_relaxation(τ,FE,μ,egrid,kB,Tel)
+    return relaxedelectron_internalenergy(relax_dis,egrid,μ,DOS,u0) 
+end
+
+function relaxedelectron_internalenergy(relax_dis,egrid,μ::Real,DOS::Spline1D,u0::Real)
+    relax_spl = get_interpolate(egrid,relax_dis)
+    return get_internalenergyspl(μ,relax_spl,DOS,u0)
+end
+@register_symbolic relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid::AbstractVector,μ::Num,DOS::Spline1D,u0::Num)
