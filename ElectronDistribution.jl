@@ -4,15 +4,18 @@
 """
 function athem_factory(sim::SimulationSettings,DOS::Spline1D,laser::Num,egl::Int;name)
     if sim.Systems.ElectronTemperature == true
-        @variables Tel(t)
+        @variables Tel(t) feq(t)[1:egl]
     else
-        @parameters Tel
+        @parameters Tel feq[1:egl]
     end
+
     @parameters kB egrid[1:egl] μ
     @named dfneq = athem_template(egl)
     feq = FermiDirac(egrid,μ,Tel,kB)
-    connections = [dfneq.Source ~ athem_wrapper(dfneq.fneq,feq,DOS,egl).*laser,
-                   dfneq.neqelel ~ electronelectron_wrapper(sim,dfneq.fneq,feq,DOS,egl)]
+    connections = [dfneq.Source .~ athem_wrapper(dfneq.fneq,feq,DOS,egl)*laser
+                   dfneq.neqelel .~  electronelectron_wrapper(sim,dfneq.fneq,feq,DOS,egl)]
+
+    connections = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(connections)))
 
     compose(ODESystem(connections,t;name),dfneq)
 end
@@ -26,7 +29,9 @@ end
 function athem_template(egl::Int;name)
     @variables (fneq(t))[1:egl] (Source(t))[1:egl] (neqelel(t))[1:egl] #(neqelph(t))[1:egl]
 
-    eqs = D(fneq) ~ Source .+ neqelel #.+ neqelph
+    eqs = [D(fneq) .~ Source .+ neqelel] #.+ neqelph
+
+    eqs = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(eqs)))
 
     ODESystem(eqs,t;name)
 end
@@ -65,17 +70,19 @@ end
 
 function electronelectron_wrapper(sim,fneq,feq,DOS,egl)
     if sim.Interactions.ElectronElectron == true
-        @variables Tel(t) n(t)
-        @parameters egrid[1:egl] μ kB u0 FE τ
-        return athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS)./flt_relaxation(τ,FE,μ,egrid,kB,Tel)
+        @variables n(t) Tel(t)
+        @parameters egrid[1:egl] μ kB u0 FE τ 
+
+        return athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS).*flt_relaxation(τ,FE,μ,egrid,kB,Tel)
     else
         return zeros(egl)
     end
 end
 
-function athem_electronelectronrelaxation(fneq,feq,egrid,μ::Real,kB::Real,u0::Real,n::Real,DOS::Spline1D)
-    ftot = get_interpolate(egrid,feq.+fneq)
-    goal = get_internalenergyspl(μ,ftot,DOS,u0)
+function athem_electronelectronrelaxation(fneq::AbstractVector,feq::AbstractVector,egrid::AbstractVector,μ::Real,kB::Real,u0::Real,n::Real,DOS::Spline1D)
+    ftot = feq .+ fneq
+    ftot_spl = get_interpolate(egrid,ftot)
+    goal = get_internalenergyspl(μ,ftot_spl,DOS,u0)
     frel = find_relaxed_eedistribution(goal,kB,egrid,n,DOS,u0)
     return (fneq .+ frel .- feq)
 end
@@ -121,31 +128,24 @@ end
 
 FermiDirac(E::Real,μ::Union{Real,ForwardDiff.Dual},Tel::Real,kB::Real)= 1/(exp((E-μ)/(kB*Tel))+1)
 
-FermiDirac(egrid,μ::Real,Tel::Real,kB::Real) = 1 ./(exp.((egrid.-μ)./(kB*Tel)).+1)
-@register_array_symbolic FermiDirac(egrid::AbstractVector,μ::Num,Tel::Num,kB::Num) begin
-    size = (length(egrid),)
-    eltype = eltype(egrid)
-end
+FermiDirac(egrid,μ,Tel,kB) = 1 ./(exp.((egrid.-μ)./(kB*Tel)).+1)
 
 function particle_change(DOS,egl;name)
     @variables n(t)
-
-    eqs = D(n) ~ electronelectron_particlechange(n,DOS,egl)
+    
+    eqs = [D(n) ~ electronelectron_particlechange(DOS,egl)]
 
     ODESystem(eqs,t;name)
 end
 
-function electronelectron_particlechange(n,DOS,egl)
-    @variables fneq(t)[1:egl] Tel(t)
-    @parameters τ FE egrid[1:egl] μ kB u0 n0
-    feq = FermiDirac(egrid,μ,Tel,kB)
-    ee_dis = athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS)
-    relax_dis = ee_dis./flt_relaxation(τ,FE,μ,egrid,kB,Tel)
-    return relaxedelectron_particlechange(relax_dis,egrid,μ,DOS,n0) 
+function electronelectron_particlechange(DOS,egl)
+    @variables relax_dis(t)[1:egl]
+    @parameters egrid[1:egl] μ n0
+    return relaxedelectron_particlechange(relax_dis,egrid,DOS,μ,n0)
 end
 
-function relaxedelectron_particlechange(relax_dis,egrid,μ::Real,DOS::Spline1D,n0::Real)
-    relax_spl = get_interpolate(egrid,relax_dis)
-    return get_noparticlesspl(μ,relax_spl,DOS,n0)
+function relaxedelectron_particlechange(relax_dis,egrid,DOS::Spline1D,μ::Real,n0::Real)
+    dis_spl = get_interpolate(egrid,relax_dis)
+    return get_noparticlesspl(μ,Dis,DOS,n0)
 end
-@register_symbolic relaxedelectron_particlechange(relax_dis::AbstractVector,egrid::AbstractVector,μ::Num,DOS::Spline1D,n0::Num)
+@register_symbolic relaxedelectron_particlechange(relax_dis::AbstractVector,egrid::AbstractVector,DOS::Spline1D,μ::Num,n0::Num)

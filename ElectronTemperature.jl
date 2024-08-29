@@ -14,11 +14,10 @@ function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser
         compose(ODESystem(connections,t;name),dTel)
     elseif sim.Systems.NonEqElectrons==true
         egl = length(mp.egrid)
-        @variables fneq(t)[1:egl] Tel(t) n(t)
-        @parameters τ FE egrid[1:egl] μ kB u0 
         @named dTel = athem_elec_template(mp.DOS)
         connections =[dTel.Δu ~ electronelectron_internalenergy(mp.DOS,egl)]
-        compose(ODESystem(connections,defaults=Pair{Num,Any}[dTel.kB => kB,dTel.μ => μ],t;name),dTel)
+
+        compose(ODESystem(connections,t;name),dTel)
     end
 end
 """``
@@ -32,7 +31,7 @@ end
 function ttm_elec_template(;name)
     @variables Tel(t) Source(t) ElecPhon(t) HeatCapacity(t) Spatial(t)
 
-    eqs = D(Tel) ~ (Source .+ Spatial .+ ElecPhon)./HeatCapacity
+    eqs = [D(Tel) ~ (Source .+ Spatial .+ ElecPhon)./HeatCapacity]
 
     ODESystem(eqs,t;name)
 end
@@ -117,22 +116,19 @@ function athem_elec_template(DOS;name)
     @variables Tel(t) Δu(t) Δn(t)
     @parameters kB μ 
 
-    eqs = D(Tel) ~ 1/(c_T(μ,Tel,DOS,kB)*p_μ(μ,Tel,DOS,kB)-p_T(μ,Tel,DOS,kB)*c_μ(μ,Tel,DOS,kB))*(p_μ(μ,Tel,DOS,kB)*Δu-c_μ(μ,Tel,DOS,kB)*Δn)
+    eqs = [D(Tel) ~ 1/(c_T(μ,Tel,DOS,kB)*p_μ(μ,Tel,DOS,kB)-p_T(μ,Tel,DOS,kB)*c_μ(μ,Tel,DOS,kB))*(p_μ(μ,Tel,DOS,kB)*Δu-c_μ(μ,Tel,DOS,kB)*Δn)]
 
     ODESystem(eqs,t;name)
 end
 
 function electronelectron_internalenergy(DOS,egl)
-    @variables fneq(t)[1:egl] Tel(t) n(t)
-    @parameters τ FE egrid[1:egl] μ kB u0 
-    feq = FermiDirac(egrid,μ,Tel,kB)
-    ee_dis = athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS)
-    relax_dis = ee_dis./flt_relaxation(τ,FE,μ,egrid,kB,Tel)
-    return relaxedelectron_internalenergy(relax_dis,egrid,μ,DOS,u0) 
+    @variables relax_dis(t)[1:egl]
+    @parameters egrid[1:egl] μ u0
+    return  relaxedelectron_internalenergy(relax_dis,egrid,DOS,μ,u0)
 end
 
-function relaxedelectron_internalenergy(relax_dis,egrid,μ::Real,DOS::Spline1D,u0::Real)
-    relax_spl = get_interpolate(egrid,relax_dis)
-    return get_internalenergyspl(μ,relax_spl,DOS,u0)
+function relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid,DOS::Spline1D,μ::Real,u0::Real)
+    dis_spl = get_interpolate(egrid,relax_dis)
+    return get_internalenergyspl(μ,dis_spl,DOS,u0)
 end
-@register_symbolic relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid::AbstractVector,μ::Num,DOS::Spline1D,u0::Num)
+@register_symbolic relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid::AbstractVector,DOS::Spline1D,μ::Num,u0::Num)::Real

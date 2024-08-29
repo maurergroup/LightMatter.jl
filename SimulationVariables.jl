@@ -23,7 +23,7 @@ end
     enough to capture all thermal and non-thermal behaviour.
 """
 get_interpolate(xvals::AbstractVector,yvals::AbstractVector) = Spline1D(xvals,yvals,bc="nearest")
-@register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
+#@register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
 """
     A callback function used to update the chemical potential with temperature. Is used when 
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
@@ -61,11 +61,12 @@ function get_noparticlesspl(μ::Real,Dis::Spline1D,DOS::Spline1D,n0)
     return uroot_neg+uroot_pos+n0
 end
 
-function get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)::Real
+function get_noparticles(Dis,DOS::Spline1D,egrid)
     integrand = Dis.*DOS(egrid)
     prob = SampledIntegralProblem(integrand,egrid)
     return solve(prob,SimpsonsRule()).u
 end
+@register_symbolic get_noparticles(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)
 
 function get_n0(DOS,μ)
     int(u,p) = DOS(u)
@@ -121,13 +122,12 @@ function internalenergy_int(y,u,p)
     end
 end
 
-
 function get_internalenergy_grid(Dis,DOS,egrid)
     integrand = Dis.*DOS(egrid).*egrid
     prob = SampledIntegralProblem(integrand,egrid)
     return solve(prob,SimpsonsRule()).u
 end
-
+@register_symbolic get_internalenergy_grid(Dis::AbstractVector,DOS::Spline1D,egrid::AbstractVector)
 function get_u0(DOS,μ)
     int(u,p) = DOS(u)*u
     prob=IntegralProblem(int,(-Inf,μ))

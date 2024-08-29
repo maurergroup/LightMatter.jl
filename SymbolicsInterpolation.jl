@@ -17,8 +17,5 @@ SymbolicUtils.promote_symtype(t::Spline1D, _...) = Real
 Base.nameof(spl::Spline1D) = :Interpolation
 
 Spline1D(x::Symbolics.Arr,y::Symbolics.Arr,bc="nearest") = SymbolicUtils.term(Spline1D,x,y,bc)
-#= function symbolic_t(T)
-    return has_symwrapper(T) ? Union{wrapper_type(T), Symbolic{<:T}} : Symbolic{<:T}
-end
-R = symbolic_t(Real)
-A = symbolic_t(Vector{Real}) =#
+Spline1D(x::Vector{SymbolicUtils.BasicSymbolic{Real}},y::Vector{SymbolicUtils.BasicSymbolic{Real}},bc="nearest") = SymbolicUtils.term(Spline1D,x,y,bc)
+
