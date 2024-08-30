@@ -42,7 +42,7 @@ function generate_variableconnections(sys)
     for i in 1:length(sys)-1
         for j in i+1:length(sys)
             if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :neq
-                push!(connections,getproperty(sys[i],:relax_dis) ~ getproperty(getproperty(sys[j],:dfneq),:neqelel))
+                push!(connections,getproperty(sys[i],:relax_dis) ~ -1*getproperty(getproperty(sys[j],:dfneq),:neqelel))
                 push!(connections,getproperty(getproperty(sys[i],:dTel),:Tel) ~ getproperty(sys[j],:Tel))
             end
             if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :partchange
@@ -82,7 +82,6 @@ function generate_parameterconnections(sys)
         for j in i+1:length(sys)
             if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :neq
                 push!(defaults,getproperty(getproperty(sys[i],:dTel),:kB) => getproperty(sys[j],:kB))
-                push!(defaults,getproperty(getproperty(sys[i],:dTel),:μ) => getproperty(sys[j],:μ))
             end
             for x in 1:length(parameters(sys[i]))
                 for y in 1:length(parameters(sys[j]))
@@ -165,7 +164,7 @@ function generate_callbacks(sim,sys,mp,cons)
             if sim.Systems.ElectronTemperature==true
                 Electron_temp = sys[1]
                 partchange = sys[2]
-                chempot = (t>=0.0) => (update_chempotAthEM!,[Electron_temp.dTel.Tel=>:Tel,partchange.n => :n],
+                chempot = (t>=-1e5) => (update_chempotAthEM!,[Electron_temp.dTel.Tel=>:Tel,partchange.n => :n],
                 [Electron_temp.μ=>:μ,Electron_temp.dTel.kB=>:kB],[Electron_temp.μ],(mp.DOS))
                 push!(events,chempot)
             end

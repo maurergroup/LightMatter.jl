@@ -13,11 +13,11 @@ function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser
                     dTel.Tel ~ Tel]
         compose(ODESystem(connections,t;name),dTel)
     elseif sim.Systems.NonEqElectrons==true
+        @parameters μ
         egl = length(mp.egrid)
         @named dTel = athem_elec_template(mp.DOS)
         connections =[dTel.Δu ~ electronelectron_internalenergy(mp.DOS,egl)]
-
-        compose(ODESystem(connections,t;name),dTel)
+        compose(ODESystem(connections,t;name,defaults=[dTel.μ=>μ]),dTel)
     end
 end
 """``

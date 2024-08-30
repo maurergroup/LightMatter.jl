@@ -73,7 +73,7 @@ function electronelectron_wrapper(sim,fneq,feq,DOS,egl)
         @variables n(t) Tel(t)
         @parameters egrid[1:egl] μ kB u0 FE τ 
 
-        return athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS).*flt_relaxation(τ,FE,μ,egrid,kB,Tel)
+        return -athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS).*flt_relaxation(τ,FE,μ,egrid,kB,Tel)
     else
         return zeros(egl)
     end
