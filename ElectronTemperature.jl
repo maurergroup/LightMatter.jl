@@ -6,18 +6,19 @@ function t_electron_factory(mp::MaterialParameters,sim::SimulationSettings,laser
     @variables Tel(t)
     if sim.Systems.NonEqElectrons==false
         @named dTel = ttm_elec_template()
-        connections =[dTel.HeatCapacity ~ t_electron_heatcapacity(mp,sim),
-                    dTel.ElecPhon ~ t_electron_phononcoupling(mp,sim),
+        connections =[dTel.HeatCapacity ~ t_electron_heatcapacity(sim),
+                    dTel.ElecPhon ~ t_electron_phononcoupling(sim),
                     dTel.Spatial ~ 0.0,
                     dTel.Source ~laser,
                     dTel.Tel ~ Tel]
         compose(ODESystem(connections,t;name),dTel)
     elseif sim.Systems.NonEqElectrons==true
-        @parameters μ
+        @parameters μ DOS::Spline1D
         egl = length(mp.egrid)
-        @named dTel = athem_elec_template(mp.DOS)
-        connections =[dTel.Δu ~ electronelectron_internalenergy(mp.DOS,egl)]
-        compose(ODESystem(connections,t;name,defaults=[dTel.μ=>μ]),dTel)
+        @named dTel = athem_elec_template()
+        connections =[dTel.Δu ~ electronelectron_internalenergy(egl),
+                      dTel.Δn ~ electronelectron_particlechange(egl)]
+        compose(ODESystem(connections,t;name,defaults=[dTel.μ=>μ,dTel.DOS=>DOS]),dTel)
     end
 end
 """``
@@ -40,11 +41,11 @@ end
     flag to determine whether a linear approximation or non-linear term is utilised and sets up
     the relative equation.
 """
-function t_electron_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
+function t_electron_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
-        @parameters kB μ
+        @parameters kB μ DOS::Spline1D
         @variables  Tel(t)
-        return nonlinear_electronheatcapacity(kB,Tel,μ,mp.DOS)
+        return nonlinear_electronheatcapacity(kB,Tel,μ,DOS)
     else
         @parameters γ 
         @variables Tel(t)
@@ -62,7 +63,7 @@ function nonlinear_electronheatcapacity(kB,Tel,μ,DOS::Spline1D)
     int(u,p) = electronheatcapacity_int(u,p)
     return solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
 end
-@register_symbolic nonlinear_electronheatcapacity(kB::Num,Tel::Num,μ::Num,DOS::Spline1D)
+@register_symbolic nonlinear_electronheatcapacity(kB::Num,Tel::Num,μ::Num,DOS::SymbolicUtils.BasicSymbolic{Spline1D})
 """
     The integrand for the non-linear electronic heat capacity using a parameter tuple 
     p=(kB, Tel, μ, DOS). The integrand is currently out-of-place.
@@ -74,13 +75,13 @@ end
     Defines and returns the requested equation for the electron-phonon coupling. Uses the Boolean
     flag to determine whether a constant or non-constant g value is used.
 """
-function t_electron_phononcoupling(mp::MaterialParameters,sim::SimulationSettings)
+function t_electron_phononcoupling(sim::SimulationSettings)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
-            @parameters hbar kB λ μ
+            @parameters hbar kB λ μ DOS::Spline1D
             @variables Tel(t) Tph(t)
 
-            return nonlinear_electronphononcoupling(hbar,kB,λ,mp.DOS,Tel,μ,Tph)
+            return nonlinear_electronphononcoupling(hbar,kB,λ,DOS,Tel,μ,Tph)
         else
             @parameters g 
             @variables Tel(t) Tph(t)
@@ -103,7 +104,7 @@ function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::Spli
     g=prefac.*solve(IntegralProblem(int,(μ-(6*Tel/10000),μ+(6*Tel/10000)),p),HCubatureJL(initdiv=10);reltol=1e-3,abstol=1e-3).u
     return -g*(Tel-Tph)
 end
-@register_symbolic nonlinear_electronphononcoupling(hbar::Num,kB::Num,λ::Num,DOS::Spline1D,Tel::Num,μ::Num,Tph::Num)
+@register_symbolic nonlinear_electronphononcoupling(hbar::Num,kB::Num,λ::Num,DOS::SymbolicUtils.BasicSymbolic{Spline1D},Tel::Num,μ::Num,Tph::Num)
 """
     The integrand for the non-constant electron-phonon coupling parameter using a parameter tuple 
     p=(kB, Tel, μ, DOS). The integrand is currently out-of-place.
@@ -112,18 +113,18 @@ function electronphononcoupling_int(u::Real,p::Tuple{Real,Real,Real,Spline1D})
     return p[4](u)^2*-dFDdE(p[1],p[2],p[3],u)
 end
 
-function athem_elec_template(DOS;name)
+function athem_elec_template(;name)
     @variables Tel(t) Δu(t) Δn(t)
-    @parameters kB μ 
+    @parameters kB μ DOS::Spline1D
 
     eqs = [D(Tel) ~ 1/(c_T(μ,Tel,DOS,kB)*p_μ(μ,Tel,DOS,kB)-p_T(μ,Tel,DOS,kB)*c_μ(μ,Tel,DOS,kB))*(p_μ(μ,Tel,DOS,kB)*Δu-c_μ(μ,Tel,DOS,kB)*Δn)]
 
     ODESystem(eqs,t;name)
 end
 
-function electronelectron_internalenergy(DOS,egl)
+function electronelectron_internalenergy(egl)
     @variables relax_dis(t)[1:egl]
-    @parameters egrid[1:egl] μ u0
+    @parameters egrid[1:egl] μ u0 DOS::Spline1D
     return  relaxedelectron_internalenergy(relax_dis,egrid,DOS,μ,u0)
 end
 
@@ -131,4 +132,4 @@ function relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid,DOS::Spl
     dis_spl = get_interpolate(egrid,relax_dis)
     return get_internalenergyspl(μ,dis_spl,DOS,u0)
 end
-@register_symbolic relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid::AbstractVector,DOS::Spline1D,μ::Num,u0::Num)::Real
+@register_symbolic relaxedelectron_internalenergy(relax_dis::AbstractVector,egrid::AbstractVector,DOS::SymbolicUtils.BasicSymbolic{Spline1D},μ::Num,u0::Num)::Real

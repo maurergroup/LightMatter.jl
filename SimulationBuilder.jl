@@ -1,21 +1,21 @@
 using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Dierckx,DelimitedFiles,Integrals
 using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse,Cubature,Roots,LaTeXStrings
 using ModelingToolkit: t_nounits as t, D_nounits as D
-include("SimulationVariables.jl")
+#= include("SimulationVariables.jl")
 include("SimulationSetup.jl")
 include("Lasers.jl")
 include("ElectronTemperature.jl")
 include("PhononTemperature.jl")
 include("SystemBuilder.jl")
-include("ElectronDistribution.jl")
+include("ElectronDistribution.jl") =#
 
 println("Compiled functions")
 
 
 function setup()
     las=define_laser_system(:Gaussian,fwhm=25,fluence=111,photon_en=3.1)
-    sim = define_simulation_settings(nlchempot=true,nlelecphon=true,nlelecheat=true,noneqelec=false
-    ,elecphonint=true,elecelecint=false,electemp=true,phonontemp=true)
+    sim = define_simulation_settings(nlchempot=true,nlelecphon=true,nlelecheat=true,noneqelec=true
+    ,elecphonint=false,elecelecint=true,electemp=true,phonontemp=false)
     mp = define_material_parameters(las,extcof=12.7,gamma=4.4315e-22,debye=165,noatoms=59,plasma=2.1357,thermalcond=320.0,
     elecperatom=1,eleceffmass=1.1,dos="DOS/Au_DOS.dat",secmomspecfun=23e-6,elecphon=1.44e-7,ballistic=0.0,cph=0.015)
     cons=Constants(8.617e-5,0.6582)

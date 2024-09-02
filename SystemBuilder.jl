@@ -3,9 +3,10 @@ function build_system(sim,mp,las,cons,dim,initialtemps=Dict("Nil"=>0.0)::Dict)
     laser=laser_factory(las,dim)
     sys = generate_systems(mp,sim,laser)
     connections = generate_variableconnections(sys)
+    #connections = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(connections)))
     default_params = generate_parameterconnections(sys)
     events = generate_callbacks(sim,sys,mp,cons)
-    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params,discrete_events=events),sys);
+    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params),sys);
     connected_sys = structural_simplify(connected)
     u0 = generate_initalconditions(connected_sys,mp,cons,initialtemps)
     p = generate_parametervalues(connected_sys,mp,las,cons,initialtemps)
@@ -20,7 +21,7 @@ function generate_systems(mp,sim,laser)
         @named Electron_temp = t_electron_factory(mp,sim,laser)
         push!(sys,Electron_temp)
         if sim.Systems.NonEqElectrons == true
-            @named partchange = particle_change(mp.DOS,length(mp.egrid))
+            @named partchange = particle_change(length(mp.egrid))
             push!(sys,partchange)
         end
     end
@@ -30,24 +31,24 @@ function generate_systems(mp,sim,laser)
     end
     if sim.Systems.NonEqElectrons == true
         egl = length(mp.egrid)
-        @named neq = athem_factory(sim,mp.DOS,laser,egl)
+        @named neq = athem_factory(sim,laser,egl)
         push!(sys,neq)
     end
     return sys    
 end 
 
 function generate_variableconnections(sys)
-    connections = Vector{Equation}(undef,0)
+    connections = Vector{Any}(undef,0)
     connected = Vector{Symbol}(undef,0)
     for i in 1:length(sys)-1
         for j in i+1:length(sys)
             if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :neq
-                push!(connections,getproperty(sys[i],:relax_dis) ~ -1*getproperty(getproperty(sys[j],:dfneq),:neqelel))
+                push!(connections,getproperty(sys[i],:relax_dis) .~ -1*getproperty(getproperty(sys[j],:dfneq),:neqelel))
                 push!(connections,getproperty(getproperty(sys[i],:dTel),:Tel) ~ getproperty(sys[j],:Tel))
             end
-            if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :partchange
+            #= if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :partchange
                 push!(connections,getproperty(getproperty(sys[i],:dTel),:Δn) ~ D(getproperty(sys[j],:n)))
-            end
+            end =#
             for x in 1:length(sys[i].unknowns)
                 sym_x = Symbol(sys[i].unknowns[x])
                 for y in 1:length(sys[j].unknowns)
@@ -57,7 +58,7 @@ function generate_variableconnections(sys)
                         if symstring[end] == ']'
                             choppedsym = Symbol(chop(symstring,tail=11,head=1))
                             if Symbol(getproperty(sys[j],choppedsym)) ∉ connected
-                                push!(connections,getproperty(sys[i],choppedsym) ~ getproperty(sys[j],choppedsym))
+                                push!(connections,getproperty(sys[i],choppedsym) .~ getproperty(sys[j],choppedsym))
                                 push!(connected,Symbol(getproperty(sys[j],choppedsym)))
                             end
                         else
@@ -76,7 +77,7 @@ function generate_variableconnections(sys)
 end
 
 function generate_parameterconnections(sys)
-    defaults = Vector{Pair{Union{Num,Symbolics.Arr{Num,1}},Any}}(undef,0)
+    defaults = Vector{Pair{Union{Num,Symbolics.Arr{Num,1},SymbolicUtils.BasicSymbolic{Spline1D}},Any}}(undef,0)
     connected = Vector{Symbol}(undef,0)
     for i in 1:length(sys)-1
         for j in i+1:length(sys)
@@ -165,7 +166,7 @@ function generate_callbacks(sim,sys,mp,cons)
                 Electron_temp = sys[1]
                 partchange = sys[2]
                 chempot = (t>=-1e5) => (update_chempotAthEM!,[Electron_temp.dTel.Tel=>:Tel,partchange.n => :n],
-                [Electron_temp.μ=>:μ,Electron_temp.dTel.kB=>:kB],[Electron_temp.μ],(mp.DOS))
+                [Electron_temp.μ=>:μ,Electron_temp.dTel.kB=>:kB,Electron_temp.DOS=>:DOS],[Electron_temp.μ])
                 push!(events,chempot)
             end
         end
