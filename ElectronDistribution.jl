@@ -9,10 +9,10 @@ function athem_factory(sim::SimulationSettings,laser::Num,egl::Int;name)
         @parameters Tel feq[1:egl]
     end
 
-    @parameters kB egrid[1:egl] μ
+    @parameters kB egrid[1:egl] μ hv u0 n0
     @named dfneq = athem_template(egl)
     feq = FermiDirac(egrid,μ,Tel,kB)
-    connections = [dfneq.Source .~ athem_wrapper(dfneq.fneq,feq,egl)*laser
+    connections = [dfneq.Source .~ athem_excitation(egrid,ftot,hv,DOS,μ,u0,n0)*laser
                    dfneq.neqelel .~  electronelectron_wrapper(sim,dfneq.fneq,feq,egl)]
 
     connections = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(connections)))
@@ -36,36 +36,30 @@ function athem_template(egl::Int;name)
     ODESystem(eqs,t;name)
 end
 
-function athem_wrapper(fneq,feq,egl)
-    @parameters (egrid)[1:egl] hv DOS::Spline1D
-    return athem_excitation(egrid,feq,fneq,hv,DOS)
-end
-
-function athem_excitation(egrid,feq,fneq,hv::Real,DOS::Spline1D)
-    ftot = fneq.+feq
-    ftotspl=get_interpolate(egrid,ftot)
-
-    Δfe = fgr_electron_generation(egrid,DOS,ftotspl,hv)
-    Δfh = fgr_hole_generation(egrid,DOS,ftotspl,hv)
-
-    pc_sf = get_noparticles(Δfe,DOS,egrid) / get_noparticles(Δfh,DOS,egrid)
-    Δfshape = (Δfe.*pc_sf).-Δfh
-    inten = get_internalenergy_grid(Δfshape,DOS,egrid)
-
+function athem_excitation(egrid,ftot,hv,DOS::Spline1D,μ,u0,n0)
+    Δfe = fgr_electron_generation(egrid,DOS,ftot,hv)
+    Δfh = fgr_hole_generation(egrid,DOS,ftot,hv)
+    pc_sf = get_noparticlesspl(μ,egrid,Δfe,DOS,n0) / get_noparticlesspl(μ,egrid,Δfh,DOS,n0)
+    Δfshape = (Δfe*pc_sf).-Δfh
+    inten = get_internalenergyspl(μ,egrid,Δfshape,DOS,u0)
     return Δfshape./inten
 end
-@register_array_symbolic athem_excitation(egrid::AbstractVector,feq::AbstractVector,fneq::AbstractVector,hv::Num,DOS::SymbolicUtils.BasicSymbolic{Spline1D}) begin
-    size = (length(egrid),)
-    eltype = eltype(fneq)
-end
 
-
-function fgr_hole_generation(egrid,DOS::Spline1D,ftotspl::Spline1D,hv::Real)
+function fgr_hole_generation(egrid,DOS::Spline1D,ftot,hv::Real)
+    ftotspl=get_interpolate(egrid,ftot)
     return DOS(egrid.+hv).*ftotspl(egrid).*(1 .-ftotspl(egrid.+hv))
 end
-
-function fgr_electron_generation(egrid,DOS::Spline1D,ftotspl::Spline1D,hv::Real)
+@register_array_symbolic fgr_hole_generation(egrid::AbstractVector,DOS::Spline1D,ftot::AbstractVector,hv::Num) begin
+    size=(length(egrid),)
+    eltype=eltype(ftot)
+end
+function fgr_electron_generation(egrid,DOS::Spline1D,ftot,hv::Real)
+    ftotspl=get_interpolate(egrid,ftot)
     return DOS(egrid.-hv).*ftotspl(egrid.-hv).*(1 .-ftotspl(egrid))
+end
+@register_array_symbolic fgr_electron_generation(egrid::AbstractVector,DOS::Spline1D,ftot::AbstractVector,hv::Num) begin
+    size=(length(egrid),)
+    eltype=eltype(ftot)
 end
 
 function electronelectron_wrapper(sim,fneq,feq,egl)
@@ -79,16 +73,10 @@ function electronelectron_wrapper(sim,fneq,feq,egl)
     end
 end
 
-function athem_electronelectronrelaxation(fneq::AbstractVector,feq::AbstractVector,egrid::AbstractVector,μ::Real,kB::Real,u0::Real,n::Real,DOS::Spline1D)
-    ftot = feq .+ fneq
-    ftot_spl = get_interpolate(egrid,ftot)
-    goal = get_internalenergyspl(μ,ftot_spl,DOS,u0)
+function athem_electronelectronrelaxation(fneq,feq,egrid,μ,kB,u0,n,DOS::Spline1D)
+    goal = get_internalenergyspl(μ,egrid,feq.+fneq,DOS,u0)
     frel = find_relaxed_eedistribution(goal,kB,egrid,n,DOS,u0)
-    return (fneq .+ frel .- feq)
-end
-@register_array_symbolic athem_electronelectronrelaxation(fneq::AbstractVector,feq::AbstractVector,egrid::AbstractVector,μ::Num,kB::Num,u0::Num,n::Num,DOS::SymbolicUtils.BasicSymbolic{Spline1D}) begin
-    size=(length(fneq),)
-    eltype = eltype(fneq)
+    return fneq .+ frel .- feq
 end
 
 function find_relaxed_eedistribution(goal,kB,egrid,n,DOS,u0)
@@ -97,11 +85,9 @@ function find_relaxed_eedistribution(goal,kB,egrid,n,DOS,u0)
     rel_μ = find_chemicalpotential(n,rel_Tel,0.0,DOS,kB)
     return FermiDirac(egrid,rel_μ,rel_Tel,kB)
 end
-
-function relaxed_internalenergy(T,n,DOS,kB,egrid,u0)
-    cp = find_chemicalpotential(n,T,0.0,DOS,kB)
-    u = get_internalenergyspl(cp,get_interpolate(egrid,FermiDirac(egrid,cp,T,kB)),DOS,u0)
-    return u
+@register_array_symbolic find_relaxed_eedistribution(goal::Num,kB::Num,egrid::AbstractVector,n::Num,DOS::Spline1D,u0::Num) begin
+    size=(length(egrid),)
+    eltype=eltype(egrid)
 end
 
 function flt_relaxation(τ,FE,μ,egrid,kB,Tel)

@@ -9,8 +9,8 @@ function t_phonon_factory(mp::MaterialParameters,sim::SimulationSettings;name)
     @variables Tph(t) Tel(t)
     @named dTph = t_phonon_template()
     connections=[dTph.Source ~ t_phonon_sourceterm(sim),
-                 dTph.HeatCapacity ~ t_phonon_heatcapacity(mp,sim),
-                 dTph.ElecPhon ~ -t_electron_phononcoupling(mp,sim),
+                 dTph.HeatCapacity ~ t_phonon_heatcapacity(sim),
+                 dTph.ElecPhon ~ -t_electron_phononcoupling(sim),
                  dTph.Tph ~ Tph]
     compose(ODESystem(connections,t;name),dTph)
 end
@@ -51,7 +51,7 @@ end
     flag to determine whether a constant parameter is used or Simpson's rule is used to evaluate 
     the heat capacity.
 """
-function t_phonon_heatcapacity(mp::MaterialParameters,sim::SimulationSettings)
+function t_phonon_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.PhononHeatCapacity == true
         @parameters n kB θ
         @variables Tph(t)

@@ -1,13 +1,14 @@
 
 function build_system(sim,mp,las,cons,dim,initialtemps=Dict("Nil"=>0.0)::Dict)
-    laser=laser_factory(las,dim)
+    laser=laser_factory(las,mp,dim)
     sys = generate_systems(mp,sim,laser)
     connections = generate_variableconnections(sys)
     #connections = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(connections)))
     default_params = generate_parameterconnections(sys)
     events = generate_callbacks(sim,sys,mp,cons)
     connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params),sys);
-    connected_sys = structural_simplify(connected)
+    ir_connected = IRSystem(connected)
+    connected_sys = structural_simplify(ir_connected)
     u0 = generate_initalconditions(connected_sys,mp,cons,initialtemps)
     p = generate_parametervalues(connected_sys,mp,las,cons,initialtemps)
     precalculators!(connected_sys,p,sim,mp)
@@ -77,7 +78,7 @@ function generate_variableconnections(sys)
 end
 
 function generate_parameterconnections(sys)
-    defaults = Vector{Pair{Union{Num,Symbolics.Arr{Num,1},SymbolicUtils.BasicSymbolic{Spline1D}},Any}}(undef,0)
+    defaults = Vector{Pair{Union{Num,Symbolics.Arr{Num,1},SymbolicUtils.BasicSymbolic{Interpolations.Extrapolation}},Any}}(undef,0)
     connected = Vector{Symbol}(undef,0)
     for i in 1:length(sys)-1
         for j in i+1:length(sys)

@@ -3,7 +3,6 @@
     Each laser type also has a functor defined for it which returns the equation describing how the laser evolves 
     over time. Lasers are centred on t = 0
 """
-abstract type Laser <: Simulation end
 @kwdef struct Gaussian <: Laser
     FWHM::Real
     ϕ::Real
@@ -81,57 +80,52 @@ end
     laser(power) and how the laser penetrates into a material(spatial). Returns a Num equation that holds the 
     relevant parameters and structure of the laser.
 """
-function laser_factory(laser::Laser,dims=Homogenous()::Dimension)
-    temporal = laser()
-    power = intensity()
-    spatial = spatial_laser(laser,dims)
+function laser_factory(laser::Laser,mp::MaterialParameters,dims=Homogenous()::Dimension)
+    temporal = laser(laser)
+    power = intensity(laser)
+    spatial = spatial_laser(laser,dims,mp)
     return temporal*spatial*power
 end
 """
     Creates the parameters that represent the Reflectivity(R) of the material and the Fluence(ϕ) of the laser.
     Returns the component of the laser equation responsible for the laser power absorbed by the material.
 """
-function intensity()
-    @parameters R ϕ
-    return (1-R)*ϕ
+function intensity(laser)
+    return (1-laser.R)*laser.ϕ
 end
 """
     Normalised Gaussian temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
 """
-function (::Gaussian)()
-    @parameters FWHM
-    return sqrt(4*log(2)/pi)/FWHM*exp(-4*log(2)*t^2/FWHM^2)
+function (::Gaussian)(laser)
+    return sqrt(4*log(2)/pi)/laser.FWHM*exp(-4*log(2)*t^2/laser.FWHM^2)
 end
 """
     Normalised Hyperbolic Secant temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
 """
-function (::HyperbolicSecant)()
-    @parameters FWHM 
-    sec = sech(2*log(1+sqrt(2))*(t/FWHM))^2
-   return log(1+sqrt(2))/FWHM * sec
+function (::HyperbolicSecant)(laser)
+    sec = sech(2*log(1+sqrt(2))*(t/laser.FWHM))^2
+   return log(1+sqrt(2))/laser.FWHM * sec
 end
 """
     Normalised Lorentzian temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
 """
-function (::Lorentzian)()
-    @parameters FWHM
-    lorent = (1+(4/(1+sqrt(2))*(t/FWHM)^2))^-2
-    return 4*sqrt(sqrt(2)-1)/(pi*FWHM)*lorent
+function (::Lorentzian)(laser)
+    lorent = (1+(4/(1+sqrt(2))*(t/laser.FWHM)^2))^-2
+    return 4*sqrt(sqrt(2)-1)/(pi*laser.FWHM)*lorent
 end
 """
     Normalised Rectangular(continuous illumination) temporal profile which creates the parameters
     for the Full-Width at Half-Maximum(FWHM).
 """
-function (::Rectangular)()
-    @parameters FWHM
-    return IfElse.ifelse(t≤2*FWHM,IfElse.ifelse(-2*FWHM≤t,1/(4*FWHM),0.0),0.0)
+function (::Rectangular)(laser)
+    return IfElse.ifelse(t≤2*laser.FWHM,IfElse.ifelse(-2*laser.FWHM≤t,1/(4*laser.FWHM),0.0),0.0)
 end
 """
     This builds the equation which defines how the laser energy is absorbed the further from
     the centre of the spot. This is split into a z and an x/y component.
 """
-function spatial_laser(laser::Laser,slab::Dimension)
-    z_laser = spatial_z_laser(laser,slab)
+function spatial_laser(laser::Laser,slab::Dimension,mp::MaterialParameters)
+    z_laser = spatial_z_laser(laser,slab,mp)
     xy_laser = spatial_xy_laser(slab)
     return z_laser.*xy_laser
 end
@@ -142,28 +136,25 @@ end
     depending on how the transport is modelled. It is assumed that the laser field is propogating
     along the z-axis
 """
-function spatial_z_laser(laser::Laser,slab::Dimension)
+function spatial_z_laser(laser::Laser,slab::Dimension,mp::MaterialParameters)
     @parameters zgrid Z 
     if laser.Transport == "Ballistic"
-        @parameters δb
         if typeof(slab) == Homogenous
-            return 1/δb
+            return 1/mp.δb
         else
-            return 1/(δb*(1-exp(-Z/δb))).*exp.(-zgrid./δb)
+            return 1/(mp.δb*(1-exp(-Z/mp.δb))).*exp.(-zgrid./mp.δb)
         end
     elseif laser.Transport == "Optical"
-        @parameters ϵ
         if typeof(slab) == Homogenous
-            return 1/ϵ
+            return 1/mp.ϵ
         else
-            return 1/(ϵ*(1-exp(-Z/ϵ))).*exp.(-zgrid./ϵ)
+            return 1/(mp.ϵ*(1-exp(-Z/mp.ϵ))).*exp.(-zgrid./mp.ϵ)
         end
     elseif laser.Transport == "Combined"
-        @parameters δb ϵ
         if typeof(slab) == Homogenous
-            return 1/(δb+ϵ)
+            return 1/(mp.ϵ+mp.ϵ)
         else
-            return 1/((δb+ϵ)*(1-exp(-Z/(δb+ϵ)))).*exp.(-zgrid./(δb+ϵ))
+            return 1/((mp.ϵ+mp.ϵ)*(1-exp(-Z/(mp.ϵ+mp.ϵ)))).*exp.(-zgrid./(mp.ϵ+mp.ϵ))
         end
     end
 end

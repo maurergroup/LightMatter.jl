@@ -55,9 +55,8 @@ function define_laser_system(Laser::Symbol;fwhm::Real,fluence::Real,
     end
 end
 
-function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
+#= function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
     fluence=dict.Fluence::Real,photon_en=Dict.hv::Real,R=dict.R::Real)
-
     if Laser == "Gaussian"
         return Gaussian(FWHM=fwhm,Power=fluence,hv=photon_en,
         R=R)
@@ -74,7 +73,7 @@ function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
         print("The laser type you chose is currently implemented, the current options
         are Gaussian, Lorentzian, HyperbolicSecant and Rectangular")
     end
-end
+end =#
 """
     Factory builds the laser from three components defining the evolution in time(temporal), the power of the
     laser(power) and how the laser penetrates into a material(spatial). Returns a Num equation that holds the 

@@ -2,7 +2,7 @@
     Type that all abstract types will derive from
 """
 abstract type Simulation end #Overarching type that holds all simulation settings
-abstract type Laser <: Simulation end # Holds all Lasers
+abstract type Laser <: Simulation end
 """
     Booleans for interactions between different ODE systems are held within this struct.
     They are used as flags to determine whether couplings should evaluate to a function

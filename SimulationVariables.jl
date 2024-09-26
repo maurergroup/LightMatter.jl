@@ -22,8 +22,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::AbstractVector,yvals::AbstractVector) = Spline1D(xvals,yvals,bc="nearest")
-#@register_symbolic get_interpolate(xvals::AbstractVector,yvals::AbstractVector)::Spline1D
+get_interpolate(xvals,yvals) = Spline1D(xvals,yvals,bc="nearest")
 """
     A callback function used to update the chemical potential with temperature. Is used when 
     Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 

@@ -18,14 +18,9 @@ function phonontemperature_heatcapacity(sim::SimulationSettings)
 end
 
 function nonlinear_phononheatcapacity(Tph::Real,n::Real,kB::Real,θ::Real)
-    int(u,p) = nonlinear_phononheatcapacity_int(u)
-    return 9*n*kB*(Tph/θ)^3*solve(IntegralProblem(int,0.0,θ/Tph),HCubatureJL(initdiv=2);abstol=1e-3,reltol=1e-3).u
-end
-"""
-    The integrand for the non-linear phononic heat capacity. Currently it is out-of-place.
-"""
-function nonlinear_phononheatcapacity_int(u::Real)
-    return u^4*exp(u)/(exp(u)-1)^2
+    int(u,p) = u^4*exp(u)/(exp(u)-1)^2
+    prob = IntegralProblem(int,(0.0,θ/Tph))
+    return 9*n*kB*(Tph/θ)^3*solve(prob,HCubatureJL(initdiv=2);abstol=1e-3,reltol=1e-3).u
 end
 
 function phonontemperature_source(sim::SimulationSettings)

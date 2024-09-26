@@ -12,12 +12,7 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,n,FE)
-    TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
-    return get_interpolate(TotalDOS[:,1].+FE,TotalDOS[:,2].*n)
-end
-
-function generate_DOSnil(File::String,n)
+function generate_DOS(File::String,n)
     TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
@@ -27,60 +22,75 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals::Vector{<:Any},yvals::Vector{<:Any}) = Spline1D(xvals,yvals,bc="nearest")
-"""
-    A callback function used to update the chemical potential with temperature. Is used when 
-    Simulation.ParameterAPproximation.ChemicalPotential == true. ctx is a tuple holding the DOS 
-     and number of particles.
-"""
-function update_chempot!(integ,u,p,ctx::Tuple{Spline1D,Real})
-    integ.p[p.μ] = find_chemicalpotential(ctx[2],integ.u[u.Tel],integ.p[p.μ],ctx[1],integ.p[p.kB])
-end
+get_interpolate(xvals,yvals) = LinearInterpolation(xvals,yvals,extrapolation_bc=Flat())
 """
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
     electronic temperature.
 """
-function find_chemicalpotential(no_part::Real,Tel::Real,μ::Real,DOS::Spline1D,kB::Real)
+function find_chemicalpotential(no_part::Real,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
     f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB)
-    return solve(ZeroProblem(f,μ),Order1();atol=1e-3,rtol=1e-3)
+    return solve(ZeroProblem(f,0.0),Order1();atol=1e-2,rtol=1e-2)
 end
 
-function get_thermalparticles(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
-    p=(μ,Tel,kB,DOS)
-    int = BatchIntegralFunction(get_thermalparticlesint,zeros(0))
-    return solve(IntegralProblem(int,(0.0,Inf),p),CubatureJLh();abstol=1e-6,reltol=1e-6).u
-end
-
-function get_thermalparticlesint(y,u,p::Tuple{Real,Real,Real,Spline1D})
-    Threads.@threads for i in 1:length(u)
-        y[i] = FermiDirac(p[2],p[1],p[3],u[i])*p[4](u[i])
-    end
+function get_thermalparticles(μ,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
+    int(u,p) = FermiDirac(Tel,μ,kB,u)*DOS(u)
+    return solve(IntegralProblem(int,(-Inf,Inf)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
 end
 """
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticles(μ::Real,Dis::Spline1D,DOS::Spline1D)
-    int(u,p) = Dis(u) * DOS(u)
-    return solve(IntegralProblem(int,(0.0,μ+10)),HCubatureJL(initdiv=100);reltol=1e-5,abstol=1e-5).u
+function get_noparticlesspl(μ::Real,Dis::Interpolations.Extrapolation,DOS::Interpolations.Extrapolation,n0)
+    int_neg(u,p) = (Dis(u).-1)*DOS(u)
+    uroot_neg = solve(IntegralProblem(int_neg,(-Inf,0.0)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    int_pos(u,p) = Dis(u)*DOS(u)
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    return uroot_neg+uroot_pos+n0
+end
+
+function get_n0(DOS,μ)
+    int(u,p) = DOS(u)
+    prob=IntegralProblem(int,(-Inf,μ))
+    return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+end
+
+function p_T(μ::Real,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
+    int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)
+    prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
+    return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+end
+
+function p_μ(μ::Real,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
+    int(u,p) = dFDdμ(kB,Tel,μ,u)*DOS(u)
+    prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
+    return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergyspl(μ::Real,Dis::Spline1D,DOS::Spline1D)
-    int(u,p) = Dis(u) * DOS(u) * u
-    return solve(IntegralProblem(int,(0.0,μ+10)),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+function get_internalenergyspl(μ::Real,Dis::Interpolations.Extrapolation,DOS::Interpolations.Extrapolation,u0::Real)
+    int_neg(u,p) = (Dis(u)-1)*DOS(u)*u
+    uroot_neg = solve(IntegralProblem(int_neg,(-Inf,0.0)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+    int_pos(u,p) = Dis(u)*DOS(u)*u
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+    return uroot_neg+uroot_pos+u0
 end
 
-function get_internalenergy(μ::Real,Tel::Real,DOS::Spline1D,kB::Real)
-    p = (μ,Tel,kB,DOS)
-    int = BatchIntegralFunction(internalenergy_int,zeros(0))
-    return solve(IntegralProblem(int,(0.0,μ+10),p),CubatureJLh();reltol=1e-5,abstol=1e-5).u
+function get_u0(DOS,μ)
+    int(u,p) = DOS(u)*u
+    prob=IntegralProblem(int,(-Inf,μ))
+    return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
 end
 
-function internalenergy_int(y,u,p)
-    Threads.@threads for i in 1:length(u)
-        @inbounds y[i] = FermiDirac(p[2],p[1],p[3],u[i]).*p[4].(u[i]) *u[i]
-    end
+function c_T(μ::Real,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
+    int(u,p) = dFDdT(kB,Tel,μ,u).*DOS(u)*u
+    prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
+    return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
+end
+
+function c_μ(μ::Real,Tel::Real,DOS::Interpolations.Extrapolation,kB::Real)
+    int(u,p) = dFDdμ(kB,Tel,μ,u).*DOS(u)*u
+    prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
+    return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
 end
