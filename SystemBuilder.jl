@@ -1,196 +1,163 @@
-
-function build_system(sim,mp,las,cons,dim,initialtemps=Dict("Nil"=>0.0)::Dict)
-    laser=laser_factory(las,mp,dim)
-    sys = generate_systems(mp,sim,laser)
-    connections = generate_variableconnections(sys)
-    #connections = Symbolics.scalarize(reduce(vcat, Symbolics.scalarize.(connections)))
-    default_params = generate_parameterconnections(sys)
-    events = generate_callbacks(sim,sys,mp,cons)
-    connected = compose(ODESystem(connections,t,name=:connected,defaults=default_params),sys);
-    ir_connected = IRSystem(connected)
-    connected_sys = structural_simplify(ir_connected)
-    u0 = generate_initalconditions(connected_sys,mp,cons,initialtemps)
-    p = generate_parametervalues(connected_sys,mp,las,cons,initialtemps)
-    precalculators!(connected_sys,p,sim,mp)
-
-    return connected_sys,u0,p
+function function_builder()
+    sim,mp,las,dim,cons = setup()
+    laser=laser_factory(las,dim)
+    sys,key_list = generate_expressions(sim,laser,dim)
+    args = generate_arguments(sim)
+    if typeof(dim) == Homogeneous
+        scalar_functions(sys,key_list,args)
+    else
+        multithread_functions(sys,key_list,args)
+    end
+    return key_list
 end
 
-function generate_systems(mp,sim,laser)
-    sys = Vector{ODESystem}(undef,0)
+function generate_expressions(sim,laser,dim)
+    exprs = Dict{String,Union{Expr,Vector{Expr}}}()
     if sim.Systems.ElectronTemperature == true
-        @named Electron_temp = t_electron_factory(mp,sim,laser)
-        push!(sys,Electron_temp)
-        if sim.Systems.NonEqElectrons == true
-            @named partchange = particle_change(length(mp.egrid))
-            push!(sys,partchange)
-        end
+        merge!(exprs,Dict("Tel" => electrontemperature_factory(sim,laser,dim)))
     end
     if sim.Systems.PhononTemperature == true
-        @named Phonon_temp=t_phonon_factory(mp,sim)
-        push!(sys,Phonon_temp)
+        merge!(exprs,Dict("Tph" => phonontemperature_factory(sim)))
     end
     if sim.Systems.NonEqElectrons == true
-        egl = length(mp.egrid)
-        @named neq = athem_factory(sim,laser,egl)
-        push!(sys,neq)
-    end
-    return sys    
-end 
-
-function generate_variableconnections(sys)
-    connections = Vector{Any}(undef,0)
-    connected = Vector{Symbol}(undef,0)
-    for i in 1:length(sys)-1
-        for j in i+1:length(sys)
-            if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :neq
-                push!(connections,getproperty(sys[i],:relax_dis) .~ -1*getproperty(getproperty(sys[j],:dfneq),:neqelel))
-                push!(connections,getproperty(getproperty(sys[i],:dTel),:Tel) ~ getproperty(sys[j],:Tel))
-            end
-            #= if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :partchange
-                push!(connections,getproperty(getproperty(sys[i],:dTel),:Δn) ~ D(getproperty(sys[j],:n)))
-            end =#
-            for x in 1:length(sys[i].unknowns)
-                sym_x = Symbol(sys[i].unknowns[x])
-                for y in 1:length(sys[j].unknowns)
-                    sym_y = Symbol(sys[j].unknowns[y])
-                    if sym_x==sym_y
-                        symstring = String(Symbol(sym_x))
-                        if symstring[end] == ']'
-                            choppedsym = Symbol(chop(symstring,tail=11,head=1))
-                            if Symbol(getproperty(sys[j],choppedsym)) ∉ connected
-                                push!(connections,getproperty(sys[i],choppedsym) .~ getproperty(sys[j],choppedsym))
-                                push!(connected,Symbol(getproperty(sys[j],choppedsym)))
-                            end
-                        else
-                            choppedsym = Symbol(chop(symstring,tail=3))
-                            if Symbol(getproperty(sys[j],choppedsym)) ∉ connected
-                                push!(connections,getproperty(sys[i],choppedsym) ~ getproperty(sys[j],choppedsym))
-                                push!(connected,Symbol(getproperty(sys[j],choppedsym)))
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return connections
-end
-
-function generate_parameterconnections(sys)
-    defaults = Vector{Pair{Union{Num,Symbolics.Arr{Num,1},SymbolicUtils.BasicSymbolic{Interpolations.Extrapolation}},Any}}(undef,0)
-    connected = Vector{Symbol}(undef,0)
-    for i in 1:length(sys)-1
-        for j in i+1:length(sys)
-            if nameof(sys[i]) == :Electron_temp && nameof(sys[j]) == :neq
-                push!(defaults,getproperty(getproperty(sys[i],:dTel),:kB) => getproperty(sys[j],:kB))
-            end
-            for x in 1:length(parameters(sys[i]))
-                for y in 1:length(parameters(sys[j]))
-                    if Symbol(parameters(sys[i])[x])==Symbol(parameters(sys[j])[y])
-                        sym = Symbol(parameters(sys[i])[x])
-                        if Symbol(getproperty(sys[i],sym)) ∉ connected
-                            push!(defaults,getproperty(sys[j],sym) => getproperty(sys[i],sym))
-                            push!(connected,Symbol(getproperty(sys[j],sym)))
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return defaults
-end
-
-function generate_initalconditions(sys,mp,cons,initialtemps)
-    u0=Vector{Pair{Union{Num,Symbolics.Arr{Num,1}},Any}}(undef,0)
-    if length(sys.systems) == 1
-        if nameof(sys.systems[1]) == :dTel
-            push!(u0,getproperty(sys.systems[i],:Tel)=>initialtemps["Tel"])
-        elseif nameof(sys.systems[1]) == :dTph
-            push!(u0,getproperty(sys.systems[i],:Tph)=>initialtemps["Tph"])
-        elseif nameof(sys.systems[1]) == :neq
-            push!(u0,getproperty(getproperty(sys.systems[1],:dfneq),:fneq)=>zeros(length(mp.egrid)))
-        end
-    else
-        for i in eachindex(sys.systems)
-            if nameof(sys.systems[i]) == :Electron_temp
-                push!(u0,getproperty(getproperty(sys.systems[i],:dTel),:Tel)=>initialtemps["Tel"])
-            elseif nameof(sys.systems[i]) == :Phonon_temp
-                push!(u0,getproperty(sys.systems[i],:Tph)=>initialtemps["Tph"])
-            elseif nameof(sys.systems[i]) == :neq
-                push!(u0,getproperty(getproperty(sys.systems[i],:dfneq),:fneq)=>@SVector zeros(length(mp.egrid)))
-            elseif nameof(sys.systems[i]) == :partchange
-                push!(u0,getproperty(sys.systems[i],:n) => get_thermalparticles(mp.μ,1.0,mp.DOS,cons.kB))
-            end
-        end
-    end
-    return u0
-end
-
-function generate_parametervalues(sys,mp,las,cons,initialtemps)
-    params = Vector{Symbol}(undef,0)
-    p=Vector{Pair{Any,Any}}(undef,0)
-    if length(sys.systems) == 1
-        if nameof(sys.systems[1]) == :neq
-            push!(p,getproperty(sys.systems[1],:Tel)=>initialtemps["Tel"])
-        end
-    end
-    for x in parameters(sys)
-        stringsym = String(Symbol(x))
-        chop_idx = findfirst("₊",stringsym)[1]
-        sym=Symbol(chop(stringsym,head=chop_idx,tail=0))
-        if sym ∉ params
-            push!(params,sym)
-            if sym in fieldnames(typeof(mp))
-                push!(p,x=>getproperty(mp,sym))
-            elseif sym in fieldnames(typeof(cons))
-                push!(p,x=>getproperty(cons,sym))
-            elseif sym in fieldnames(typeof(las))
-                push!(p,x=>getproperty(las,sym))
-            end
-        end
-    end
-    return p
-end
-
-function generate_callbacks(sim,sys,mp,cons)
-    events=[]
-    if sim.ParameterApprox.ChemicalPotential == true
-        if sim.Systems.NonEqElectrons==false
-            Electron_temp = sys[1]
-            no_part=get_thermalparticles(mp.μ,1e-18,mp.DOS,cons.kB)
-            chempot = (t>=0.0) => (update_chempotTTM!,[Electron_temp.dTel.Tel=>:Tel],
-            [Electron_temp.μ=>:μ,Electron_temp.kB=>:kB],[Electron_temp.μ],(mp.DOS,no_part))
-            push!(events,chempot)
-        elseif sim.Systems.NonEqElectrons==true
-            if sim.Systems.ElectronTemperature==true
-                Electron_temp = sys[1]
-                partchange = sys[2]
-                chempot = (t>=-1e5) => (update_chempotAthEM!,[Electron_temp.dTel.Tel=>:Tel,partchange.n => :n],
-                [Electron_temp.μ=>:μ,Electron_temp.dTel.kB=>:kB,Electron_temp.DOS=>:DOS],[Electron_temp.μ])
-                push!(events,chempot)
-            end
-        end
-    end
-    return events
-end
-
-function precalculators!(sys,p,sim,mp)
-    #push!(p,getproperty(getproperty(getproperty(sys,:Electron_temp),:dTel),:μ)=>mp.μ)
-    if sim.Systems.NonEqElectrons == true
+        merge!(exprs,Dict("fneq" => athemdistribution_factory(sim,laser,dim)))
         if sim.Interactions.ElectronElectron == true
-            n0 = get_n0(mp.DOS,mp.μ)
-            u0 = get_u0(mp.DOS,mp.μ)
-            push!(p,getproperty(getproperty(sys,:neq),:u0)=>u0)
-            push!(p,getproperty(getproperty(sys,:partchange),:n0)=>n0)
+            merge!(exprs,Dict("noe" => athem_electronparticlechange()))
+        end
+    end
+    return exprs,collect(keys(exprs))    
+end
+
+function generate_arguments(sim::SimulationSettings)
+    args = Dict{String,Tuple}()
+    if sim.Systems.ElectronTemperature == true
+        if sim.Interactions.ElectronElectron == true
+            if sim.Interactions.ElectronPhonon == true
+                merge!(args,Dict("Tel" => ((:Tel,Real),(:Tph,Real),(:mp,MaterialParameters),(:cons,Constants),(:μ,Real),(:relax_dis,Vector{<:Real}),(:Δn,Real),(:cond,Real))))
+            else
+                merge!(args,Dict("Tel" => ((:Tel,Real),(:mp,MaterialParameters),(:cons,Constants),(:μ,Real),(:relax_dis,Vector{<:Real}),:(:Δn,Real),(:cond,Real))))
+            end
+        elseif sim.Interactions.ElectronPhonon == true
+            merge!(args,Dict("Tel" => ((:Tel,Real),(:Tph,Real),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser),(:μ,Real),(:t,Real),(:cond,Real))))
+        else
+            merge!(args,Dict("Tel" => ((:Tel,Real),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser),(:μ,Real),(:t,Real),(:cond,Real))))
+        end
+    end
+
+
+    if sim.Systems.PhononTemperature == true
+        if sim.Systems.NonEqElectrons == true
+            merge!(args,Dict("Tph" => ((:Tel,Real),(:Tph,Real),(:mp,MaterialParameters),(:cons,Constants),(:μ,Real),(:relax_Tphdis,Vector{<:Real}))))
+        else
+            merge!(args,Dict("Tph" => ((:Tel,Real),(:Tph,Real),(:mp,MaterialParameters),(:cons,Constants),(:μ,Real))))
+        end
+    end
+
+    if sim.Systems.NonEqElectrons == true
+        merge!(args,Dict("fneq" => ((:fneq,Vector{<:Real}),(:Tel,Real),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser),(:μ,Real),(:t,Real))))
+        if sim.Interactions.ElectronElectron == true
+            merge!(args,Dict("noe" => ((:relax_dis,Vector{<:Real}),(:μ,Real),(:mp,MaterialParameters))))
+        end
+    end
+
+    return args
+end
+
+function generate_initalconditions(key_list,mp,cons,initialtemps,dim)
+    temp_u = ()
+    for i in key_list
+        if i =="Tel"
+            temp_u = (temp_u...,fill(initialtemps[i],dim.length))
+        elseif i == "Tph"
+            temp_u = (temp_u...,fill(initialtemps[i],dim.length))
+        elseif i == "fneq"
+            temp_u = (temp_u...,zeros(dim.length,length(mp.egrid)))
+        elseif i == "noe"
+            temp_u = (temp_u...,fill(get_thermalparticles(mp.μ,1e-16,mp.DOS,cons.kB,mp.FE),dim.length))
+        end
+    end
+    return ArrayPartition(temp_u)
+end
+
+function generate_parameters(sim,mp,cons,las,initialtemps,dim)
+    if sim.Systems.NonEqElectrons==true
+        if sim.Systems.ElectronTemperature==false
+            n = get_thermalparticles(mp.μ,1e-16,mp.DOS,cons.kB,mp.FE)
+            μ = find_chemicalpotential(n,initialtemps["Tel"],mp.DOS,cons.kB,mp.FE)
+            return (las,mp,cons,dim,initaltemps["Tel"],n,μ)
+        else
+            return (las,mp,cons,dim)
         end
     else
-        return nothing
+        n = get_thermalparticles(0.0,1e-16,mp.DOS,cons.kB,mp.FE)
+        return (las,mp,cons,dim,n)
     end
 end
 
-function run_dynamics(connected_eq,u0,tspan,p)
-    prob=ODEProblem(connected_eq,u0,tspan,p)
-    sol=solve(prob,Tsit5();abstol=1e-5,reltol=1e-5)
-    return sol
+function scalar_functions(sys,key_list,args)
+    for i in key_list
+        make_function(args[i],sys[i],Symbol(i*"_scal"))
+        new_args = ()
+        scalar_args = ()
+        for j in args[i]
+            if j[2] == Real && j[1] != :t
+                new_args=(new_args...,:($(j[1])[1]))
+                scalar_args=(scalar_args...,(j[1],Vector{<:Real}))
+            elseif j[2] == Vector{<:Real} 
+                new_args=(new_args...,:($(j[1])[1]))
+                scalar_args=(scalar_args...,(j[1],Vector{Vector{<:Real}}))
+            else
+                new_args=(new_args...,j[1])
+                scalar_args=(scalar_args...,j)
+            end
+        end
+        expr = scalar_expr(Symbol(i*"_scal"),:du,new_args)
+        scalar_args = (scalar_args...,(:du,Vector{<:Real}))
+        make_function(scalar_args,expr,Symbol(i))
+    end
+end
+
+function multithread_functions(sys,key_list,args)
+    for i in key_list
+        scal_args = (args[i]...,(:i,Int))
+        make_function(scal_args,sys[i],Symbol(i*"_scal"))
+        new_args = ()
+        parallel_args = ()
+        for j in args[i]
+            if j[2] == Real && j[1] != :t
+                new_args=(new_args...,:($(j[1])[i]))
+                parallel_args=(parallel_args...,(j[1],Vector{<:Real}))
+            elseif j[2] == Vector{<:Real} 
+                new_args=(new_args...,:($(j[1])[i]))
+                parallel_args=(parallel_args...,(j[1],Vector{Vector{<:Real}}))
+            else
+                new_args=(new_args...,j[1])
+                parallel_args=(parallel_args...,j)
+            end
+        end
+        expr = multithreaded_expr(Symbol(i*"_scal"),:du,new_args)
+        parallel_args = (parallel_args...,(:du,Vector{<:Real}))
+        make_function(parallel_args,expr,Symbol(i))
+    end
+end  
+
+function make_function(typed_vars::Tuple, expr::Expr,name::Symbol)
+    args = [Expr(:(::), var, typ) for (var, typ) in typed_vars]
+    function_expr = Expr(:function, Expr(:call, name, args...), expr)
+    eval(function_expr)
+    eval(function_expr.args[1].args[1])
+end
+
+function multithreaded_expr(func, result::Symbol, vars)
+    return quote
+        Threads.@threads for i in 1:length($result)
+            $result[i] = $func($(vars...),i)
+        end
+    end
+end
+
+function scalar_expr(func,result,vars)
+    return quote
+        $result[1] = $func($(vars...))
+    end
 end

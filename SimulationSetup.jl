@@ -3,6 +3,7 @@
 """
 abstract type Simulation end #Overarching type that holds all simulation settings
 abstract type Laser <: Simulation end
+spl=DataInterpolations.LinearInterpolation
 """
     Booleans for interactions between different ODE systems are held within this struct.
     They are used as flags to determine whether couplings should evaluate to a function
@@ -50,24 +51,29 @@ abstract type Dimension <: Simulation end
 """
     A type to define the model is in 0D
 """
-struct Homogenous <: Dimension end
+@kwdef struct Homogeneous <: Dimension 
+    length::Int
+    grid::Vector{<:Real}
+end
 """
     1D struct that holds a grid defined by it's length with pre-determined spacing
 """
-@kwdef struct Linear{L} <: Dimension # The 1D model defined by a depth
-    spatial_grid::SVector{L,<:Real}
+@kwdef struct Linear <: Dimension # The 1D model defined by a depth
+    grid::Vector{<:Real}
+    dz::Real
+    length::Int
 end
 """
     2D struct that holds a grid defined by it's length and radius with pre-determined spacing
 """
-@kwdef struct Cylindrical{r,L} <: Dimension #This assumes circular symmetry around the laser pulse so x & y are defined by a radius
-    spatial_grid::SMatrix{r,L,Real}
+@kwdef struct Cylindrical <: Dimension #This assumes circular symmetry around the laser pulse so x & y are defined by a radius
+    spatial_grid::Matrix{<:Real}
 end
 """
     3D struct that holds a grid defined by the length of each axis with pre-determined spacing
 """
 @kwdef struct Cubic{x,y,z} <: Dimension #A fully 3D cuboidal model but current construction has the length of x & y equal
-    spatial_grid::SArray{Tuple{y,x,z},Real}
+    spatial_grid::Array{<:Real}
 end
 """
     This struct holds all parameters and informaion pertaining to the material. Undecided on whether alloys
@@ -83,13 +89,16 @@ end
     κ::Real #Room temperature thermal conductivity
     ne::Real #Number of electrons per atom
     effmass::Real #Effective mass of conduction electrons
-    DOS::Spline1D #The DOS
+    DOS::spl #The DOS
     λ::Real #Second momentum of spectral function
     g::Real # Linear electron-phonon coupling constant
     Ballistic::Real # Ballistic length of electrons
     Cph::Real #Constant heat capacity for phonons
     egrid::Vector{Float64} # Energy grid to solve neq electrons on
     τ::Real #Scalar value for the Fermi Liquid Theory relaxation time
+    u0::Real
+    n0::Real
+    τep::Real
 end
 """
     Struct that holds constants
@@ -122,7 +131,7 @@ function define_simulation_settings(;nlchempot=false,nlelecphon=false,nlelecheat
     return sim_settings
 end
 
-function define_simulation_settings(dict::Dict;nlchempot=dict["ChemPot"],nlelecphon=dict["ElecPhonCoup"],nlelecheat=dict["ElecHeatCapac"],
+#= function define_simulation_settings(dict::Dict;nlchempot=dict["ChemPot"],nlelecphon=dict["ElecPhonCoup"],nlelecheat=dict["ElecHeatCapac"],
     noneqelec=dict["NoneqElec"],elecelecint=dict["Elec-Elec"],elecphonint=dict["Elec-Phon"],output=dict["Output"],electemp=dict["Tel"],
     phonontemp=dict["Tph"],simendtime=dict["SimTime"],phononheatcapacity=dict["PhononHeatCapac"])
     
@@ -145,7 +154,7 @@ function define_simulation_settings(dict::Dict;nlchempot=dict["ChemPot"],nlelecp
     Simulation_End_Time=simendtime)
     
     return sim_settings
-end
+end =#
 """
     Builds the correct slab based on purely user settings or user settings and a dictionary generated from an input
     file built within InputFileControl.jl. Temporary : File Control not fully supported
@@ -153,7 +162,7 @@ end
 function define_sim_dimensions(;Dimension::Int64,Lengths=400::Union{Real,Vector{<:Real}},spacing=1::Union{Real,Vector{<:Real}})
     
     if Dimension == 0
-        return Homogenous()
+        return Homogeneous(length=1,grid=[0.0])
     elseif Dimension == 1
         return one_dimension(Lengths,spacing)
     elseif Dimension == 2
@@ -163,14 +172,14 @@ function define_sim_dimensions(;Dimension::Int64,Lengths=400::Union{Real,Vector{
     end
 end
 
-function define_sim_dimensions(dict::Dict;Dimension=dict.Dimension::Int64,Lengths=dict.Lengths::Union{Real,Vector{<:Real}}
+#= function define_sim_dimensions(dict::Dict;Dimension=dict.Dimension::Int64,Lengths=dict.Lengths::Union{Real,Vector{<:Real}}
     ,spacing=dict.Spacing::Union{Real,Vector{<:Real}})
 
     Dims == length(Lengths) == length(Spacing) || error("The number of dimensions specified doesn't equal the lengths of
     one of the input settongs.")
 
     if dict.Dimension == 0
-        return Homogenous
+        return Homogeneous
     elseif dict.Dimension == 1
         return one_dimension(Lengths,spacing)
     elseif dict.Dimension == 2
@@ -178,37 +187,35 @@ function define_sim_dimensions(dict::Dict;Dimension=dict.Dimension::Int64,Length
     elseif dict.Dimension == 3
         return three_dimension(Lengths,spacing)
     end
-end
+end =#
 """
     Builds 1D slab using the length and spacing
 """
 function one_dimension(Length,spacing)
-    zs=0:spacing:Length
-    zs=collect(zs)
-    slab = SVector{length(zs),typeof(zs[1])}(zs)
-    return Linear{length(slab)}(spatial_grid=slab)
+    zs=collect(0:spacing:Length)
+    return Linear(grid=zs,dz=spacing,length=length(zs))
 end
 """
     Builds 2D slab, the vectors are ordered by [z-axis,radius]
 """
 function two_dimension(Length,spacing)
-    rs=SVector{length(0:spacing[2]:Length[2])}(0:spacing[2]:Length[2])
-    zs=SVector{length(0:spacing[1]:Length[1])}(0:spacing[1]:Length[1])
+    rs=Vector(0:spacing[2]:Length[2])
+    zs=Vector(0:spacing[1]:Length[1])
     slab_grid=Matrix{Tuple{Real,Real}}(undef,length(zs),length(rs))
     for (i,r) in enumerate(rs)
         for (j,z) in enumerate(zs)
             slab_grid[j,i]=(r,z)
         end
     end
-    return Cylindrical{length(rs),length(zs)}(spatial_grid=slab_grid)
+    return Cylindrical(spatial_grid=slab_grid)
 end
 """
     Builds 3D slab, the vectors are ordered by [z-axis,x-axis,y-axis]
 """
 function three_dimension(Length,spacing)
-    xs=SVector{length(-Length[2]/2:spacing[2]:Length[2]/2)}(-Length[2]/2:spacing[2]:Length[2]/2)
-    ys=SVector{length(-Length[3]/2:spacing[3]:Length[3]/2)}(-Length[3]/2:spacing[3]:Length[3]/2)
-    zs=SVector{length(0:spacing[1]:Length[1])}(0:spacing[1]:Length[1])
+    xs=Vector(-Length[2]/2:spacing[2]:Length[2]/2)
+    ys=Vector(-Length[3]/2:spacing[3]:Length[3]/2)
+    zs=Vector(0:spacing[1]:Length[1])
     slab_grid=Array{Tuple{Real,Real,Real}}(undef,length(ys),length(xs),length(zs))
     for (i,x) in enumerate(xs)
         for (j,y) in enumerate(ys)
@@ -217,26 +224,30 @@ function three_dimension(Length,spacing)
             end
         end
     end
-    return Cubic{length(ys),length(xs),length(zs)}(spatial_grid=slab_grid)
+    return Cubic(spatial_grid=slab_grid)
 end
 """
     Builds the material parameter struct with user parameters or user settings and a dictionary generated from an input
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
 function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0
-    ,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0)
+    ,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0)
     
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
-    tau = 0.546#128/(sqrt(3)*pi^2*plasma)
+    tau = 128/(sqrt(3)*pi^2*plasma)
     erange = grid_builder(0.0,-3*las.hv,3*las.hv,0.0005, 0.0002) 
+    u0 = get_u0(DOS,0.0,fermien)
+    n0 = get_n0(DOS,0.0,fermien)
+    τep = τf*las.hv/8.617e-5/debye
+
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien)
+    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,u0=u0,n0=n0,τep=τep)
 
     return matpat
 end
 
-function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict["Gamma"],debye=dict["Debye"],noatoms=dict["AtomDens"],
+#= function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict["Gamma"],debye=dict["Debye"],noatoms=dict["AtomDens"],
     plasma=dict["Plasma"],thermalcond=dict["RTKappa"],elecperatom=dict["ne"],eleceffmass=dict["EffMass"],dos=dict["DOS"],
     secmomspecfun=Dict["SpectralFunc"],elecphon=Dict["g"],ballistic=dict["BallisticLength"],cph=dict["Cph"])
 
@@ -247,7 +258,7 @@ function define_material_parameters(dict::Dict;extcof=dict["ExtCof"],gamma=dict[
     DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph,cph)
 
     return matpat
-end
+end =#
 
 function grid_builder(mid, left, right, step, α)
     v = Vector{typeof(mid + α*step)}()

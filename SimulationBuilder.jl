@@ -1,39 +1,25 @@
-using ModelingToolkit,DifferentialEquations,Plots,Symbolics,Interpolations,DelimitedFiles,Integrals
-using Unitful,BenchmarkTools,ForwardDiff,StaticArrays,IfElse,Cubature,Roots,LaTeXStrings,JuliaSimCompiler
-using ModelingToolkit: t_nounits as t, D_nounits as D
-include("SimulationVariables.jl")
+using DataInterpolations,DelimitedFiles,Integrals,OrdinaryDiffEq,Plots,Roots,RecursiveArrayTools
 include("SimulationSetup.jl")
 include("Lasers.jl")
-include("ElectronTemperature.jl")
-include("PhononTemperature.jl")
+include("ElectronicTemperature.jl")
+include("PhononicTemperature.jl")
+include("SimulationVariables.jl")
+include("ElectronicDistribution.jl")
+include("SimulationConfigurations.jl")
 include("SystemBuilder.jl")
-include("ElectronDistribution.jl")
-
-println("Compiled functions")
-
 
 function setup()
-    las=define_laser_system(:Gaussian,fwhm=25,fluence=111,photon_en=3.1)
-    sim = define_simulation_settings(nlchempot=true,nlelecphon=true,nlelecheat=true,noneqelec=true
-    ,elecphonint=true,elecelecint=true,electemp=true,phonontemp=false)
-    mp = define_material_parameters(las,extcof=12.7,gamma=4.4315e-22,debye=165,noatoms=59,plasma=2.1357,thermalcond=320.0,
-    elecperatom=1,eleceffmass=1.1,dos="DOS/Au_DOS.dat",secmomspecfun=23e-6,elecphon=1.44e-7,ballistic=0.0,cph=0.015)
+    las=define_laser_system(:Gaussian,fwhm=150,fluence=124.8,photon_en=1.55)
+    sim = define_simulation_settings(nlchempot=true,nlelecphon=true,nlelecheat=true,noneqelec=false
+    ,elecphonint=true,elecelecint=false,electemp=true,phonontemp=true)
+    mp = define_material_parameters(las,extcof=14.9,gamma=4.4315e-22,debye=343,noatoms=85,plasma=13.4,thermalcond=0.0025,
+    elecperatom=1,eleceffmass=1.01,dos="DOS/Cu_DOS.dat",secmomspecfun=29e-6,elecphon=6.24e-7,ballistic=0.0,cph=0.015,τf=18.55)
     cons=Constants(8.617e-5,0.6582)
-    dim = Homogenous()
+    dim = define_sim_dimensions(Dimension=0)#define_sim_dimensions(Dimension=1,Lengths=400,spacing=2)#
     return sim,mp,las,dim,cons
 end
 
-function main()
-    sim,mp,las,dim,cons=setup()
-    tspan=(-100.0,100.0)
-    initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-
-    #Generates: Connected equations,initial conditions, parameters
-    connected_sys,u0,p=build_system(sim,mp,las,cons,dim,initialtemps)
-
-    println("Started Running")
-    sol=run_dynamics(connected_sys,u0,tspan,p)
-    return connected_sys,sol
-end
-
-connected_sys,sol = main()
+key_list = function_builder()
+initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
+tspan=(-450.0,4550.0)
+sol = run_simulation(key_list,initialtemps,tspan)

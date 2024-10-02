@@ -1,1 +1,13 @@
-{}
+{
+    "files.exclude": {
+        ".gitattributes": true,
+        ".gitignore": true,
+        "*.code-profile": true,
+        "*.drawio": true,
+        "*.pptx": true,
+        "LICENSE": true,
+        "Manifest.toml": true,
+        "Project.toml": true,
+        "README.md": true
+    }
+}
