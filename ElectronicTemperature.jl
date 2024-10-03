@@ -78,13 +78,44 @@ function athem_electempenergychange(sim,dim)
 end
 
 function electrontemperature_conductivity(Tel,dim,Tph,mp)
-    Tel_spl = get_interpolate(dim.grid,Tel)
-    dTeldz = DataInterpolations.derivative.(Ref(Tel_spl),dim.grid)
+    #= dTeldz = Tel_derivative(Tel,dim.dz)
     K=mp.κ*(Tel./Tph)
-    Q_spl=get_interpolate(dim.grid,dTeldz.*K)
-    cond = DataInterpolations.derivative.(Ref(Q_spl),dim.grid)
-    cond[end]=0.0
-    return cond
+    return Q_derivative(dTeldz.*K,dim.dz) =#
+    dz=dim.dz
+    dTdz=Depthderivative(Tel,dz)
+    K=mp.κ*Tel./Tph
+    Q=zeros(dim.length+2)
+    Q[2:end-1]=dTdz.*K
+    dQdz=Depthderivative(Q,dz)
+    return dQdz[2:end-1]
+end
+
+function Depthderivative(vec,dz)
+    Diff=zeros(length(vec))
+    for i in 2:length(vec)-1
+        Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
+    end
+    Diff[1] = (vec[2]-vec[1])/dz
+    Diff[end] = (vec[end]-vec[end-1])/dz
+    return Diff
+end
+
+function Tel_derivative(vec,spacing)
+    d_vec=zeros(length(vec))
+    for i in 2:length(vec)-1
+        d_vec[i]=(vec[i+1]-vec[i-1])/(2*spacing)
+    end
+    return d_vec
+end
+
+function Q_derivative(vec,spacing)
+    d_vec=zeros(length(vec))
+    for i in 2:length(vec)-1
+        d_vec[i]=(vec[i+1]-2*vec[i]+vec[i-1])/(2*spacing)
+    end
+    d_vec[1] = (vec[2]-vec[1])/spacing
+    d_vec[end] = (vec[end]-vec[end-1])/spacing
+    return d_vec
 end
 
 function electrontemperature_conductivity(Tel,dim::Homogeneous,Tph,mp)

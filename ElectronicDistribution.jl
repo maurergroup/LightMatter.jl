@@ -3,13 +3,8 @@ function athemdistribution_factory(sim::SimulationSettings,laser,dim)
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-
-    athem_expr = Vector{Expr}(undef,dim.length)
-    for i in eachindex(athem_expr)
-        athemexcite = athemexcitation(ftot,laser[i])
-        athem_expr[i] = build_athemdistribution(athemexcite,Elecelec,Elecphon)
-    end
-    return athem_expr
+    athemexcite=athemexcitation(:(fneq.+$feq),laser)
+    return build_athemdistribution(athemexcite,Elecelec,Elecphon)
 end
 
 function build_athemdistribution(athemexcite,Elecelec,Elecphon)

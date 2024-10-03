@@ -1,4 +1,4 @@
-using DataInterpolations,DelimitedFiles,Integrals,OrdinaryDiffEq,Plots,Roots,RecursiveArrayTools
+using DataInterpolations,DelimitedFiles,Integrals,Plots,Roots,RecursiveArrayTools,OrdinaryDiffEq,DataFrames
 include("SimulationSetup.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
@@ -21,5 +21,7 @@ end
 
 key_list = function_builder()
 initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-tspan=(-450.0,4550.0)
+tspan=(-450.0,550.0)
 sol = run_simulation(key_list,initialtemps,tspan)
+df - DataFrame(sol)
+CSV.write("Test.csv", df)
