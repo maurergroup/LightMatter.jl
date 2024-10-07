@@ -4,7 +4,7 @@
     based on the Fermi Energy^2. In all other places, the Fermi Energy is defined as 0.0.
 """
 function get_FermiEnergy(File::String)
-    TotalDOS::Matrix{Real}=readdlm(File,skipstart=3)
+    TotalDOS::Matrix{Float64}=readdlm(File)
     Nonzero = findfirst(!=(0.0),TotalDOS[:,2])
     return abs(TotalDOS[Nonzero,1])
 end
@@ -13,7 +13,7 @@ end
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
 function generate_DOS(File::String,n)
-    TotalDOS::Matrix{<:Real}=readdlm(File,skipstart=3)
+    TotalDOS::Matrix{Float64}=readdlm(File)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 """
@@ -27,24 +27,27 @@ get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xval
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
     electronic temperature.
 """
-function find_chemicalpotential(no_part::Real,Tel::Real,DOS::spl,kB::Real,FE)
-    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB,FE)
+function find_chemicalpotential(no_part::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64,n0::Float64)::Float64
+    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB,FE,n0)
     return solve(ZeroProblem(f,0.0),Order1();atol=1e-2,rtol=1e-2)
 end
 
-function get_thermalparticles(μ,Tel::Real,DOS::spl,kB::Real,FE::Real)
-    int(u,p) = FermiDirac(Tel,μ,kB,u)*DOS(u)
-    return solve(IntegralProblem(int,(-FE,Inf)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+function get_thermalparticles(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64,n0::Float64)::Float64
+    int_neg(u,p) = DOS(u)*(1/(exp((u-μ)/(kB*Tel))+1)-1)
+    uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2);abstol=1e-2,reltol=1e-2).u
+    int_pos(u,p) = DOS(u)/(exp((u-μ)/(kB*Tel))+1)
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2);abstol=1e-2,reltol=1e-2).u
+    return uroot_neg+uroot_pos+n0
 end
 """
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticlesspl(μ::Real,Dis::spl,DOS::spl,n0,FE)
+function get_noparticlesspl(Dis::spl,DOS::spl,n0,FE)
     int_neg(u,p) = (Dis(u).-1)*DOS(u)
     uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
     int_pos(u,p) = Dis(u)*DOS(u)
-    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
     return uroot_neg+uroot_pos+n0
 end
 
@@ -54,13 +57,13 @@ function get_n0(DOS,μ,FE)
     return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
 end
 
-function p_T(μ::Real,Tel::Real,DOS::spl,kB::Real)
+function p_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)
     prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
 end
 
-function p_μ(μ::Real,Tel::Real,DOS::spl,kB::Real)
+function p_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdμ(kB,Tel,μ,u)*DOS(u)
     prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
@@ -69,11 +72,11 @@ end
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergyspl(μ::Real,Dis::spl,DOS::spl,u0::Real,FE)
+function get_internalenergyspl(Dis::spl,DOS::spl,u0::Float64,FE)
     int_neg(u,p) = (Dis(u)-1)*DOS(u)*u
     uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
     int_pos(u,p) = Dis(u)*DOS(u)*u
-    uroot_pos = solve(IntegralProblem(int_pos,(0.0,μ+10)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
     return uroot_neg+uroot_pos+u0
 end
 
@@ -83,13 +86,13 @@ function get_u0(DOS,μ,FE)
     return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
 end
 
-function c_T(μ::Real,Tel::Real,DOS::spl,kB::Real)
+function c_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdT(kB,Tel,μ,u).*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
 end
 
-function c_μ(μ::Real,Tel::Real,DOS::spl,kB::Real)
+function c_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdμ(kB,Tel,μ,u).*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u

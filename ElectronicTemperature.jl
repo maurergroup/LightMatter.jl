@@ -22,7 +22,7 @@ function electrontemperature_heatcapacity(sim::SimulationSettings)
     end
 end
 
-function nonlinear_electronheatcapacity(kB::Real,Tel::Real,μ::Real,DOS::spl)
+function nonlinear_electronheatcapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::spl)
     int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
@@ -40,11 +40,11 @@ function electronphonon_coupling(sim)
     end
 end
 
-function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::spl,Tel::Real,μ::Real,Tph::Real)
+function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,DOS::spl,Tel::Float64,μ::Float64,Tph::Float64)
     prefac=pi*kB*λ/DOS(μ)/hbar
     int(u,p) = DOS(u)^2*-dFDdE(kB,Tel,μ,u)
-    prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    g=prefac.*solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
+    prob = IntegralProblem(int,(μ-(10*Tel/10000),μ+(10*Tel/10000)))
+    g=prefac.*solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
     return -g*(Tel-Tph)
 end
 
@@ -60,14 +60,14 @@ function build_athemelectron(Δu)
     return :( 1/(c_T(μ,Tel,mp.DOS,cons.kB)*p_μ(μ,Tel,mp.DOS,cons.kB)-p_T(μ,Tel,mp.DOS,cons.kB)*c_μ(μ,Tel,mp.DOS,cons.kB))*(p_μ(μ,Tel,mp.DOS,cons.kB)*$Δu-c_μ(μ,Tel,mp.DOS,cons.kB)*Δn))
 end
 
-function elec_energychange(egrid,relax_dis,μ,DOS,u0,FE)
+function elec_energychange(egrid,relax_dis,DOS,u0,FE)
     spl = get_interpolate(egrid,relax_dis)
-    return get_internalenergyspl(μ,spl,DOS,u0,FE)
+    return get_internalenergyspl(spl,DOS,u0,FE)
 end
 
 function athem_electempenergychange(sim,dim)
     args = Vector{Union{Expr,Symbol}}(undef,0)
-    push!(args,:(elec_energychange(mp.egrid,relax_dis,μ,mp.DOS,mp.u0,mp.FE)))
+    push!(args,:(elec_energychange(mp.egrid,relax_dis,mp.DOS,mp.u0,mp.FE)))
     if sim.Systems.PhononTemperature == true
        push!(args,:(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS,Tel,μ,Tph)))
     end
@@ -77,47 +77,22 @@ function athem_electempenergychange(sim,dim)
     return :(+($(args...)))
 end
 
-function electrontemperature_conductivity(Tel,dim,Tph,mp)
-    #= dTeldz = Tel_derivative(Tel,dim.dz)
-    K=mp.κ*(Tel./Tph)
-    return Q_derivative(dTeldz.*K,dim.dz) =#
-    dz=dim.dz
-    dTdz=Depthderivative(Tel,dz)
+function electrontemperature_conductivity(Tel::Vector{Float64},dim::Linear,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
+    Depthderivative(Tel,dim.dz,cond)
+    cond[1]=0.0
+    cond[end]=0.0
     K=mp.κ*Tel./Tph
-    Q=zeros(dim.length+2)
-    Q[2:end-1]=dTdz.*K
-    dQdz=Depthderivative(Q,dz)
-    return dQdz[2:end-1]
+    Depthderivative((cond.*K),dim.dz,cond)
 end
 
-function Depthderivative(vec,dz)
-    Diff=zeros(length(vec))
+function Depthderivative(vec::Vector{Float64},dz::Int,Diff::Vector{Float64})
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
     end
     Diff[1] = (vec[2]-vec[1])/dz
     Diff[end] = (vec[end]-vec[end-1])/dz
-    return Diff
 end
 
-function Tel_derivative(vec,spacing)
-    d_vec=zeros(length(vec))
-    for i in 2:length(vec)-1
-        d_vec[i]=(vec[i+1]-vec[i-1])/(2*spacing)
-    end
-    return d_vec
-end
-
-function Q_derivative(vec,spacing)
-    d_vec=zeros(length(vec))
-    for i in 2:length(vec)-1
-        d_vec[i]=(vec[i+1]-2*vec[i]+vec[i-1])/(2*spacing)
-    end
-    d_vec[1] = (vec[2]-vec[1])/spacing
-    d_vec[end] = (vec[end]-vec[end-1])/spacing
-    return d_vec
-end
-
-function electrontemperature_conductivity(Tel,dim::Homogeneous,Tph,mp)
-    return [0.0]
+function electrontemperature_conductivity(Tel::Vector{Float64},dim::Homogeneous,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
+    return cond[1]=0.0
 end

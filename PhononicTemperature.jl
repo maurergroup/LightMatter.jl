@@ -26,7 +26,7 @@ end
 function phonontemperature_source(sim::SimulationSettings)
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronPhonon == true
-            return neqelectron_phonontransfer()
+            return :(neqelectron_phonontransfer(fneq,mp.egrid,mp.τep,mp.u0,mp.FE,mp.DOS))
         else
             return 0.0
         end
@@ -35,7 +35,7 @@ function phonontemperature_source(sim::SimulationSettings)
     end
 end
 
-function neqelectron_phonontransfer()
-    spl=:(get_interpolate(mp.egrid,fneq./mp.τep))
-    return :(get_internalenergyspl(μ,$spl,mp.DOS,mp.u0,mp.FE))
+function neqelectron_phonontransfer(fneq,egrid,τep,u0,FE,DOS)
+    spl=get_interpolate(egrid,fneq./τep)
+    return get_internalenergyspl(spl,DOS,u0,FE)
 end

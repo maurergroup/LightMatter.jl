@@ -1,6 +1,3 @@
-# total density of states output by FHI-aims 
-# The energy reference for this output is the chemical potential, mu =       -6.311749 eV
-#    Energy (eV)      DOS 
         -13.68825150          0.00000000
         -13.68525150          0.00000000
         -13.68225150          0.00000000
