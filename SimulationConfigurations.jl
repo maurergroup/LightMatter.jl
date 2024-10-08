@@ -78,7 +78,7 @@ function FullAthEM_simulation(du,u,p,t)
     end
     relax(u.x[1],u.x[4],u.x[2],p[5],p[2],p[3],p[7])
     noe(p[7],p[5],p[2],du.x[2])
-    Tel(u.x[1],u.x[3],p[2],p[3],p[5],p[7],du.x[1],p[6],du.x[1])
+    Tel(u.x[1],u.x[3],p[2],p[3],p[5],p[7],du.x[2],p[6],du.x[1])
     Tph(u.x[1],u.x[3],p[2],p[3],p[5],u.x[4],du.x[3])
     fneq(u.x[4],u.x[1],p[2],p[3],p[1],p[5],t,p[4],p[7],du.x[4])
     nothing
