@@ -3,7 +3,7 @@ function athemdistribution_factory(sim::SimulationSettings,laser::Expr)
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-    athemexcite=athemexcitation(:(fneq.+$feq),laser)
+    athemexcite=:($laser*(athemexcitation($ftot,mp.egrid,mp.DOS,las.hv,mp.n0,mp.FE,mp.u0)))
     return build_athemdistribution(athemexcite,Elecelec,Elecphon)
 end
 
@@ -11,14 +11,13 @@ function build_athemdistribution(athemexcite,Elecelec,Elecphon)
     return Expr(:call,:.+,athemexcite,Elecelec,Elecphon)
 end
 
-function athemexcitation(ftot::Expr,laser::Expr)
-    ftotspl = :(get_interpolate(mp.egrid,$ftot))
-    Δfneqh = :(athem_holegeneration(mp.egrid,mp.DOS,$ftotspl,las.hv))
-    Δfneqe = :(athem_electrongeneration(mp.egrid,mp.DOS,$ftotspl,las.hv))
-    pc_sf = :(athem_particleconservation(mp.DOS,$Δfneqe,$Δfneqh,mp.egrid,mp.n0,mp.FE))
-    Δfneqtot = Expr(:call,:.-,Expr(:call,:*,pc_sf,Δfneqe),Δfneqh)
-    δ = :($laser/athem_excitation_internalenergy($Δfneqtot,mp.DOS,mp.egrid,mp.u0,mp.FE))
-    return Expr(:call,:*,δ,Δfneqtot)
+function athemexcitation(ftot,egrid,DOS,hv,n0,FE,u0)
+    ftotspl = get_interpolate(egrid,ftot)
+    Δfneqh = athem_holegeneration(egrid,DOS,ftotspl,hv)
+    Δfneqe = athem_electrongeneration(egrid,DOS,ftotspl,hv)
+    pc_sf = get_noparticlesspl(get_interpolate(egrid,Δfneqe),DOS,n0,FE) / get_noparticlesspl(get_interpolate(egrid,Δfneqh),DOS,n0,FE)
+    Δfneqtot = (pc_sf*Δfneqe).-Δfneqh
+    return Δfneqtot./get_internalenergyspl(get_interpolate(egrid,Δfneqtot),DOS,u0,FE)
 end
 
 function athem_holegeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64)
@@ -34,11 +33,6 @@ function athem_particleconservation(DOS::spl,Δfneqe::Vector{Float64},Δfneqh::V
     hDis = get_interpolate(egrid,Δfneqh)
     f(u) = get_noparticlesspl(hDis,DOS,n0,FE) - u*get_noparticlesspl(elDis,DOS,n0,FE)
     return solve(ZeroProblem(f,1.0),Order1();atol=1e-2,rtol=1e-2)
-end
-
-function athem_excitation_internalenergy(Δfneqtot::Vector{Float64},DOS::spl,egrid::Vector{Float64},u0::Float64,FE::Float64)
-    fneqspl = get_interpolate(egrid,Δfneqtot)
-    return get_internalenergyspl(fneqspl,DOS,u0,FE)
 end
 
 function athem_electronelectroninteraction(sim::SimulationSettings)

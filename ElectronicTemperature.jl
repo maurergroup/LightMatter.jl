@@ -25,7 +25,7 @@ end
 function nonlinear_electronheatcapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::spl)
     int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=50);reltol=1e-5,abstol=1e-5).u
 end
 
 function electronphonon_coupling(sim)
@@ -44,7 +44,7 @@ function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,
     prefac=pi*kB*λ/DOS(μ)/hbar
     int(u,p) = DOS(u)^2*-dFDdE(kB,Tel,μ,u)
     prob = IntegralProblem(int,(μ-(10*Tel/10000),μ+(10*Tel/10000)))
-    g=prefac.*solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
+    g=prefac.*solve(prob,HCubatureJL(initdiv=50);reltol=1e-5,abstol=1e-5).u
     return -g*(Tel-Tph)
 end
 

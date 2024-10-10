@@ -190,7 +190,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = grid_builder(0.0,-3*las.hv,3*las.hv,0.0005, 0.0002) 
+    erange = collect(range(-3*las.hv,3*las.hv,step=0.02))#grid_builder(0.0,-3*las.hv,3*las.hv,0.0005, 0.0002) 
     u0 = get_u0(DOS,0.0,fermien)
     n0 = get_n0(DOS,0.0,fermien)
     τep = τf*las.hv/8.617e-5/debye

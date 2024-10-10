@@ -29,14 +29,16 @@ get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xval
 """
 function find_chemicalpotential(no_part::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64,n0::Float64)::Float64
     f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB,FE,n0)
-    return solve(ZeroProblem(f,0.0),Order1();atol=1e-2,rtol=1e-2)
+    return solve(ZeroProblem(f,0.0),Order1();atol=1e-3,rtol=1e-3)
 end
 
 function get_thermalparticles(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64,n0::Float64)::Float64
     int_neg(u,p) = DOS(u)*(1/(exp((u-μ)/(kB*Tel))+1)-1)
-    uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2);abstol=1e-2,reltol=1e-2).u
     int_pos(u,p) = DOS(u)/(exp((u-μ)/(kB*Tel))+1)
-    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2);abstol=1e-2,reltol=1e-2).u
+    prob=IntegralProblem(int_neg,(-FE,0.0))
+    prob2=IntegralProblem(int_pos,(0.0,20.0))
+    uroot_neg = solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+    uroot_pos = solve(prob2,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
     return uroot_neg+uroot_pos+n0
 end
 """
@@ -45,28 +47,30 @@ end
 """
 function get_noparticlesspl(Dis::spl,DOS::spl,n0,FE)
     int_neg(u,p) = (Dis(u).-1)*DOS(u)
-    uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
     int_pos(u,p) = Dis(u)*DOS(u)
-    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    prob=IntegralProblem(int_neg,(-FE,0.0))
+    prob2=IntegralProblem(int_pos,(0.0,20.0))
+    uroot_neg = solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+    uroot_pos = solve(prob2,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
     return uroot_neg+uroot_pos+n0
 end
 
 function get_n0(DOS,μ,FE)
     int(u,p) = DOS(u)
     prob=IntegralProblem(int,(-FE,μ))
-    return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10),reltol=1e-5,abstol=1e-5).u
 end
 
 function p_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)
     prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
 end
 
 function p_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdμ(kB,Tel,μ,u)*DOS(u)
     prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=2);abstol=1e-5,reltol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
@@ -74,26 +78,28 @@ end
 """
 function get_internalenergyspl(Dis::spl,DOS::spl,u0::Float64,FE)
     int_neg(u,p) = (Dis(u)-1)*DOS(u)*u
-    uroot_neg = solve(IntegralProblem(int_neg,(-FE,0.0)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
     int_pos(u,p) = Dis(u)*DOS(u)*u
-    uroot_pos = solve(IntegralProblem(int_pos,(0.0,Inf)),HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
-    return uroot_neg+uroot_pos+u0
+    prob=IntegralProblem(int_neg,(-FE,0.0))
+    prob2=IntegralProblem(int_pos,(0.0,20.0))
+    u_neg = solve(prob,HCubatureJL(initdiv=10),reltol=1e-5,abstol=1e-5).u
+    u_pos = solve(prob2,HCubatureJL(initdiv=10),reltol=1e-5,abstol=1e-5).u
+    return u_neg+u_pos+u0
 end
 
 function get_u0(DOS,μ,FE)
     int(u,p) = DOS(u)*u
     prob=IntegralProblem(int,(-FE,μ))
-    return solve(prob,HCubatureJL(initdiv=2),reltol=1e-5,abstol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10),reltol=1e-5,abstol=1e-5).u
 end
 
 function c_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdT(kB,Tel,μ,u).*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
 end
 
 function c_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
     int(u,p) = dFDdμ(kB,Tel,μ,u).*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=2);reltol=1e-5,abstol=1e-5).u
+    return solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
 end

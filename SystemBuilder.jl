@@ -69,7 +69,7 @@ function generate_arguments(sim::SimulationSettings)
     return args
 end
 
-function generate_initalconditions(key_list,mp,cons,initialtemps,dim)
+function generate_initalconditions(key_list,mp,initialtemps,dim)
     temp_u = ()
     for i in key_list
         if i =="Tel"
@@ -77,9 +77,9 @@ function generate_initalconditions(key_list,mp,cons,initialtemps,dim)
         elseif i == "Tph"
             temp_u = (temp_u...,fill(initialtemps[i],dim.length))
         elseif i == "fneq"
-            temp_u = (temp_u...,zeros(dim.length,length(mp.egrid)))
+            temp_u = (temp_u...,zeros(length(mp.egrid),dim.length))
         elseif i == "noe"
-            temp_u = (temp_u...,fill(get_thermalparticles(mp.μ,1e-16,mp.DOS,cons.kB,mp.FE,mp.n0),dim.length))
+            temp_u = (temp_u...,fill(mp.n0,dim.length))
         end
     end
     return ArrayPartition(temp_u)
@@ -88,14 +88,13 @@ end
 function generate_parameters(sim,mp,cons,las,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
-            n = get_thermalparticles(mp.μ,1e-16,mp.DOS,cons.kB,mp.FE,mp.n0)
-            μ = find_chemicalpotential(n,initialtemps["Tel"],mp.DOS,cons.kB,mp.FE,mp.n0)
-            return (las,mp,cons,dim,initaltemps["Tel"],n,μ)
+            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS,cons.kB,mp.FE,mp.n0)
+            return (las,mp,cons,dim,initialtemps["Tel"],μ)
         else
-            return (las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(dim.length,length(mp.egrid)))
+            return (las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(length(mp.egrid),dim.length))
         end
     else
-        n = get_thermalparticles(0.0,1e-16,mp.DOS,cons.kB,mp.FE,mp.n0)
+        n = mp.n0
         return (las,mp,cons,dim,n,zeros(dim.length),zeros(dim.length))
     end
 end
@@ -110,7 +109,7 @@ function scalar_functions(sys,key_list,args)
                 new_args=(new_args...,:($(j[1])[1]))
                 scalar_args=(scalar_args...,(j[1],Vector{Float64}))
             elseif j[2] == Vector{Float64} 
-                new_args=(new_args...,:($(j[1])[1,:]))
+                new_args=(new_args...,:($(j[1])[:]))
                 scalar_args=(scalar_args...,(j[1],Matrix{Float64}))
             else
                 new_args=(new_args...,j[1])
@@ -123,7 +122,7 @@ function scalar_functions(sys,key_list,args)
         else
             scalar_args = (scalar_args...,(:du,Vector{Float64}))
         end
-        make_function(scalar_args,expr,Symbol(i))
+        make_function(scalar_args,expr,Symbol(i*"_func"))
     end
 end
 
@@ -138,7 +137,7 @@ function multithread_functions(sys,key_list,args)
                 new_args=(new_args...,:($(j[1])[i]))
                 parallel_args=(parallel_args...,(j[1],Vector{Float64}))
             elseif j[2] == Vector{Float64} 
-                new_args=(new_args...,:($(j[1])[i,:]))
+                new_args=(new_args...,:($(j[1])[:,i]))
                 parallel_args=(parallel_args...,(j[1],Matrix{Float64}))
             else
                 new_args=(new_args...,j[1])
@@ -151,7 +150,7 @@ function multithread_functions(sys,key_list,args)
         else
             parallel_args = (parallel_args...,(:du,Vector{Float64}))
         end
-        make_function(parallel_args,expr,Symbol(i))
+        make_function(parallel_args,expr,Symbol(i*"_func"))
     end
 end  
 
@@ -165,7 +164,7 @@ end
 function multithreaded_expr(func, result::Symbol, vars)
     return quote
         Threads.@threads for i in 1:length($result[:,1])
-            @inbounds $result[i,:] .= $func($(vars...),i)
+            @inbounds $result[:,i] .= $func($(vars...),i)
         end
     end
 end

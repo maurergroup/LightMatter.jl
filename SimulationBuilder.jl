@@ -21,6 +21,6 @@ end
 
 key_list = function_builder()
 initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-tspan=(-300,300.0)
+tspan=(-450, -449.0)
 sol = run_simulation(key_list,initialtemps,tspan)
 @save "AthEMTTM_20.jld2" sol
