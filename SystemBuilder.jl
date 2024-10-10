@@ -163,7 +163,7 @@ end
 
 function multithreaded_expr(func, result::Symbol, vars)
     return quote
-        Threads.@threads for i in 1:length($result[:,1])
+        Threads.@threads for i in eachindex(du[1,:])
             @inbounds $result[:,i] .= $func($(vars...),i)
         end
     end
