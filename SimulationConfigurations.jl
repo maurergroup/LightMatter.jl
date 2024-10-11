@@ -19,7 +19,7 @@ end
 
 function run_dynamics4(p,u0,tspan)
     prob=ODEProblem(FullAthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=1.0,dtmin=0.1)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=1.0)
     return sol
 end
 

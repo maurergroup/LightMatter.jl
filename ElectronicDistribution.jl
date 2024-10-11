@@ -63,7 +63,7 @@ end
 
 function find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64,u0::Float64,FE::Float64,n0::Float64)
     f(u) = goal - find_temperatureandμ(u,n,DOS,kB,u0,egrid,FE,n0)
-    Temp = solve(ZeroProblem(f,1000.0),Order1();abstol=1e-10,reltol=1e-10)
+    Temp = solve(ZeroProblem(f,1000.0);abstol=1e-7,reltol=1e-7)
     μ = find_chemicalpotential(n,Temp,DOS,kB,FE,n0)
     return FermiDirac(Temp,μ,kB,egrid)
 end
