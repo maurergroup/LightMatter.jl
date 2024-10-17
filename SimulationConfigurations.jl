@@ -19,13 +19,13 @@ end
 
 function run_dynamics4(p,u0,tspan)
     prob=ODEProblem(FullAthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=1.0)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=2.0)
     return sol
 end
 
 function run_dynamics1(p,u0,tspan)
     prob=ODEProblem(EHP_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=1.0,dtmin=0.1)
+    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=2.0,dtmin=0.1)
     return sol
 end
    
@@ -85,18 +85,4 @@ function EHP_simulation(du,u,p,t)
     println(t)
     fneq_func(u.x[1],[p[5]],p[2],p[3],p[1],[p[6]],t,p[4],du.x[1])
     nothing
-end
-
-function euler(du,u,p,tspan)
-    newu=copy(u)
-    trange=range(tspan[1],tspan[2],step=0.1)
-    mtx = zeros(length(trange),length(newu))
-    for i in eachindex(trange)
-        println(trange[i])
-        AthEM_simulation(du,newu,p,trange[i])
-        println(du.x[1])
-        newu .+= du*0.1
-        mtx[i,:] .= newu
-    end
-    return mtx
 end

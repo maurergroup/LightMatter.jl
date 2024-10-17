@@ -1,4 +1,4 @@
-using DataInterpolations,DelimitedFiles,Integrals,Plots,Roots,RecursiveArrayTools,OrdinaryDiffEq,JLD2
+using DataInterpolations,DelimitedFiles,Integrals,Plots,Roots,RecursiveArrayTools,OrdinaryDiffEq,JLD2,FastGaussQuadrature,HDF5
 include("SimulationSetup.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
@@ -9,7 +9,7 @@ include("SimulationConfigurations.jl")
 include("SystemBuilder.jl")
 
 function setup()
-    las=define_laser_system(:Gaussian,fwhm=150,fluence=124.8,photon_en=1.55)
+    las=define_laser_system(:Gaussian,fwhm=150,fluence=124.8,photon_en=2.18)
     sim = define_simulation_settings(nlelecphon=true,nlelecheat=true,noneqelec=true
     ,elecphonint=true,elecelecint=true,electemp=true,phonontemp=true)
     mp = define_material_parameters(las,extcof=14.9,gamma=6.117e-7,debye=343,noatoms=85,plasma=13.4,thermalcond=0.0025,
@@ -21,6 +21,6 @@ end
 
 key_list = function_builder()
 initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-tspan=(-450, 4550.0)
-sol = run_simulation(key_list,initialtemps,tspan)
-@save "AthEMTTM_20.jld2" sol
+tspan=(-450, 1000.0)
+#= sol = run_simulation(key_list,initialtemps,tspan)
+@save "Test.jld2" sol =#

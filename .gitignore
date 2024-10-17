@@ -4,3 +4,6 @@
 *.jld2
 *.mp4
 *.nxs
+*.hdf5
+*.pdf
+*.ipynb

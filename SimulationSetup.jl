@@ -190,7 +190,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     fermien=get_FermiEnergy(dos)
     DOS = generate_DOS(dos,noatoms)
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-3*las.hv,3*las.hv,step=0.02))#grid_builder(0.0,-3*las.hv,3*las.hv,0.0005, 0.0002) 
+    erange = collect(range(-3*las.hv,3*las.hv,step=0.02))#grid_builder(200,6*las.hv) #
     u0 = get_u0(DOS,0.0,fermien)
     n0 = get_n0(DOS,0.0,fermien)
     τep = τf*las.hv/8.617e-5/debye
@@ -201,23 +201,7 @@ function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,no
     return matpat
 end
 
-function grid_builder(mid, left, right, step, α)
-    v = Vector{typeof(mid + α*step)}()
-    let s = step, a = mid - s
-        while a ≥ left
-            push!(v, a)
-            s += α
-            a -= s
-        end
-    end
-    reverse!(v)
-    push!(v, mid)
-    let s = step, a = mid + s
-        while a ≤ right
-            push!(v, a)
-            s += α
-            a += s
-        end
-    end
-    v
+function grid_builder(l,Espan)
+    gh,weights = gausshermite(l)
+    return ((gh .- minimum(gh)) ./ (maximum(gh)/(Espan/2))) .- (Espan/2) 
 end
