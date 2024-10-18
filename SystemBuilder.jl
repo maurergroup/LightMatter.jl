@@ -77,7 +77,7 @@ function generate_initalconditions(key_list,mp,initialtemps,dim)
         elseif i == "Tph"
             temp_u = (temp_u...,fill(initialtemps[i],dim.length))
         elseif i == "fneq"
-            temp_u = (temp_u...,zeros(length(mp.egrid),dim.length))
+            temp_u = (temp_u...,zeros(dim.length,length(mp.egrid)))
         elseif i == "noe"
             temp_u = (temp_u...,fill(mp.n0,dim.length))
         end
@@ -89,13 +89,12 @@ function generate_parameters(sim,mp,cons,las,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
             μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS,cons.kB,mp.FE,mp.n0)
-            return (las,mp,cons,dim,initialtemps["Tel"],μ)
+            return [las,mp,cons,dim,initialtemps["Tel"],μ]
         else
-            return (las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(length(mp.egrid),dim.length))
+            return [las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(dim.length,length(mp.egrid))]
         end
     else
-        n = mp.n0
-        return (las,mp,cons,dim,n,zeros(dim.length),zeros(dim.length))
+        return [las,mp,cons,dim,mp.n0,zeros(dim.length),zeros(dim.length)]
     end
 end
 
@@ -128,7 +127,7 @@ end
 
 function multithread_functions(sys,key_list,args)
     for i in key_list
-        scal_args = (args[i]...,(:i,Int))
+        scal_args = (args[i]...,(:z,Int))
         make_function(scal_args,sys[i],Symbol(i*"_scal"))
         new_args = ()
         parallel_args = ()
@@ -137,7 +136,7 @@ function multithread_functions(sys,key_list,args)
                 new_args=(new_args...,:($(j[1])[i]))
                 parallel_args=(parallel_args...,(j[1],Vector{Float64}))
             elseif j[2] == Vector{Float64} 
-                new_args=(new_args...,:($(j[1])[:,i]))
+                new_args=(new_args...,:($(j[1])[i,:]))
                 parallel_args=(parallel_args...,(j[1],Matrix{Float64}))
             else
                 new_args=(new_args...,j[1])
@@ -158,13 +157,12 @@ function make_function(typed_vars::Tuple, expr::Expr,name::Symbol)
     args = [Expr(:(::), var, typ) for (var, typ) in typed_vars]
     function_expr = Expr(:function, Expr(:call, name, args...), expr)
     eval(function_expr)
-    eval(function_expr.args[1].args[1])
 end
 
 function multithreaded_expr(func, result::Symbol, vars)
     return quote
-        Threads.@threads for i in eachindex(du[1,:])
-            @inbounds $result[:,i] .= $func($(vars...),i)
+        Threads.@threads for i in eachindex(du[:,1])
+            @inbounds $result[i,:] .= $func($(vars...),i)
         end
     end
 end

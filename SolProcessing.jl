@@ -1,5 +1,3 @@
-include("SimulationBuilder.jl")
-
 function post_production(sol,file_name,initial_temps)
     sim,mp,las,dim,cons = setup()
     fid = create_datafile_and_structure(file_name)
@@ -12,7 +10,7 @@ function post_production(sol,file_name,initial_temps)
     μs = pp_chemicalpotential(results["Tel"],results["n"],mp,cons)
     fid["Miscellaneous"]["Chemical Potential"] = μs
     FD = pp_FermiDistribution(results["Tel"],mp,cons,μs)
-    write_laser(fid["Miscellaneous"],las,dim,results["times"])
+    write_laser(fid["Miscellaneous"],las,dim,results["times"],mp)
 
     relax=()
     if sim.Systems.NonEqElectrons == true
@@ -20,7 +18,7 @@ function post_production(sol,file_name,initial_temps)
     end
     write_electronictemperature(fid["Electronic Temperature"],results,dim,mp,μs,sim,FD,relax)
     write_phononictemperature(fid["Phononic Temperature"],results,sim,mp,fid_id)
-    write_numberofparticles(fid["Number Of Particles"],results,sim,mp,relax)
+    write_numberofparticles(fid["Number Of Particles"],results,sim,mp,relax,μs)
     close(fid)
 end
 
@@ -169,7 +167,9 @@ end
 function pp_spatial_Tel(Tel,dim,Tph,mp)
     spat = zeros(size(Tel))
     Threads.@threads for i in eachindex(Tel[:,1])
-        spat[i,:] .= electrontemperature_conductivity(Tel[i,:],dim,Tph[i,:],mp,spat[i,:])
+        temp = zeros(length(Tel[1,:]))
+        electrontemperature_conductivity(Tel[i,:],dim,Tph[i,:],mp,temp)
+        spat[i,:] .= temp
     end
     return spat
 end
@@ -267,7 +267,7 @@ function pp_neqelectronphononenergychange(fneq,mp)
     return uep
 end
 
-function write_numberofparticles(f,results,sim,mp,relax)
+function write_numberofparticles(f,results,sim,mp,relax,μ)
     if sim.Systems.NonEqElectrons == true
         f["Number of Electrons"] = results["n"]
         if sim.Interactions.ElectronElectron == true
@@ -348,7 +348,7 @@ function pp_athemelectronphononrelaxation(fneq,mp)
     return rel
 end
 
-function write_laser(f,las,dim,timepoints)
+function write_laser(f,las,dim,timepoints,mp)
     create_group(f,"Laser")
     tuple_las = [("Laser Form",String(Symbol(typeof(las)))),
                  ("Full-Width at Half Maximum / fs",las.FWHM),
@@ -359,10 +359,10 @@ function write_laser(f,las,dim,timepoints)
     las_dict=Dict(tuple_las)
     dict_to_hdf5(f["Laser"],las_dict)
     laser=laser_factory(las,dim)
-    f["Laser"]["Temporal Profile"] = pp_temporalprofile(las,dim,timepoints)
+    f["Laser"]["Temporal Profile"] = pp_temporalprofile(las,dim,timepoints,mp)
 end
 
-function pp_temporalprofile(las,dim,timepoints)
+function pp_temporalprofile(las,dim,timepoints,mp)
     temp_prof = zeros(length(timepoints),length(dim.grid))
     if typeof(las) == Gaussian
         for i in eachindex(timepoints)

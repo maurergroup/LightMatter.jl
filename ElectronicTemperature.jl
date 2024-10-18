@@ -48,14 +48,6 @@ function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,
     return -g*(Tel-Tph)
 end
 
-function electrontemperature_conductivity(dim::Dimension)
-    if typeof(dim) == Homogeneous
-        return 0.0
-    else 
-        return :(electronicthermalconductivity())
-    end
-end
-
 function build_athemelectron(Δu)
     return :( 1/(c_T(μ,Tel,mp.DOS,cons.kB)*p_μ(μ,Tel,mp.DOS,cons.kB)-p_T(μ,Tel,mp.DOS,cons.kB)*c_μ(μ,Tel,mp.DOS,cons.kB))*(p_μ(μ,Tel,mp.DOS,cons.kB)*$Δu-c_μ(μ,Tel,mp.DOS,cons.kB)*Δn))
 end
@@ -74,7 +66,7 @@ function athem_electempenergychange(sim,dim)
     if typeof(dim) != Homogeneous
         push!(args,:(cond))
     end
-    return :(+($(args...)))
+    return :(.+($(args...)))
 end
 
 function electrontemperature_conductivity(Tel::Vector{Float64},dim::Linear,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
@@ -94,5 +86,5 @@ function Depthderivative(vec::Vector{Float64},dz::Int,Diff::Vector{Float64})
 end
 
 function electrontemperature_conductivity(Tel::Vector{Float64},dim::Homogeneous,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
-    return cond[1]=0.0
+    return [0.0]
 end

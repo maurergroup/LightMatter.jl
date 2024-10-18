@@ -151,8 +151,7 @@ function spatial_z_laser(las::Laser,slab::Dimension)
             return :(1/mp.ϵ)
         else
             l=slab.grid[end]
-            z = :(dim.grid[i])
-            las_vec= :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ))).*exp.(-$z./mp.ϵ))
+            las_vec= :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[z]./mp.ϵ))
             return las_vec
         end
     elseif las.Transport == "Combined"

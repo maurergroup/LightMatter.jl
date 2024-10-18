@@ -7,6 +7,7 @@ include("SimulationVariables.jl")
 include("ElectronicDistribution.jl")
 include("SimulationConfigurations.jl")
 include("SystemBuilder.jl")
+include("SolProcessing.jl")
 
 function setup()
     las=define_laser_system(:Gaussian,fwhm=150,fluence=124.8,photon_en=2.18)
@@ -21,6 +22,6 @@ end
 
 key_list = function_builder()
 initialtemps=Dict("Tel"=>300.0,"Tph"=>300.0)
-tspan=(-450, 1000.0)
-#= sol = run_simulation(key_list,initialtemps,tspan)
-@save "Test.jld2" sol =#
+tspan=(-50, 0.0)
+sol = run_simulation(key_list,initialtemps,tspan)
+#@save "AthEM_20.jld2" sol
