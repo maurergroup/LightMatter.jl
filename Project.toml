@@ -1,7 +1,7 @@
 name = "Lightmatter"
 uuid = "b578e399-e75b-4901-9c37-d6aa618b88c4"
 authors = ["Henry Snowden, Reinhard Maurer"]
-version = "1.0.0"
+version = "1.0.1"
 
 [deps]
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
