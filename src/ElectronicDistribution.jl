@@ -36,14 +36,6 @@ function athem_electronelectroninteraction(sim::SimulationSettings)
     end
 end
 
-function athem_electronphononinteraction(sim::SimulationSettings)
-    if sim.Interactions.ElectronElectron == true 
-        return :(-1*fneq./mp.τep)
-    else
-        return 0.0
-    end
-end
-
 function athem_electronelectronscattering()
     feq = :(FermiDirac(Tel,μ,cons.kB,mp.egrid))
     ftot = :($feq.+fneq)
