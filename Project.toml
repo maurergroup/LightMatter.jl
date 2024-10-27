@@ -15,6 +15,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 
 [compat]
+Trapz = "2"
 julia = "1.6.7"
 
 [extras]
