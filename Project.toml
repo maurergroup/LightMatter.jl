@@ -4,6 +4,7 @@ authors = ["Henry Snowden, Reinhard Maurer"]
 version = "1.0.2"
 
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
@@ -16,6 +17,9 @@ Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 
 [compat]
 Trapz = "2"
+DataInterpolations = "6"
+OrdinaryDiffEq = "6"
+HDF5 = "0.17"
 julia = "1.6.7"
 
 [extras]
