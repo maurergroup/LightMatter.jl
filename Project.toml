@@ -14,8 +14,10 @@ OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 
 [compat]
+Interpolations = "0.15"
 DelimitedFiles = "1"
 FastGaussQuadrature = "1"
 Integrals = "4"

@@ -1,5 +1,4 @@
-function post_production(sol,file_name,initial_temps,output)
-    sim,mp,las,dim,cons = setup()
+function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim,cons)
     fid = create_datafile_and_structure(file_name)
     fid_id = fid.id
     write_simsettings(fid["Settings"],sim)
@@ -109,8 +108,8 @@ function seperate_results(sol,initial_temps,mp)
     l = length(sol[:,1].x)
     vals =  Dict{String,Any}("Tel"=>0.0,"Tph"=>0.0,"fneq"=>0.0,"n"=>0.0,"times"=>sol.t)
     if l == 1
-        vals["Tel"] = initial_temps["Tel"]
-        vals["Tph"] = initial_temps["Tel"]
+        vals["Tel"] = [initial_temps["Tel"]]
+        vals["Tph"] = [initial_temps["Tel"]]
         vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 1)...,dims=3)
         vals["n"] = mp.n0
     elseif l== 2
@@ -119,7 +118,7 @@ function seperate_results(sol,initial_temps,mp)
         vals["n"] = mp.n0
     elseif l==3
         vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
-        vals["Tph"] = initial_temps["Tel"]
+        vals["Tph"] = [initial_temps["Tel"]]
         vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 3)...,dims=3)
         vals["n"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
     elseif l==4
