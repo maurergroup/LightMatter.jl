@@ -40,6 +40,7 @@ end
     ParameterApprox::ParameterApproximation
     Interactions::Interaction
     Systems::SystemComponents
+    Spatial_DOS::Bool
 end
 """
     Dimension is the parent type of all dimensionality information
@@ -109,7 +110,7 @@ end
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
 function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=true,elecelecint=true,elecphonint=true,
-    phononheatcapacity=true,electemp=true,phonontemp=true)
+    phononheatcapacity=true,electemp=true,phonontemp=true,zDOS=false)
     
     if noneqelec==false
         elecelecint=false
@@ -122,7 +123,7 @@ function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec
     
     components=SystemComponents(ElectronTemperature=electemp,PhononTemperature=phonontemp,NonEqElectrons=noneqelec)
 
-    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components)
+    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components,Spatial_DOS=zDOS)
     
     return sim_settings
 end

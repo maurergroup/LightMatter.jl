@@ -18,49 +18,47 @@ function generate_DOS(File::String,n)
 end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance=0.1)
+    bulkDOS = readdlm(bulk)
+    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*n,SteffenMonotonicInterpolation())
+    bulkDOSspl=extrapolate(bulkDOSspl,Flat())
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
-    zDOS = build_zDOSArray(egrid,folder,files,heights,bulk,n)
+    zDOS = build_zDOSArray(egrid,folder,files,heights,bulkDOSspl,n)
     Temp=zeros(dim.length,length(egrid))
     for z in eachindex(dim.grid)
         for E in eachindex(egrid)
             Temp[z,E] = zDOS[E](dim.grid[z])
         end
     end
-    DOSScale(Temp,BulkDOS[:,2],egrid)
-    for i in eachindex(zdim.grid)
-        if i<=4
-            zgridDOS[i]=Interpolations.interpolate(Energies, Temp[i,:]*n, SteffenMonotonicInterpolation())
-        else 
-            zgridDOS[i]=Interpolations.interpolate(Energies, BulkDOS[:,2]*n, SteffenMonotonicInterpolation())
-        end
+    DOSScale(Temp,bulkDOSspl(egrid),egrid)
+    zgridDOS=Vector{Any}(undef,dim.length)
+    for i in eachindex(zgridDOS) 
+        zgridDOS[i]=get_interpolate(egrid, Temp[i,:])
     end
-
+    return zgridDOS
 end
 
 function DOSScale(Temp,bulk,Energies)
+    fd = FermiDirac(0.0,0.0,8.617e-5,Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = trapz(Energies,(u*Temp[i,:]) .- bulk)
+        f(u) = trapz(Energies,fd.*(u*Temp[i,:] .- bulk))
         x0 = 1
         prob = ZeroProblem(f,x0)
         rescale = solve(prob,Order16();atol=1e-10,rtol=1e-10)
-        Temp[i,:] = Temp[i,:]*scal
+        Temp[i,:] = Temp[i,:]*rescale
     end
     return Temp
 end
 
-function build_zDOSArray(egrid,folder,files,heights,bulk,n)
+function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
     zDOS=Matrix{Float64}(undef,length(heights),length(egrid))
     for i in eachindex(files)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
         zDOS[i,:]=TotalDOS[:,2]*n
     end
-    bulkDOS = readdlm(bulk)
-    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2],SteffenMonotonicInterpolation())
-    bulkDOSspl=extrapolate(bulkDOSspl,Flat())
-    zDOS=vcat(zDOS,transpose(bulkDOSspl(egrid)*n))
-    zDOS=vcat(zDOS,transpose(bulkDOSspl(egrid)*n))
+    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)*n))
+    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)*n))
     heights=vcat(heights,findmax(heights)[1]+0.1)
     heights=vcat(heights,findmax(heights)[1]+0.1)
     zDOSspl=Vector{Any}(undef,length(egrid))

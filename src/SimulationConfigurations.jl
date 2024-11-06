@@ -1,42 +1,42 @@
-function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim,cons)
+function run_simulation(key_list,initialtemps,tspan,save,sim,mp,las,dim,cons)
     u0 = generate_initalconditions(key_list,mp,initialtemps,dim)
     p = generate_parameters(sim,mp,cons,las,initialtemps,dim)
-    return run_dynamics(p,u0,tspan)
+    return run_dynamics(p,u0,tspan,save)
 end
 
-function run_dynamics(p,u0,tspan)
+function run_dynamics(p,u0,tspan,save)
     if length(u0.x) == 1
-        return run_dynamics1(p,u0,tspan)
+        return run_dynamics1(p,u0,tspan,save)
     elseif length(u0.x) == 2
-        return run_dynamics2(p,u0,tspan)
+        return run_dynamics2(p,u0,tspan,save)
     elseif length(u0.x) == 3
-        return sol = run_dynamics3(p,u0,tspan)
+        return sol = run_dynamics3(p,u0,tspan,save)
     elseif length(u0.x) == 4
-        return sol = run_dynamics4(p,u0,tspan)
+        return sol = run_dynamics4(p,u0,tspan,save)
     end
 end
 
-function run_dynamics4(p,u0,tspan)
+function run_dynamics4(p,u0,tspan,save)
     prob=ODEProblem(FullAthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=2.0)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=save)
     return sol
 end
 
-function run_dynamics1(p,u0,tspan)
+function run_dynamics1(p,u0,tspan,save)
     prob=ODEProblem(EHP_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=2.0,dtmin=0.1)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=save)
     return sol
 end
    
-function run_dynamics3(p,u0,tspan)
+function run_dynamics3(p,u0,tspan,save)
     prob=ODEProblem(AthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=2.0,dtmin=0.1)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=save)
     return sol
 end
 
-function run_dynamics2(p,u0,tspan)
+function run_dynamics2(p,u0,tspan,save)
     prob=ODEProblem(TTM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=1e-4,reltol=1e-4,saveat=2.0,dtmin=0.1)
+    sol = solve(prob,Tsit5(),abstol=1e-5,reltol=1e-5,saveat=save)
     return sol
 end
 
