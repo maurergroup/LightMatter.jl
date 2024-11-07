@@ -33,34 +33,34 @@ function generate_arguments(sim::SimulationSettings)
     if sim.Systems.ElectronTemperature == true
         if sim.Interactions.ElectronElectron == true
             if sim.Interactions.ElectronPhonon == true
-                merge!(args,Dict("Tel" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:cons,Constants),(:μ,Float64),(:relax_dis,Vector{Float64}),(:Δn,Float64),(:cond,Float64))))
+                merge!(args,Dict("Tel" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:μ,Float64),(:relax_dis,Vector{Float64}),(:Δn,Float64),(:cond,Float64))))
             else
-                merge!(args,Dict("Tel" => ((:Tel,Float64),(:mp,MaterialParameters),(:cons,Constants),(:μ,Float64),(:relax_dis,Vector{Float64}),(:Δn,Float64),(:cond,Float64))))
+                merge!(args,Dict("Tel" => ((:Tel,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:μ,Float64),(:relax_dis,Vector{Float64}),(:Δn,Float64),(:cond,Float64))))
             end
         elseif sim.Interactions.ElectronPhonon == true
-            merge!(args,Dict("Tel" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser),(:μ,Float64),(:t,Float64),(:cond,Float64),(:dim,Dimension))))
+            merge!(args,Dict("Tel" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:las,Laser),(:μ,Float64),(:t,Float64),(:cond,Float64),(:dim,Dimension))))
         else
-            merge!(args,Dict("Tel" => ((:Tel,Float64),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser),(:μ,Float64),(:t,Float64),(:cond,Float64))))
+            merge!(args,Dict("Tel" => ((:Tel,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:las,Laser),(:μ,Float64),(:t,Float64),(:cond,Float64))))
         end
     end
 
 
     if sim.Systems.PhononTemperature == true
         if sim.Systems.NonEqElectrons == true
-            merge!(args,Dict("Tph" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:cons,Constants),(:μ,Float64),(:fneq,Vector{Float64}))))
+            merge!(args,Dict("Tph" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:μ,Float64),(:fneq,Vector{Float64}))))
         else
-            merge!(args,Dict("Tph" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:cons,Constants),(:μ,Float64))))
+            merge!(args,Dict("Tph" => ((:Tel,Float64),(:Tph,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:μ,Float64))))
         end
     end
 
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronElectron == true
-            merge!(args,Dict("fneq" => ((:fneq,Vector{Float64}),(:Tel,Float64),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser)
+            merge!(args,Dict("fneq" => ((:fneq,Vector{Float64}),(:Tel,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:las,Laser)
                                 ,(:μ,Float64),(:t,Float64),(:dim,Dimension),(:relax_dis,Vector{Float64}))))
-            merge!(args,Dict("noe" => ((:relax_dis,Vector{Float64}),(:μ,Float64),(:mp,MaterialParameters))))
-            merge!(args,Dict("relax" => ((:Tel,Float64),(:fneq,Vector{Float64}),(:n,Float64),(:μ,Float64),(:mp,MaterialParameters),(:cons,Constants))))
+            merge!(args,Dict("noe" => ((:relax_dis,Vector{Float64}),(:μ,Float64),(:mp,MaterialParameters),(:DOS,spl))))
+            merge!(args,Dict("relax" => ((:Tel,Float64),(:fneq,Vector{Float64}),(:n,Float64),(:μ,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants))))
         else
-            merge!(args,Dict("fneq" => ((:fneq,Vector{Float64}),(:Tel,Float64),(:mp,MaterialParameters),(:cons,Constants),(:las,Laser)
+            merge!(args,Dict("fneq" => ((:fneq,Vector{Float64}),(:Tel,Float64),(:mp,MaterialParameters),(:DOS,spl),(:cons,Constants),(:las,Laser)
                                         ,(:μ,Float64),(:t,Float64),(:dim,Dimension))))
         end
     end
@@ -87,7 +87,7 @@ end
 function generate_parameters(sim,mp,cons,las,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
-            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS,cons.kB,mp.FE,mp.n0)
+            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS[1],cons.kB,mp.FE,mp.n0)
             return [las,mp,cons,dim,initialtemps["Tel"],μ]
         else
             return [las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(dim.length,length(mp.egrid))]
@@ -109,6 +109,9 @@ function scalar_functions(sys,key_list,args)
             elseif j[2] == Vector{Float64} 
                 new_args=(new_args...,:($(j[1])[:]))
                 scalar_args=(scalar_args...,(j[1],Matrix{Float64}))
+            elseif j[2] == spl
+                new_args=(new_args...,:($(j[1])[1]))
+                scalar_args=(scalar_args...,(j[1],Vector{spl}))
             else
                 new_args=(new_args...,j[1])
                 scalar_args=(scalar_args...,j)
@@ -137,6 +140,9 @@ function multithread_functions(sys,key_list,args)
             elseif j[2] == Vector{Float64} 
                 new_args=(new_args...,:($(j[1])[i,:]))
                 parallel_args=(parallel_args...,(j[1],Matrix{Float64}))
+            elseif j[2] == spl
+                new_args=(new_args...,:($(j[1])[i]))
+                scalar_args=(scalar_args...,(j[1],Vector{spl}))
             else
                 new_args=(new_args...,j[1])
                 parallel_args=(parallel_args...,j)

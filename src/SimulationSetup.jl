@@ -87,7 +87,7 @@ end
     κ::Float64 #Room temperature thermal conductivity
     ne::Float64 #Number of electrons per atom
     effmass::Float64 #Effective mass of conduction electrons
-    DOS::spl #The DOS
+    DOS::Vector{spl} #The DOS
     λ::Float64 #Second momentum of spectral function
     g::Float64 # Linear electron-phonon coupling constant
     Ballistic::Float64 # Ballistic length of electrons
@@ -185,15 +185,20 @@ end
     Builds the material parameter struct with user parameters or user settings and a dictionary generated from an input
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
-function define_material_parameters(las::Laser;extcof=0.0,gamma=0.0,debye=0.0,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0
-    ,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0)
+function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
+    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
+    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1)
     
     fermien=get_FermiEnergy(dos)
-    DOS = generate_DOS(dos,noatoms)
+    if sim.Spatial_DOS == true
+        DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance)
+    elseif sim.Spatial_DOS == false
+        DOS = [generate_DOS(dos,noatoms)]
+    end
     tau = 128/(sqrt(3)*pi^2*plasma)
     erange = collect(range(-2*las.hv,2*las.hv,step=0.02))#grid_builder(200,6*las.hv) #
-    u0 = get_u0(DOS,0.0,fermien)
-    n0 = get_n0(DOS,0.0,fermien)
+    u0 = get_u0(DOS[end],0.0,fermien)
+    n0 = get_n0(DOS[end],0.0,fermien)
     τep = τf*las.hv/8.617e-5/debye
 
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,

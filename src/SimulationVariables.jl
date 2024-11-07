@@ -17,7 +17,7 @@ function generate_DOS(File::String,n)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 
-function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance=0.1)
+function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
     bulkDOS = readdlm(bulk)
     bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*n,SteffenMonotonicInterpolation())
     bulkDOSspl=extrapolate(bulkDOSspl,Flat())

@@ -90,7 +90,10 @@ end
 function write_DOS(f,mp)
     create_group(f,"Density Of States")
     egrid = collect(range(-10,10,step=0.01))
-    DOS = mp.DOS(egrid)
+    DOS = zeros(length(mp.DOS),length(egrid))
+    for i in eachindex(mp.DOS)
+        DOS[i,:] = mp.DOS[i](egrid)
+    end
     f["Density Of States"]["DOS"] = DOS
     f["Density Of States"]["Energy Axis"] = egrid
 
@@ -223,12 +226,12 @@ end
 function pp_chemicalpotential(Tel,n,mp,cons)
     cp = zeros(size(Tel))
     if typeof(n) == Float64
-        Threads.@threads for i in eachindex(Tel[:,1])
-            cp[i,:] .= find_chemicalpotential.(n,Tel[i,:],Ref(mp.DOS),cons.kB,mp.FE,mp.n0)
+        Threads.@threads for i in eachindex(Tel[1,:])
+            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE,mp.n0)
         end
     else
-        Threads.@threads for i in eachindex(Tel[:,1])
-            cp[i,:] .= find_chemicalpotential.(n[i,:],Tel[i,:],Ref(mp.DOS),cons.kB,mp.FE,mp.n0)
+        Threads.@threads for i in eachindex(Tel[1,:])
+            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE,mp.n0)
         end
     end
     return cp

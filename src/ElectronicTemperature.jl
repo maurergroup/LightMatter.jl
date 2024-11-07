@@ -16,7 +16,7 @@ end
 
 function electrontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
-        return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ,mp.DOS))
+        return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ,DOS))
     else
         return :(mp.γ*Tel)
     end
@@ -31,7 +31,7 @@ end
 function electronphonon_coupling(sim)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
-            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS,Tel,μ,Tph))
+            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph))
         else
             return :(-mp.g*(Tel-Tph))
         end
@@ -49,7 +49,7 @@ function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,
 end
 
 function build_athemelectron(Δu)
-    return :( 1/(c_T(μ,Tel,mp.DOS,cons.kB)*p_μ(μ,Tel,mp.DOS,cons.kB)-p_T(μ,Tel,mp.DOS,cons.kB)*c_μ(μ,Tel,mp.DOS,cons.kB))*(p_μ(μ,Tel,mp.DOS,cons.kB)*$Δu-c_μ(μ,Tel,mp.DOS,cons.kB)*Δn))
+    return :( 1/(c_T(μ,Tel,DOS,cons.kB)*p_μ(μ,Tel,DOS,cons.kB)-p_T(μ,Tel,DOS,cons.kB)*c_μ(μ,Tel,DOS,cons.kB))*(p_μ(μ,Tel,DOS,cons.kB)*$Δu-c_μ(μ,Tel,DOS,cons.kB)*Δn))
 end
 
 function elec_energychange(egrid,relax_dis,DOS,u0,FE)
@@ -59,9 +59,9 @@ end
 
 function athem_electempenergychange(sim,dim)
     args = Vector{Union{Expr,Symbol}}(undef,0)
-    push!(args,:(elec_energychange(mp.egrid,relax_dis,mp.DOS,mp.u0,mp.FE)))
+    push!(args,:(elec_energychange(mp.egrid,relax_dis,DOS,mp.u0,mp.FE)))
     if sim.Systems.PhononTemperature == true
-       push!(args,:(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,mp.DOS,Tel,μ,Tph)))
+       push!(args,:(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph)))
     end
     if typeof(dim) != Homogeneous
         push!(args,:(cond))
