@@ -77,7 +77,7 @@ function electrontemperature_conductivity(Tel::Vector{Float64},dim::Linear,Tph::
     Depthderivative((cond.*K),dim.dz,cond)
 end
 
-function Depthderivative(vec::Vector{Float64},dz::Int,Diff::Vector{Float64})
+function Depthderivative(vec::Vector{Float64},dz::Real,Diff::Vector{Float64})
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
     end

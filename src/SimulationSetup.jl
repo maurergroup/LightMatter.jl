@@ -58,7 +58,7 @@ end
 """
 @kwdef struct Linear <: Dimension # The 1D model defined by a depth
     grid::Vector{Float64}
-    dz::Int
+    dz::Real
     length::Int
 end
 """
@@ -131,7 +131,7 @@ end
     Builds the correct slab based on purely user settings or user settings and a dictionary generated from an input
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
-function define_sim_dimensions(;Dimension::Int64,Lengths=400::Union{Int,Vector{Int}},spacing=1::Union{Int,Vector{Int}})
+function define_sim_dimensions(;Dimension::Int64,Lengths=400::Union{Int,Vector{Int}},spacing=1::Union{Real,Vector{Real}})
     
     if Dimension == 0
         return Homogeneous(length=1,grid=[0.0])
@@ -193,7 +193,14 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     if sim.Spatial_DOS == true
         DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance)
     elseif sim.Spatial_DOS == false
-        DOS = [generate_DOS(dos,noatoms)]
+        if typeof(dim) == Homogeneous
+            DOS = [generate_DOS(dos,noatoms)]
+        else
+            DOS = Vector{spl}(undef,dim.length)
+            for i in eachindex(DOS)
+                DOS[i] = generate_DOS(dos,noatoms)
+            end
+        end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
     erange = collect(range(-2*las.hv,2*las.hv,step=0.02))#grid_builder(200,6*las.hv) #

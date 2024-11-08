@@ -142,7 +142,7 @@ function multithread_functions(sys,key_list,args)
                 parallel_args=(parallel_args...,(j[1],Matrix{Float64}))
             elseif j[2] == spl
                 new_args=(new_args...,:($(j[1])[i]))
-                scalar_args=(scalar_args...,(j[1],Vector{spl}))
+                parallel_args=(parallel_args...,(j[1],Vector{spl}))
             else
                 new_args=(new_args...,j[1])
                 parallel_args=(parallel_args...,j)
