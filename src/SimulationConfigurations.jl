@@ -1,5 +1,5 @@
 function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim,cons;save=2.0,tolerance=1e-4,min_step=0.1)
-    u0 = generate_initalconditions(key_list,mp,initialtemps,dim)
+    u0 = generate_initialconditions(key_list,mp,initialtemps,dim)
     p = generate_parameters(sim,mp,cons,las,initialtemps,dim)
     return run_dynamics(p,u0,tspan,save,tolerance,min_step)
 end
@@ -54,11 +54,11 @@ end
 
 function TTM_simulation(du,u,p,t)
     println(t)
+    @assert all(!isnan(x) for x in u)
     electrontemperature_conductivity(u.x[1],p[4],u.x[2],p[2],p[7])
     Threads.@threads for i in eachindex(u.x[1])
         @inbounds p[6][i] = find_chemicalpotential(p[5],u.x[1][i],p[2].DOS[i],p[3].kB,p[2].FE,p[2].n0)
     end
-
     Tel_func(u.x[1],u.x[2],p[2],p[2].DOS,p[3],p[1],p[6],t,p[7],p[4],du.x[1])
     Tph_func(u.x[1],u.x[2],p[2],p[2].DOS,p[3],p[6],du.x[2])
     nothing

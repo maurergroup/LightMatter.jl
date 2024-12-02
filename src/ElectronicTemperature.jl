@@ -22,7 +22,7 @@ function electrontemperature_heatcapacity(sim::SimulationSettings)
     end
 end
 
-function nonlinear_electronheatcapacity(kB::Float64,Tel::Float64,μ::Float64,DOS::spl)
+function nonlinear_electronheatcapacity(kB,Tel,μ,DOS)
     int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)*u
     prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
     return solve(prob,HCubatureJL(initdiv=50);reltol=1e-5,abstol=1e-5).u
@@ -40,7 +40,7 @@ function electronphonon_coupling(sim)
     end
 end
 
-function nonlinear_electronphononcoupling(hbar::Float64,kB::Float64,λ::Float64,DOS::spl,Tel::Float64,μ::Float64,Tph::Float64)
+function nonlinear_electronphononcoupling(hbar,kB,λ,DOS,Tel,μ,Tph)
     prefac=pi*kB*λ/DOS(μ)/hbar
     int(u,p) = DOS(u)^2*-dFDdE(kB,Tel,μ,u)
     prob = IntegralProblem(int,(μ-(10*Tel/10000),μ+(10*Tel/10000)))
@@ -69,7 +69,7 @@ function athem_electempenergychange(sim,dim)
     return :(.+($(args...)))
 end
 
-function electrontemperature_conductivity(Tel::Vector{Float64},dim::Linear,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
+function electrontemperature_conductivity(Tel,dim::Dimension,Tph,mp,cond)
     Depthderivative(Tel,dim.dz,cond)
     cond[1]=0.0
     cond[end]=0.0
@@ -77,7 +77,7 @@ function electrontemperature_conductivity(Tel::Vector{Float64},dim::Linear,Tph::
     Depthderivative((cond.*K),dim.dz,cond)
 end
 
-function Depthderivative(vec::Vector{Float64},dz::Real,Diff::Vector{Float64})
+function Depthderivative(vec,dz,Diff)
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
     end
@@ -85,6 +85,6 @@ function Depthderivative(vec::Vector{Float64},dz::Real,Diff::Vector{Float64})
     Diff[end] = (vec[end]-vec[end-1])/dz
 end
 
-function electrontemperature_conductivity(Tel::Vector{Float64},dim::Homogeneous,Tph::Vector{Float64},mp::MaterialParameters,cond::Vector{Float64})
+function electrontemperature_conductivity(Tel,dim::Homogeneous,Tph,mp,cond)
     return [0.0]
 end

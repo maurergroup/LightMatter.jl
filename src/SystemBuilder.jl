@@ -68,7 +68,7 @@ function generate_arguments(sim::SimulationSettings)
     return args
 end
 
-function generate_initalconditions(key_list,mp,initialtemps,dim)
+function generate_initialconditions(key_list,mp,initialtemps,dim)
     temp_u = ()
     for i in key_list
         if i =="Tel"
@@ -97,69 +97,63 @@ function generate_parameters(sim,mp,cons,las,initialtemps,dim)
     end
 end
 
-function scalar_functions(sys,key_list,args)
-    for i in key_list
-        make_function(args[i],sys[i],Symbol(i*"_scal"))
-        new_args = ()
-        scalar_args = ()
+function scalar_functions(sys,key_list,args) #Generates Scalar functions
+    for i in key_list #Cycles through the different funcitons
+        vars = collect(x for (x,y) in args[i])
+        make_function(vars,sys[i],Symbol(i*"_scal"))
+        new_args = []
+        scalar_args = []
         for j in args[i]
             if j[2] == Float64 && j[1] != :t
-                new_args=(new_args...,:($(j[1])[1]))
-                scalar_args=(scalar_args...,(j[1],Vector{Float64}))
+                push!(new_args,:($(j[1])[1]))
+                push!(scalar_args,j[1])
             elseif j[2] == Vector{Float64} 
-                new_args=(new_args...,:($(j[1])[:]))
-                scalar_args=(scalar_args...,(j[1],Matrix{Float64}))
+                push!(new_args,:($(j[1])[:]))
+                push!(scalar_args,j[1])
             elseif j[2] == spl
-                new_args=(new_args...,:($(j[1])[1]))
-                scalar_args=(scalar_args...,(j[1],Vector{spl}))
+                push!(new_args,:($(j[1])[1]))
+                push!(scalar_args,j[1])
             else
-                new_args=(new_args...,j[1])
-                scalar_args=(scalar_args...,j)
+                push!(new_args,j[1])
+                push!(scalar_args,j[1])
             end
         end
         expr = scalar_expr(Symbol(i*"_scal"),:du,new_args)
-        if i == "relax" || i == "fneq"
-            scalar_args = (scalar_args...,(:du,Matrix{Float64}))
-        else
-            scalar_args = (scalar_args...,(:du,Vector{Float64}))
-        end
+
+        push!(scalar_args,:du)
         make_function(scalar_args,expr,Symbol(i*"_func"))
     end
 end
 
 function multithread_functions(sys,key_list,args)
     for i in key_list
-        scal_args = (args[i]...,(:z,Int))
+        scal_args = collect(x for (x,y) in args[i])
+        scal_args = push!(scal_args,:z)
         make_function(scal_args,sys[i],Symbol(i*"_scal"))
-        new_args = ()
-        parallel_args = ()
+        new_args = []
+        parallel_args = []
         for j in args[i]
             if j[2] == Float64 && j[1] != :t
-                new_args=(new_args...,:($(j[1])[i]))
-                parallel_args=(parallel_args...,(j[1],Vector{Float64}))
+                push!(new_args,:($(j[1])[i]))
+                push!(parallel_args,j[1])
             elseif j[2] == Vector{Float64} 
-                new_args=(new_args...,:($(j[1])[i,:]))
-                parallel_args=(parallel_args...,(j[1],Matrix{Float64}))
+                push!(new_args,:($(j[1])[i,:]))
+                push!(parallel_args,j[1])
             elseif j[2] == spl
-                new_args=(new_args...,:($(j[1])[i]))
-                parallel_args=(parallel_args...,(j[1],Vector{spl}))
+                push!(new_args,:($(j[1])[i]))
+                push!(parallel_args,j[1])
             else
-                new_args=(new_args...,j[1])
-                parallel_args=(parallel_args...,j)
+                push!(new_args,j[1])
+                push!(parallel_args,j[1])
             end
         end
         expr = multithreaded_expr(Symbol(i*"_scal"),:du,new_args)
-        if i == "relax" || i == "fneq"
-            parallel_args = (parallel_args...,(:du,Matrix{Float64}))
-        else
-            parallel_args = (parallel_args...,(:du,Vector{Float64}))
-        end
+        push!(parallel_args,:du)
         make_function(parallel_args,expr,Symbol(i*"_func"))
     end
 end  
 
-function make_function(typed_vars::Tuple, expr::Expr,name::Symbol)
-    args = [Expr(:(::), var, typ) for (var, typ) in typed_vars]
+function make_function(args, expr::Expr,name::Symbol)
     function_expr = Expr(:function, Expr(:call, name, args...), expr)
     eval(function_expr)
 end

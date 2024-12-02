@@ -17,7 +17,7 @@ function phonontemperature_heatcapacity(sim::SimulationSettings)
     end
 end
 
-function nonlinear_phononheatcapacity(Tph::Real,n::Real,kB::Real,θ::Real)
+function nonlinear_phononheatcapacity(Tph,n,kB,θ)
     int(u,p) = u^4*exp(u)/(exp(u)-1)^2
     prob = IntegralProblem(int,(0.0,θ/Tph))
     return 9*n*kB*(Tph/θ)^3*solve(prob,HCubatureJL(initdiv=2);abstol=1e-3,reltol=1e-3).u
