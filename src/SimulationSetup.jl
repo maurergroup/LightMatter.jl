@@ -22,6 +22,7 @@ end
     ElectronPhononCoupling::Bool
     ElectronHeatCapacity::Bool
     PhononHeatCapacity::Bool
+    EmbeddingMethod::Bool
 end
 """
     Booleans for whether a system should be included in the coupled ODE's. There will be an ODE
@@ -90,11 +91,10 @@ end
     DOS::Vector{spl} #The DOS
     λ::Float64 #Second momentum of spectral function
     g::Float64 # Linear electron-phonon coupling constant
-    Ballistic::Float64 # Ballistic length of electrons
+    δb::Float64 # Ballistic length of electrons
     Cph::Float64 #Constant heat capacity for phonons
     egrid::Vector{Float64} # Energy grid to solve neq electrons on
     τ::Float64 #Scalar value for the Fermi Liquid Theory relaxation time
-    u0::Float64
     n0::Float64
     τep::Float64
 end
@@ -110,14 +110,14 @@ end
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
 function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=true,elecelecint=true,elecphonint=true,
-    phononheatcapacity=true,electemp=true,phonontemp=true,zDOS=false)
+    phononheatcapacity=true,electemp=true,phonontemp=true,zDOS=false,embedding=false)
     
     if noneqelec==false
         elecelecint=false
     end
 
     params=ParameterApproximation(ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
-    PhononHeatCapacity=phononheatcapacity)
+    PhononHeatCapacity=phononheatcapacity,EmbeddingMethod=embedding)
 
     interact=Interaction(ElectronElectron=elecelecint,ElectronPhonon=elecphonint)
     
@@ -203,13 +203,12 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-2*las.hv,2*las.hv,step=0.02))#grid_builder(200,6*las.hv) #
-    u0 = get_u0(DOS[end],0.0,fermien)
-    n0 = get_n0(DOS[end],0.0,fermien)
+    erange = collect(range(-2*las.hv,2*las.hv,step=0.01))#grid_builder(200,6*las.hv) #
+    n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,fermien)
     τep = τf*las.hv/8.617e-5/debye
 
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,Ballistic=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,u0=u0,n0=n0,τep=τep)
+    DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep)
 
     return matpat
 end

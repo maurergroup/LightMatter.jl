@@ -4,12 +4,16 @@ function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim,cons)
     write_simsettings(fid["Settings"],sim)
     write_materialproperties(fid["Parameters"],mp,dim,cons)
 
-    results = seperate_results(sol,initial_temps,mp)
+    results = seperate_results(sol,initial_temps,mp,sim)
     fid["Miscellaneous"]["Time Span"] = results["times"]
     μs = pp_chemicalpotential(results["Tel"],results["n"],mp,cons)
     fid["Miscellaneous"]["Chemical Potential"] = μs
     FD = pp_FermiDistribution(results["Tel"],mp,cons,μs)
     write_laser(fid["Miscellaneous"],las,dim,results["times"],mp)
+
+    create_group(fid["Miscellaneous"],"System Equations")
+    output_functions(fid["Miscellaneous"]["System Equations"],sim,las,dim)
+
     if output=="full"
         relax=()
         if sim.Systems.NonEqElectrons == true
@@ -107,7 +111,7 @@ function write_dimsdict(dim)
     end
 end
 
-function seperate_results(sol,initial_temps,mp)
+function seperate_results(sol,initial_temps,mp,sim)
     l = length(sol[:,1].x)
     vals =  Dict{String,Any}("Tel"=>0.0,"Tph"=>0.0,"fneq"=>0.0,"n"=>0.0,"times"=>sol.t)
     if l == 1
@@ -125,10 +129,17 @@ function seperate_results(sol,initial_temps,mp)
         vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 3)...,dims=3)
         vals["n"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
     elseif l==4
-        vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
-        vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 3),dims=1)
-        vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 4)...,dims=3)
-        vals["n"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
+        if sim.ParameterApprox.EmbeddingMethod == true
+            vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 3),dims=1)
+            vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 4),dims=1)
+            vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 2)...,dims=3)
+            vals["n"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
+        else
+            vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
+            vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 3),dims=1)
+            vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 4)...,dims=3)
+            vals["n"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
+        end
     end
     return vals
 end
@@ -217,7 +228,7 @@ function pp_neqelectronelectronenergychange(relax,mp)
     uee = zeros(length(relax[1,1,:]),length(relax[1,:,1]))
     Threads.@threads for i in eachindex(uee[:,1])
         for j in eachindex(uee[i,:])
-            uee[i,j] = elec_energychange(mp.egrid,-1*relax[:,j,i],mp.DOS,mp.u0,mp.FE)
+            uee[i,j] = elec_energychange(mp.egrid,-1*relax[:,j,i],mp.DOS,mp.FE)
         end
     end
     return uee
@@ -227,11 +238,11 @@ function pp_chemicalpotential(Tel,n,mp,cons)
     cp = zeros(size(Tel))
     if typeof(n) == Float64
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE,mp.n0)
+            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE)
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE,mp.n0)
+            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE)
         end
     end
     return cp
@@ -272,7 +283,7 @@ function pp_neqelectronphononenergychange(fneq,mp)
     uep = zeros(length(fneq[1,1,:]),length(fneq[1,:,1])) 
     Threads.@threads for i in eachindex(fneq[1,1,:])
         for j in eachindex(fneq[1,:,1])
-            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],mp.egrid,mp.τep,mp.u0,mp.fe,mp.DOS)
+            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],mp.egrid,mp.τep,mp.FE,mp.DOS)
         end
     end
     return uep
@@ -335,7 +346,7 @@ function pp_athemexcitation(ftot,mp,las)
     excite = zeros(size(ftot))
     Threads.@threads for i in eachindex(ftot[1,1,:])
         for j in eachindex(ftot[1,:,1])
-            excite[:,j,i] .= athemexcitation(ftot[:,j,i],mp.egrid,mp.DOS,las.hv,mp.n0,mp.FE,mp.u0)
+            excite[:,j,i] .= athemexcitation(ftot[:,j,i],mp.egrid,mp.DOS,las.hv,mp.FE)
         end
     end
     return FD
@@ -393,4 +404,25 @@ function write_minimum(f,results,FD,sim)
         f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
     end
 end
-        
+    
+function output_functions(f,sim,las,dim)
+    sys,key_list = function_builder(sim,las,dim,sys_output=true)
+    f["Name of Method"] = method_name(key_list)
+    for i in key_list
+        f[i] = string(sys)
+    end
+end
+
+function method_name(key_list)
+    if length(key_list) == 1
+        return "Athermal Electron Generation"
+    elseif length(key_list) == 2
+        return "Two-Temperature Model"
+    elseif length(key_list) == 3
+        return "Athermal Electrons with Electron Relaxation"
+    elseif length(key_list) == 4
+        return "AthEM with Electron & Phonon Relaxation"
+    elseif length(key_list) == 7
+        return "Embedded AthEM inside Two-Temperature Model"
+    end
+end

@@ -52,14 +52,14 @@ function build_athemelectron(Δu)
     return :( 1/(c_T(μ,Tel,DOS,cons.kB)*p_μ(μ,Tel,DOS,cons.kB)-p_T(μ,Tel,DOS,cons.kB)*c_μ(μ,Tel,DOS,cons.kB))*(p_μ(μ,Tel,DOS,cons.kB)*$Δu-c_μ(μ,Tel,DOS,cons.kB)*Δn))
 end
 
-function elec_energychange(egrid,relax_dis,DOS,u0,FE)
+function elec_energychange(egrid,relax_dis,DOS,FE)
     spl = get_interpolate(egrid,relax_dis)
-    return get_internalenergyspl(spl,DOS,u0,FE)
+    return get_internalenergyspl(spl,DOS,FE)
 end
 
 function athem_electempenergychange(sim,dim)
     args = Vector{Union{Expr,Symbol}}(undef,0)
-    push!(args,:(elec_energychange(mp.egrid,relax_dis,DOS,mp.u0,mp.FE)))
+    push!(args,:(elec_energychange(mp.egrid,relax_dis,DOS,mp.FE)))
     if sim.Systems.PhononTemperature == true
        push!(args,:(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph)))
     end
@@ -77,6 +77,10 @@ function electrontemperature_conductivity(Tel,dim::Dimension,Tph,mp,cond)
     Depthderivative((cond.*K),dim.dz,cond)
 end
 
+function electrontemperature_conductivity(Tel,dim::Homogeneous,Tph,mp,cond)
+    return [0.0]
+end
+
 function Depthderivative(vec,dz,Diff)
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
@@ -85,6 +89,10 @@ function Depthderivative(vec,dz,Diff)
     Diff[end] = (vec[end]-vec[end-1])/dz
 end
 
-function electrontemperature_conductivity(Tel,dim::Homogeneous,Tph,mp,cond)
-    return [0.0]
+function embedded_AthEM_conductivity(Tel,Tph,dim,mp)
+    dTel = (Tel[3].-Tel[1])./dim.dz
+    K=mp.κ*Tel[2]./Tph[2]
+    dQ = dTel .* K
+    return (dQ-0.0)/dim.dz
 end
+

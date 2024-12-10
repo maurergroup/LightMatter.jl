@@ -1,13 +1,36 @@
-function function_builder(sim,las,dim)
+function function_builder(sim,las,dim;sys_output=false)
     laser=laser_factory(las,dim)
-    sys,key_list = generate_expressions(sim,laser,dim)
-    args = generate_arguments(sim)
-    if typeof(dim) == Homogeneous
-        scalar_functions(sys,key_list,args)
+    if sim.ParameterApprox.EmbeddingMethod == true && sim.Systems==SystemComponents(true,true,true)
+        sim_bg = SimulationSettings(ParameterApproximation(true, true, true, true), Interaction(false, true), SystemComponents(true, true, false), true)
+        sys_embed,key_list_embed = generate_expressions(sim,laser,dim)
+        sys_embed = Dict("$(key)_AthEM" => value for (key, value) in sys_embed)
+        key_list_embed = ["$(s)_AthEM" for s in key_list_embed]
+        sys_bg,key_list_bg = generate_expressions(sim_bg,laser,dim)
+        args_embed = generate_arguments(sim)
+        args_embed = Dict("$(key)_AthEM" => value for (key, value) in args_embed)
+        args_bg = generate_arguments(sim_bg)
+
+        scalar_functions(sys_embed,key_list_embed,args_embed)
+        multithread_functions(sys_bg,key_list_bg,args_bg)
+        if sys_output==true
+            return merge(sys_embed,sys_bg),vcat(key_list_embed,key_list_bg)
+        else
+            return vcat(key_list_embed,key_list_bg)
+        end
     else
-        multithread_functions(sys,key_list,args)
+        sys,key_list = generate_expressions(sim,laser,dim)
+        args = generate_arguments(sim)
+        if typeof(dim) == Homogeneous
+            scalar_functions(sys,key_list,args)
+        else
+            multithread_functions(sys,key_list,args)
+        end
+        if sys_output==true
+            return sys,key_list
+        else
+            return key_list
+        end
     end
-    return key_list
 end
 
 function generate_expressions(sim,laser,dim)
@@ -79,6 +102,10 @@ function generate_initialconditions(key_list,mp,initialtemps,dim)
             temp_u = (temp_u...,zeros(dim.length,length(mp.egrid)))
         elseif i == "noe"
             temp_u = (temp_u...,fill(mp.n0,dim.length))
+        elseif i == "fneq_AthEM"
+            temp_u = (temp_u...,zeros(1,length(mp.egrid)))
+        elseif i == "noe_AthEM"
+            temp_u = (temp_u...,fill(mp.n0,dim.length))
         end
     end
     return ArrayPartition(temp_u)
@@ -90,7 +117,11 @@ function generate_parameters(sim,mp,cons,las,initialtemps,dim)
             μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS[1],cons.kB,mp.FE,mp.n0)
             return [las,mp,cons,dim,initialtemps["Tel"],μ]
         else
-            return [las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(dim.length,length(mp.egrid))]
+            if sim.ParameterApprox.EmbeddingMethod == true
+                return [las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(1,length(mp.egrid))]
+            else
+                return return [las,mp,cons,dim,zeros(dim.length),zeros(dim.length),zeros(dim.length,length(mp.egrid))]
+            end
         end
     else
         return [las,mp,cons,dim,mp.n0,zeros(dim.length),zeros(dim.length)]
@@ -98,8 +129,11 @@ function generate_parameters(sim,mp,cons,las,initialtemps,dim)
 end
 
 function scalar_functions(sys,key_list,args) #Generates Scalar functions
-    for i in key_list #Cycles through the different funcitons
+    for i in key_list #Cycles through the different functions
         vars = collect(x for (x,y) in args[i])
+        if i == "fneq_AthEM"
+            push!(vars,:z)
+        end
         make_function(vars,sys[i],Symbol(i*"_scal"))
         new_args = []
         scalar_args = []
@@ -118,8 +152,10 @@ function scalar_functions(sys,key_list,args) #Generates Scalar functions
                 push!(scalar_args,j[1])
             end
         end
+        if i == "fneq_AthEM"
+            push!(new_args,1)
+        end
         expr = scalar_expr(Symbol(i*"_scal"),:du,new_args)
-
         push!(scalar_args,:du)
         make_function(scalar_args,expr,Symbol(i*"_func"))
     end

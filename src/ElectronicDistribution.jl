@@ -3,7 +3,7 @@ function athemdistribution_factory(sim::SimulationSettings,laser::Expr)
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-    athemexcite=:($laser*(athemexcitation($ftot,mp.egrid,DOS,las.hv,mp.n0,mp.FE,mp.u0)))
+    athemexcite=:($laser*athemexcitation($ftot,mp.egrid,DOS,las.hv,mp.FE))
     return build_athemdistribution(athemexcite,Elecelec,Elecphon)
 end
 
@@ -11,13 +11,13 @@ function build_athemdistribution(athemexcite,Elecelec,Elecphon)
     return Expr(:call,:.+,athemexcite,Elecelec,Elecphon)
 end
 
-function athemexcitation(ftot,egrid,DOS,hv,n0,FE,u0)
+function athemexcitation(ftot,egrid,DOS,hv,FE)
     ftotspl = get_interpolate(egrid,ftot)
     Δfneqh = athem_holegeneration(egrid,DOS,ftotspl,hv)
     Δfneqe = athem_electrongeneration(egrid,DOS,ftotspl,hv)
-    pc_sf = get_noparticlesspl(get_interpolate(egrid,Δfneqe),DOS,n0,FE) / get_noparticlesspl(get_interpolate(egrid,Δfneqh),DOS,n0,FE)
+    pc_sf = get_noparticlesspl(get_interpolate(egrid,Δfneqe),DOS,FE) / get_noparticlesspl(get_interpolate(egrid,Δfneqh),DOS,FE)
     Δfneqtot = (pc_sf*Δfneqe).-Δfneqh
-    return Δfneqtot./get_internalenergyspl(get_interpolate(egrid,Δfneqtot),DOS,u0,FE)
+    return Δfneqtot./get_internalenergyspl(get_interpolate(egrid,Δfneqtot),DOS,FE)
 end
 
 function athem_holegeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64)
@@ -41,20 +41,20 @@ function athem_electronelectronscattering()
     ftot = :($feq.+fneq)
     τee = :(mp.τ*(μ.+mp.FE)^2 ./((mp.egrid.-μ).^2 .+(pi*cons.kB*Tel)^2))
     goal = :(trapz(mp.egrid,$ftot.*DOS(mp.egrid).*mp.egrid))
-    frel = :(find_relaxeddistribution(mp.egrid,$goal,n,DOS,cons.kB,mp.u0,mp.FE,mp.n0))
+    frel = :(find_relaxeddistribution(mp.egrid,$goal,n,DOS,cons.kB,mp.FE))
     Δfee = Expr(:call,:.-,:(fneq.+$frel),feq)
     return Expr(:call,:./,Δfee,τee)
 end
 
-function find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64,u0::Float64,FE::Float64,n0::Float64)
-    f(u) = goal - find_temperatureandμ(u,n,DOS,kB,u0,egrid,FE,n0)
+function find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64,FE::Float64)
+    f(u) = goal - find_temperatureandμ(u,n,DOS,kB,egrid,FE)
     Temp = solve(ZeroProblem(f,1000.0);abstol=1e-10,reltol=1e-10)
-    μ = find_chemicalpotential(n,Temp,DOS,kB,FE,n0)
+    μ = find_chemicalpotential(n,Temp,DOS,kB,FE)
     return FermiDirac(Temp,μ,kB,egrid)
 end
 
-function find_temperatureandμ(Tel::Real,n::Real,DOS::spl,kB::Real,u0::Real,egrid::Vector{Float64},FE::Float64,n0::Float64)
-    μ = find_chemicalpotential(n,Tel,DOS,kB,FE,n0)
+function find_temperatureandμ(Tel::Real,n::Real,DOS::spl,kB::Real,egrid::Vector{Float64},FE::Float64)
+    μ = find_chemicalpotential(n,Tel,DOS,kB,FE)
     return trapz(egrid,FermiDirac(Tel,μ,kB,egrid).*DOS(egrid).*egrid)
 end
 
@@ -68,7 +68,7 @@ end
 
 function athem_electronparticlechange()
     spl = :(get_interpolate(mp.egrid,relax_dis))
-    return :(get_noparticlesspl($spl,DOS,mp.n0,mp.FE))
+    return :([get_noparticlesspl($spl,DOS,mp.FE)])
 end
 
 function dFDdE(kB::Float64,Tel::Real,μ::Float64,E::Float64)::Real

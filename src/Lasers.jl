@@ -151,15 +151,14 @@ function spatial_z_laser(las::Laser,slab::Dimension)
             return :(1/mp.ϵ)
         else
             l=slab.grid[end]
-            las_vec= :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[z]./mp.ϵ))
-            return las_vec
+            return :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[z]./mp.ϵ))
         end
     elseif las.Transport == "Combined"
         if typeof(slab) == Homogeneous
             return :(1/(mp.δb+mp.ϵ))
         else
-            zs = [x[end] for x in slab.grid]
-            return :(1/((mp.δb+mp.ϵ)*(1-exp(-length(slab.grid)/(mp.δb+mp.ϵ)))).*exp.(-$zs[i]./(mp.δb+mp.ϵ)))
+            l=slab.grid[end]
+            return :(1/((mp.δb+mp.ϵ)*(1-exp(-$l/(mp.δb+mp.ϵ)))).*exp.(-dim.grid[z]./(mp.δb+mp.ϵ)))
         end
     end
 end
