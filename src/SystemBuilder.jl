@@ -101,11 +101,19 @@ function generate_initialconditions(key_list,mp,initialtemps,dim)
         elseif i == "fneq"
             temp_u = (temp_u...,zeros(dim.length,length(mp.egrid)))
         elseif i == "noe"
-            temp_u = (temp_u...,fill(mp.n0,dim.length))
+            no_part=zeros(dim.length)
+            for j in eachindex(dim.grid)
+                no_part[j] = get_thermalparticles(0.0,1e-32,mp.DOS[j],8.617e-5,mp.egrid)
+            end
+            temp_u = (temp_u...,no_part)
         elseif i == "fneq_AthEM"
             temp_u = (temp_u...,zeros(1,length(mp.egrid)))
         elseif i == "noe_AthEM"
-            temp_u = (temp_u...,fill(mp.n0,dim.length))
+            no_part=zeros(dim.length)
+            for j in eachindex(dim.grid)
+                no_part[j] = get_thermalparticles(0.0,1e-32,mp.DOS[j],8.617e-5,mp.egrid)
+            end
+            temp_u = (temp_u...,no_part)
         end
     end
     return ArrayPartition(temp_u)

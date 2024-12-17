@@ -115,7 +115,7 @@ function embedded_AthEM_simulation(du,u,p,t)
     electrontemperature_conductivity(u.x[3][2:end],p[4],u.x[4][2:end],p[2],view(p[6],2:p[4].length))
     p[6][1] = embedded_AthEM_conductivity(u.x[3],u.x[4],p[4],p[2])
     Threads.@threads for i in eachindex(p[5])
-        p[5][i] = find_chemicalpotential(u.x[1][i],u.x[3][i],p[2].DOS[i],p[3].kB,p[2].FE)
+        p[5][i] = find_chemicalpotential(u.x[1][i],u.x[3][i],p[2].DOS[i],p[3].kB,p[2].egrid)
     end
 
     relax_AthEM_func(u.x[3][1],u.x[2][1,:],u.x[1][1],p[5][1],p[2],p[2].DOS,p[3],p[7])

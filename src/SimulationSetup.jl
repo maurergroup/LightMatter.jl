@@ -203,14 +203,29 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = collect(range(-2*las.hv,2*las.hv,step=0.01))#grid_builder(200,6*las.hv) #
-    n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,fermien)
+    erange = build_egrid(las.hv)#
+    n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,erange)
     τep = τf*las.hv/8.617e-5/debye
 
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
     DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep)
 
     return matpat
+end
+
+function build_egrid(hv)
+    egrid = collect(range(-2*hv,2*hv,step=0.01))
+    side = 1
+    while length(egrid) % 4 != 1
+        if side == 1
+            push!(egrid,egrid[end]+0.01)
+            side = -1
+        elseif side == -1
+            pushfirst!(egrid,egrid[1]-0.01)
+            side = 1
+        end
+    end
+    return egrid
 end
 
 function grid_builder(l,Espan)

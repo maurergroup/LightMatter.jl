@@ -31,7 +31,7 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::D
             Temp[z,E] = zDOS[E](dim.grid[z])
         end
     end
-    DOSScale(Temp,bulkDOSspl(egrid),egrid)
+    #DOSScale(Temp,bulkDOSspl(egrid),egrid)
     zgridDOS=Vector{Any}(undef,dim.length)
     for i in eachindex(zgridDOS) 
         zgridDOS[i]=get_interpolate(egrid, Temp[i,:])
@@ -42,7 +42,7 @@ end
 function DOSScale(Temp,bulk,Energies)
     fd = FermiDirac(0.0,0.0,8.617e-5,Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = trapz(Energies,fd.*(u*Temp[i,:] .- bulk))
+        f(u) = extended_Bode(Energies,fd.*(u*Temp[i,:] .- bulk))
         x0 = 1
         prob = ZeroProblem(f,x0)
         rescale = solve(prob,Order16();atol=1e-10,rtol=1e-10)
@@ -57,8 +57,8 @@ function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
         zDOS[i,:]=TotalDOS[:,2]*n
     end
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)*n))
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)*n))
+    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
+    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
     heights=vcat(heights,findmax(heights)[1]+0.1)
     heights=vcat(heights,findmax(heights)[1]+0.1)
     zDOSspl=Vector{Any}(undef,length(egrid))
@@ -138,82 +138,59 @@ get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xval
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
     electronic temperature.
 """
-function find_chemicalpotential(no_part::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64)::Float64
-    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB,FE)
+function find_chemicalpotential(no_part::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid)::Float64
+    f(u) = no_part - get_thermalparticles(u,Tel,DOS,kB,egrid)
     return solve(ZeroProblem(f,0.0),Order1();atol=1e-3,rtol=1e-3)
 end
 
-function get_thermalparticles(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,FE::Float64)::Float64
-    int(u,p) = DOS(u)/(exp((u-μ)/(kB*Tel))+1)
-    prob=IntegralProblem(int,(-FE,FE)) 
-    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+function get_thermalparticles(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid)::Float64
+    return extended_Bode(DOS(egrid).*FermiDirac(Tel,μ,kB,egrid),egrid)
 end
 """
     Determines the number of particles in any system using an interpolation of the system and
     the DOS of the system.
 """
-function get_noparticlesspl(Dis::spl,DOS::spl,FE)
-    int(u,p) = Dis(u)*DOS(u)
-    prob=IntegralProblem(int,(-FE,FE))
-    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+function get_noparticles(Dis::Vector{<:Real},DOS::spl,egrid)
+    return extended_Bode(Dis.*DOS(egrid),egrid)
 end
 
-function p_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
-    int(u,p) = dFDdT(kB,Tel,μ,u)*DOS(u)
-    prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+function p_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid)
+    return extended_Bode(dFDdT(kB,Tel,μ,egrid).*DOS(egrid),egrid)
 end
 
-function p_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
-    int(u,p) = dFDdμ(kB,Tel,μ,u)*DOS(u)
-    prob=IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=10);abstol=1e-5,reltol=1e-5).u
+function p_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid)
+    return extended_Bode(dFDdμ(kB,Tel,μ,egrid).*DOS(egrid),egrid)
 end
 """
     Determines the internal energy of any system using an interpolation of that system and the
     DOS of the system.
 """
-function get_internalenergyspl(Dis::spl,DOS::spl,FE)
-    int(u,p) = Dis(u)*DOS(u)*u
-    prob=IntegralProblem(int,(-FE,FE))
-    return solve(prob,HCubatureJL(initdiv=10),reltol=1e-5,abstol=1e-5).u
+function get_internalenergy(Dis::Vector{<:Real},DOS::spl,egrid)
+    return extended_Bode(Dis.*DOS(egrid).*egrid,egrid)
 end
 
-function c_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
-    int(u,p) = dFDdT(kB,Tel,μ,u).*DOS(u)*u
-    prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
+function c_T(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid::Vector{<:Real})
+    return extended_Bode(dFDdT(kB,Tel,μ,egrid).*DOS(egrid).*egrid,egrid)
 end
 
-function c_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64)
-    int(u,p) = dFDdμ(kB,Tel,μ,u).*DOS(u)*u
-    prob = IntegralProblem(int,(μ-(60*Tel/10000),μ+(60*Tel/10000)))
-    return solve(prob,HCubatureJL(initdiv=10);reltol=1e-5,abstol=1e-5).u
+function c_μ(μ::Float64,Tel::Float64,DOS::spl,kB::Float64,egrid)
+    return extended_Bode(dFDdμ(kB,Tel,μ,egrid).*DOS(egrid).*egrid,egrid)
 end
 
-function combined_simpsons(y::Vector{<:Real}, x::Vector{<:Real})
+function extended_Bode(y::Vector{<:Real}, x::Vector{<:Real})
     n = length(x)
     h = x[2]-x[1]  # The spacing between points
     integral = 0.0
 
     # Determine how many intervals to use for each rule
-    remaining_intervals = n - 1
-    if remaining_intervals % 3 == 2
-        # Use 1/3 Rule for the last two intervals
-        integral += (h / 3) * (y[end-2] + 4*y[end-1] + y[end])
-        remaining_intervals -= 2
-    elseif remaining_intervals % 3 == 1
-        # Use 1/3 Rule for the last two intervals
-        integral += (h / 3) * (y[end-2] + 4*y[end-1] + y[end])
-        remaining_intervals -= 2
-    end
+    integral_limit = n - 1
 
     # Apply Composite 3/8 Rule for the remaining intervals
-    integral += (3h / 8) * (
-        y[1] + y[remaining_intervals+1] +
-        3 * sum(y[2:3:remaining_intervals]) +
-        3 * sum(y[3:3:remaining_intervals]) +
-        2 * sum(y[4:3:remaining_intervals-1])
+    integral += (2h / 45) * (
+        7 * y[1] + 7 * y[integral_limit+1] +
+        32 * sum(y[2:2:integral_limit]) +
+        12 * sum(y[3:4:integral_limit]) +
+        14 * sum(y[4:3:integral_limit])
     )
     return integral
 end

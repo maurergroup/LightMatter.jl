@@ -228,7 +228,7 @@ function pp_neqelectronelectronenergychange(relax,mp)
     uee = zeros(length(relax[1,1,:]),length(relax[1,:,1]))
     Threads.@threads for i in eachindex(uee[:,1])
         for j in eachindex(uee[i,:])
-            uee[i,j] = elec_energychange(mp.egrid,-1*relax[:,j,i],mp.DOS,mp.FE)
+            uee[i,j] = elec_energychange(mp.egrid,-1*relax[:,j,i],mp.DOS)
         end
     end
     return uee
@@ -238,11 +238,11 @@ function pp_chemicalpotential(Tel,n,mp,cons)
     cp = zeros(size(Tel))
     if typeof(n) == Float64
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE)
+            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,mp.FE)
+            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
         end
     end
     return cp
@@ -283,7 +283,7 @@ function pp_neqelectronphononenergychange(fneq,mp)
     uep = zeros(length(fneq[1,1,:]),length(fneq[1,:,1])) 
     Threads.@threads for i in eachindex(fneq[1,1,:])
         for j in eachindex(fneq[1,:,1])
-            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],mp.egrid,mp.τep,mp.FE,mp.DOS)
+            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],mp.egrid,mp.τep,mp.DOS)
         end
     end
     return uep
@@ -346,7 +346,7 @@ function pp_athemexcitation(ftot,mp,las)
     excite = zeros(size(ftot))
     Threads.@threads for i in eachindex(ftot[1,1,:])
         for j in eachindex(ftot[1,:,1])
-            excite[:,j,i] .= athemexcitation(ftot[:,j,i],mp.egrid,mp.DOS,las.hv,mp.FE)
+            excite[:,j,i] .= athemexcitation(ftot[:,j,i],mp.egrid,mp.DOS,las.hv)
         end
     end
     return FD
