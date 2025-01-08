@@ -1,7 +1,7 @@
 function phonontemperature_factory(sim::SimulationSettings)
     HeatCapacity = phonontemperature_heatcapacity(sim)
     ElecPhon = Expr(:call,:*,-1,electronphonon_coupling(sim))
-    Source = 0.0#phonontemperature_source(sim)
+    Source = phonontemperature_source(sim)
     return build_phonontemperature(Source,ElecPhon,HeatCapacity)
 end
 

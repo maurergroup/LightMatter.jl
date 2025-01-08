@@ -1,4 +1,4 @@
-function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim,cons;save=2.0,tolerance=1e-4,min_step=0.1)
+function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim;save=2.0,tolerance=1e-4,min_step=0.1)
     u0 = generate_initialconditions(key_list,mp,initialtemps,dim)
     p = generate_parameters(sim,mp,cons,las,initialtemps,dim)
     return run_dynamics(key_list,p,u0,tspan,save,tolerance,min_step)

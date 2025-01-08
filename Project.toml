@@ -1,7 +1,7 @@
 name = "Lightmatter"
 uuid = "b578e399-e75b-4901-9c37-d6aa618b88c4"
 authors = ["Henry Snowden, Reinhard Maurer"]
-version = "1.0.2"
+version = "1.0.3"
 
 [deps]
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"

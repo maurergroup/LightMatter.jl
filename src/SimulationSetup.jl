@@ -230,3 +230,5 @@ function grid_builder(l,Espan)
     gh,weights = gausshermite(l)
     return ((gh .- minimum(gh)) ./ (maximum(gh)/(Espan/2))) .- (Espan/2) 
 end
+
+const cons=Constants(8.617e-5,0.6582)

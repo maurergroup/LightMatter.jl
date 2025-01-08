@@ -1,4 +1,4 @@
-function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim,cons)
+function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim)
     fid = create_datafile_and_structure(file_name)
     fid_id = fid.id
     write_simsettings(fid["Settings"],sim)
