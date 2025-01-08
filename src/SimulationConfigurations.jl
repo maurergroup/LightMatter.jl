@@ -68,7 +68,7 @@ function TTM_simulation(du,u,p,t)
     @assert all(!isnan(x) for x in u)
     electrontemperature_conductivity(u.x[1],p[4],u.x[2],p[2],p[7])
     Threads.@threads for i in eachindex(u.x[1])
-        @inbounds p[6][i] = find_chemicalpotential(p[5],u.x[1][i],p[2].DOS[i],p[3].kB,p[2].FE)
+        @inbounds p[6][i] = find_chemicalpotential(p[5],u.x[1][i],p[2].DOS[i],p[3].kB,p[2].egrid)
     end
     Tel_func(u.x[1],u.x[2],p[2],p[2].DOS,p[3],p[1],p[6],t,p[7],p[4],du.x[1])
     Tph_func(u.x[1],u.x[2],p[2],p[2].DOS,p[3],p[6],du.x[2])
@@ -79,7 +79,7 @@ function eeAthEM_simulation(du,u,p,t)
     println(t) 
     #n = 1, Tel = 2, fneq = 3 
 
-    μ = find_chemicalpotential.(u.x[1],u.x[2],Ref(p[2].DOS[1]),p[3].kB,p[2].FE)
+    μ = find_chemicalpotential.(u.x[1],u.x[2],Ref(p[2].DOS[1]),p[3].kB,p[2].egrid)
     relax_dis = zeros(length(u.x[3]),1)
     relax_func(u.x[2],u.x[3],u.x[1],μ,p[2],p[2].DOS,p[3],relax_dis)
     noe_func(relax_dis,μ,p[2],p[2].DOS,du.x[1])
@@ -93,7 +93,7 @@ function FullAthEM_simulation(du,u,p,t)
 
     electrontemperature_conductivity(u.x[1],p[4],u.x[3],p[2],p[6])
     Threads.@threads for i in eachindex(p[5])
-        p[5][i] = find_chemicalpotential(u.x[2][i],u.x[1][i],p[2].DOS[i],p[3].kB,p[2].FE)
+        p[5][i] = find_chemicalpotential(u.x[2][i],u.x[1][i],p[2].DOS[i],p[3].kB,p[2].egrid)
     end
     relax_func(u.x[1],u.x[4],u.x[2],p[5],p[2],p[2].DOS,p[3],p[7])
     noe_func(p[7],p[5],p[2],p[2].DOS,du.x[2])
