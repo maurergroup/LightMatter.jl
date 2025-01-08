@@ -71,8 +71,6 @@ function write_materialproperties(f,mp,dim,cons)
                 ("Debye Temperature / K",mp.θ),
                 ("Number of Atoms / nm^3",mp.n),
                 ("Room Temperature Diffusive Thermal Conductivity / eV/fs/m/K",mp.κ),
-                ("Number of Free Electrons per atom",mp.ne),
-                ("Effective Mass of Electrons",mp.effmass),
                 ("Second Moment of Phonon Spectrum × Electron-Phonon Mass Enhancement Factor / eV^2",mp.λ),
                 ("Linear Electron-Phonon Coupling Constant / eV/fs/nm^3/K",mp.g),
                 ("Material Dependent Fermi Liquid Lifetime scalar / fs^-1",mp.τ),

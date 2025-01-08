@@ -2,7 +2,7 @@ function athemdistribution_factory(sim::SimulationSettings,laser::Expr)
     feq = :(1 ./(exp.((mp.egrid.-μ)./(cons.kB*Tel)).+1))
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
-    Elecphon = athem_electronphononinteraction(sim)
+    Elecphon = 0.0#athem_electronphononinteraction(sim)
     athemexcite=:($laser*athemexcitation($ftot,mp.egrid,DOS,las.hv))
     return build_athemdistribution(athemexcite,Elecelec,Elecphon)
 end

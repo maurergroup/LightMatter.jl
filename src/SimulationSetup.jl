@@ -86,8 +86,6 @@ end
     θ::Float64 #Debye temperature
     n::Float64 #Number of atoms per volume
     κ::Float64 #Room temperature thermal conductivity
-    ne::Float64 #Number of electrons per atom
-    effmass::Float64 #Effective mass of conduction electrons
     DOS::Vector{spl} #The DOS
     λ::Float64 #Second momentum of spectral function
     g::Float64 # Linear electron-phonon coupling constant
@@ -186,7 +184,7 @@ end
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
-    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,elecperatom=0.0,eleceffmass=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
+    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
     ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1)
     
     fermien=get_FermiEnergy(dos)
@@ -207,7 +205,7 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,erange)
     τep = τf*las.hv/8.617e-5/debye
 
-    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,ne=elecperatom,effmass=eleceffmass,
+    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,
     DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep)
 
     return matpat
