@@ -1,65 +1,65 @@
-function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim;save=2.0,tolerance=1e-4,min_step=0.1)
+function run_simulation(key_list,initialtemps,tspan,sim,mp,las,dim;save=2.0,tolerance=1e-4,max_step=0.1)
     u0 = generate_initialconditions(key_list,mp,initialtemps,dim)
     p = generate_parameters(sim,mp,cons,las,initialtemps,dim)
-    return run_dynamics(key_list,p,u0,tspan,save,tolerance,min_step)
+    return run_dynamics(key_list,p,u0,tspan,save,tolerance,max_step)
 end
 
-function run_dynamics(key_list,p,u0,tspan,save,tolerance,min_step)
+function run_dynamics(key_list,p,u0,tspan,save,tolerance,max_step)
     if length(key_list) == 1
-        return run_dynamics1(p,u0,tspan,save,tolerance,min_step)
+        return run_dynamics1(p,u0,tspan,save,tolerance,max_step)
     elseif length(key_list) == 2
-        return run_dynamics2(p,u0,tspan,save,tolerance,min_step)
+        return run_dynamics2(p,u0,tspan,save,tolerance,max_step)
     elseif length(key_list) == 3
-        return sol = run_dynamics3(p,u0,tspan,save,tolerance,min_step)
+        return sol = run_dynamics3(p,u0,tspan,save,tolerance,max_step)
     elseif length(key_list) == 5
-        return sol = run_dynamics4(p,u0,tspan,save,tolerance,min_step)
+        return sol = run_dynamics4(p,u0,tspan,save,tolerance,max_step)
     elseif length(key_list) == 7
-        return sol = run_dynamics7(p,u0,tspan,save,tolerance,min_step)
+        return sol = run_dynamics7(p,u0,tspan,save,tolerance,max_step)
     end
 end
 
-function run_dynamics1(p,u0,tspan,save,tolerance,min_step)
+function run_dynamics1(p,u0,tspan,save,tolerance,max_step)
     println("Running small time span to precompile dynamics")
-    solve(ODEProblem(EHP_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    solve(ODEProblem(EHP_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     println("Running main dynamics")
     prob=ODEProblem(EHP_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     return sol
 end
 
-function run_dynamics2(p,u0,tspan,save,tolerance,min_step)
+function run_dynamics2(p,u0,tspan,save,tolerance,max_step)
     println("Running small time span to precompile dynamics")
-    solve(ODEProblem(TTM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    solve(ODEProblem(TTM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     println("Running main dynamics")
     prob=ODEProblem(TTM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     return sol
 end
 
-function run_dynamics3(p,u0,tspan,save,tolerance,min_step)
+function run_dynamics3(p,u0,tspan,save,tolerance,max_step)
     println("Running small time span to precompile dynamics")
-    solve(ODEProblem(eeAthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    solve(ODEProblem(eeAthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     println("Running main dynamics")
     prob=ODEProblem(eeAthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     return sol
 end
 
-function run_dynamics4(p,u0,tspan,save,tolerance,min_step)
+function run_dynamics4(p,u0,tspan,save,tolerance,max_step)
     println("Running small time span to precompile dynamics")
-    solve(ODEProblem(FullAthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    solve(ODEProblem(FullAthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     println("Running main dynamics")
     prob=ODEProblem(FullAthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     return sol
 end
 
-function run_dynamics7(p,u0,tspan,save,tolerance,min_step)
+function run_dynamics7(p,u0,tspan,save,tolerance,max_step)
     println("Running small time span to precompile dynamics")
-    solve(ODEProblem(embedded_AthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    solve(ODEProblem(embedded_AthEM_simulation,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     println("Running main dynamics")
     prob=ODEProblem(embedded_AthEM_simulation,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step)
     return sol
 end
 

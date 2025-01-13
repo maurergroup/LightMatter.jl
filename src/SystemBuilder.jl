@@ -122,7 +122,7 @@ end
 function generate_parameters(sim,mp,cons,las,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
-            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS[1],cons.kB,mp.FE,mp.n0)
+            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS[1],cons.kB,mp.egrid)
             return [las,mp,cons,dim,initialtemps["Tel"],μ]
         else
             if sim.ParameterApprox.EmbeddingMethod == true
