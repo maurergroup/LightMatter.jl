@@ -69,8 +69,9 @@ function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
 end
 
 function get_files_heights_forDOS(folder,geometry,tolerance)
-    files_from_folder = [file for file in readdir(folder) if isfile(joinpath(folder, file))]
-    split = splitext.(files_from_folder)
+    files_from_folder = readdir(folder)
+    dos_files = filter(f -> endswith(f, ".dat"), files_from_folder)
+    split = splitext.(dos_files)
     file_names,extensions = [getindex.(split, i) for i in eachindex(first(split))]
     atoms = get_slabgeometry(geometry)
     layers = get_atomiclayers(atoms,tolerance)
