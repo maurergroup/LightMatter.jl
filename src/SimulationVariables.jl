@@ -114,19 +114,19 @@ function get_slabgeometry(file_path)
     geom = readdlm(file_path)
     for l in eachindex(geom[:,1])
         if geom[l,1] == "atom"
-            push!(atom_data, [i, geom[l,2], geom[l,3], geom[l,4],l])
-            i+=1
-        end
-        if geom[l,1] == "constrain_relaxation"
-            if geom[l-1,4] < top_constraint[1] 
-                top_constraint[1] = geom[l-1,4]
-                top_constraint[2] = l-1
+            if l != size(geom,1)
+                if geom[l+1,1] != "constrain_relaxation"
+                    push!(atom_data, [i, geom[l,2], geom[l,3], geom[l,4]])
+                    i+=1
+                end
+            else
+                push!(atom_data, [i, geom[l,2], geom[l,3], geom[l,4]])
+                i+=1
             end
         end
+
     end
-    atom_data = stack(atom_data,dims=1)
-    removed_constraints = [row[1:4] for row in eachrow(atom_data) if row[end] <= top_constraint[2]]
-    return stack(removed_constraints,dims=1)
+    return stack(atom_data,dims=1)
 end
 """
     Generates an interpolation object with extrapolation from any two vectors of reals. The
