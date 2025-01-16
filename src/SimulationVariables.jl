@@ -12,26 +12,36 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,n)
+function generate_DOS(File::String,V)
     TotalDOS::Matrix{Float64}=readdlm(File)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 
-function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
+function get_volume(geometry)
+    geom = readdlm(geometry)
+    lattice_vectors=[]
+    for row in eachrow(geom)
+        if row[1] == "lattice_vector"
+            push!(lattice_vectors,row[2:4]./10)
+        end
+    end
+    return dot(cross(lattice_vectors[1],lattice_vectors[2]),lattice_vectors[3])
+end
+
+function spatial_DOS(folder::String,geometry::String,bulk::String,V::Real,dim::Dimension,tolerance)
     bulkDOS = readdlm(bulk)
-    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*n,SteffenMonotonicInterpolation())
+    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*V,SteffenMonotonicInterpolation())
     bulkDOSspl=extrapolate(bulkDOSspl,Flat())
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
-    zDOS = build_zDOSArray(egrid,folder,files,heights,bulkDOSspl,n)
+    zDOS = build_zDOSArray(egrid,folder,files,heights,bulkDOSspl,get_volume(geometry))
     Temp=zeros(dim.length,length(egrid))
     for z in eachindex(dim.grid)
         for E in eachindex(egrid)
             Temp[z,E] = zDOS[E](dim.grid[z])
         end
     end
-    #DOSScale(Temp,bulkDOSspl(egrid),egrid)
     zgridDOS=Vector{Any}(undef,dim.length)
     for i in eachindex(zgridDOS) 
         zgridDOS[i]=get_interpolate(egrid, Temp[i,:])
@@ -39,23 +49,11 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::D
     return zgridDOS
 end
 
-function DOSScale(Temp,bulk,Energies)
-    fd = FermiDirac(0.0,0.0,8.617e-5,Energies)
-    for i in eachindex(Temp[:,1])
-        f(u) = extended_Bode(Energies,fd.*(u*Temp[i,:] .- bulk))
-        x0 = 1
-        prob = ZeroProblem(f,x0)
-        rescale = solve(prob,Order16();atol=1e-10,rtol=1e-10)
-        Temp[i,:] = Temp[i,:]*rescale
-    end
-    return Temp
-end
-
-function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
+function build_zDOSArray(egrid,folder,files,heights,bulkDOS,V)
     zDOS=Matrix{Float64}(undef,length(heights),length(egrid))
     for i in eachindex(files)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
-        zDOS[i,:]=TotalDOS[:,2]*n
+        zDOS[i,:]=TotalDOS[:,2]*V
     end
     zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
     zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
@@ -109,7 +107,6 @@ end
 
 function get_slabgeometry(file_path)
     atom_data = []
-    top_constraint = [Inf,0]
     i=1
     geom = readdlm(file_path)
     for l in eachindex(geom[:,1])
