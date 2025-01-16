@@ -25,7 +25,7 @@ function get_volume(geometry)
             push!(lattice_vectors,row[2:4]./10)
         end
     end
-    return dot(cross(lattice_vectors[1],lattice_vectors[2]),lattice_vectors[3])
+    return abs(dot(cross(lattice_vectors[1],lattice_vectors[2]),lattice_vectors[3]))
 end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,V::Real,dim::Dimension,tolerance)
