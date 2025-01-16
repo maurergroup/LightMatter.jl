@@ -14,7 +14,7 @@ end
 """
 function generate_DOS(File::String,V)
     TotalDOS::Matrix{Float64}=readdlm(File)
-    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
+    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*V)
 end
 
 function get_volume(geometry)
