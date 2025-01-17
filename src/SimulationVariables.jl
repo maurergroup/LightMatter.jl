@@ -31,7 +31,7 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::D
             Temp[z,E] = zDOS[E](dim.grid[z])
         end
     end
-    #DOSScale(Temp,bulkDOSspl(egrid),egrid)
+    DOSScale(Temp,bulkDOSspl(egrid),egrid)
     zgridDOS=Vector{Any}(undef,dim.length)
     for i in eachindex(zgridDOS) 
         zgridDOS[i]=get_interpolate(egrid, Temp[i,:])
