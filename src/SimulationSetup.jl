@@ -184,15 +184,15 @@ end
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
-    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0,volume=1
+    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
     ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1)
     
     fermien=get_FermiEnergy(dos)
     if sim.Spatial_DOS == true
-        DOS = spatial_DOS(folder,geometry,dos,volume,dim,layer_tolerance)
+        DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance)
     elseif sim.Spatial_DOS == false
         if typeof(dim) == Homogeneous
-            DOS = [generate_DOS(dos,volume)]
+            DOS = [generate_DOS(dos,noatoms)]
         else
             DOS = fill(generate_DOS(dos,volume),dim.length)
         end

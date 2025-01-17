@@ -2,7 +2,7 @@ module Lightmatter
 
 using DataInterpolations, DelimitedFiles, Integrals, Roots, RecursiveArrayTools, OrdinaryDiffEq, HDF5, Interpolations, LinearAlgebra
 
-export define_laser_system, define_simulation_settings, define_material_parameters, Constants, define_sim_dimensions, function_builder, run_simulation, post_production, get_volume
+export define_laser_system, define_simulation_settings, define_material_parameters, Constants, define_sim_dimensions, function_builder, run_simulation, post_production 
 
 include("SimulationSetup.jl")
 include("Lasers.jl")
