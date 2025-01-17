@@ -194,7 +194,7 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
         if typeof(dim) == Homogeneous
             DOS = [generate_DOS(dos,noatoms)]
         else
-            DOS = fill(generate_DOS(dos,volume),dim.length)
+            DOS = fill(generate_DOS(dos,noatoms),dim.length)
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
