@@ -14,7 +14,7 @@ end
 """
 function generate_DOS(File::String,n)
     TotalDOS::Matrix{Float64}=readdlm(File)
-    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*V)
+    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
