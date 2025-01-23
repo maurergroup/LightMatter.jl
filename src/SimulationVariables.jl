@@ -19,8 +19,7 @@ end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
     bulkDOS = readdlm(bulk)
-    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*n,SteffenMonotonicInterpolation())
-    bulkDOSspl=extrapolate(bulkDOSspl,Flat())
+    bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]*n)
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
@@ -109,7 +108,6 @@ end
 
 function get_slabgeometry(file_path)
     atom_data = []
-    top_constraint = [Inf,0]
     i=1
     geom = readdlm(file_path)
     for l in eachindex(geom[:,1])
@@ -134,7 +132,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xvals,extrapolate=true)
+get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xvals,extrapolation = ExtrapolationType.Constant)
 """
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
     electronic temperature.
