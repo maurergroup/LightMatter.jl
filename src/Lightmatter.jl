@@ -13,5 +13,6 @@ include("ElectronicDistribution.jl")
 include("SimulationConfigurations.jl")
 include("SystemBuilder.jl")
 include("SolProcessing.jl")
+include("NewSystemBuilder.jl")
 
 end

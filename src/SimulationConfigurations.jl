@@ -74,6 +74,12 @@ function TTM_simulation(du,u,p,t)
     nothing
 end
 
+function EHP_simulation(du,u,p,t)
+    println(t)
+    @invokelatest fneq_func(u.x[1],[p[5]],p[2],p[2].DOS,p[3],p[1],[p[6]],t,p[4],du.x[1])
+    nothing
+end
+
 function eeAthEM_simulation(du,u,p,t)
     println(t) 
     #n = 1, Tel = 2, fneq = 3 
@@ -102,17 +108,9 @@ function FullAthEM_simulation(du,u,p,t)
     nothing
 end
 
-function EHP_simulation(du,u,p,t)
-    println(t)
-    @invokelatest fneq_func(u.x[1],[p[5]],p[2],p[2].DOS,p[3],p[1],[p[6]],t,p[4],du.x[1])
-    nothing
-end
-
 function embedded_AthEM_simulation(du,u,p,t)
     println(t)
-    #electrontemperature_conductivity(u.x[3],p[4],u.x[4],p[2],p[6])
-    electrontemperature_conductivity(u.x[3][2:end],p[4],u.x[4][2:end],p[2],view(p[6],2:p[4].length))
-    p[6][1] = embedded_AthEM_conductivity(u.x[3],u.x[4],p[4],p[2])
+    electrontemperature_conductivity(u.x[3],p[4],u.x[4],p[2],p[6])
     Threads.@threads for i in eachindex(p[5])
         p[5][i] = find_chemicalpotential(u.x[1][i],u.x[3][i],p[2].DOS[i],p[3].kB,p[2].egrid)
     end

@@ -83,11 +83,3 @@ function Depthderivative(vec,dz,Diff)
     Diff[1] = (vec[2]-vec[1])/dz
     Diff[end] = (vec[end]-vec[end-1])/dz
 end
-
-function embedded_AthEM_conductivity(Tel,Tph,dim,mp)
-    dTel = (Tel[3].-Tel[1])./dim.dz
-    K=mp.κ*Tel[2]./Tph[2]
-    dQ = dTel .* K
-    return (dQ-0.0)/dim.dz
-end
-
