@@ -8,7 +8,8 @@ function athemdistribution_factory(sim::SimulationSettings,laser::Expr)
 end
 
 function build_athemdistribution(athemexcite,Elecelec,Elecphon)
-    return Expr(:call,:.+,athemexcite,Elecelec,Elecphon)
+    args = (athemexcite,Elecelec,Elecphon)
+    return foldl((a, b) -> :($a .+ $b), args)
 end
 
 function athemexcitation(ftot,egrid,DOS,hv)

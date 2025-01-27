@@ -39,12 +39,12 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::D
 end
 
 function DOSScale(Temp,bulk,Energies)
-    fd = FermiDirac(0.0,0.0,8.617e-5,Energies)
+    fd = FermiDirac(0.0,0.0,cons.kB,Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = extended_Bode(Energies,fd.*(u*Temp[i,:] .- bulk))
+        f(u) = extended_Bode(u*fd.*Temp[i,:],Energies) - extended_Bode(fd.*bulk,Energies)
         x0 = 1
         prob = ZeroProblem(f,x0)
-        rescale = solve(prob,Order16();atol=1e-10,rtol=1e-10)
+        rescale = solve(prob,Order1();atol=1e-10,rtol=1e-10)
         Temp[i,:] = Temp[i,:]*rescale
     end
     return Temp
@@ -56,11 +56,11 @@ function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
         zDOS[i,:]=TotalDOS[:,2]*n
     end
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
+    #= zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
     zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
     heights=vcat(heights,findmax(heights)[1]+0.1)
-    heights=vcat(heights,findmax(heights)[1]+0.1)
-    zDOSspl=Vector{Any}(undef,length(egrid))
+    heights=vcat(heights,findmax(heights)[1]+0.1) =#
+    zDOSspl=Vector{spl}(undef,length(egrid))
     for x in eachindex(zDOSspl)
         zDOSspl[x]=get_interpolate(heights,zDOS[:,x])
     end

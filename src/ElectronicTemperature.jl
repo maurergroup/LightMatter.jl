@@ -61,7 +61,7 @@ function athem_electempenergychange(sim,dim)
     if typeof(dim) != Homogeneous
         push!(args,:(cond))
     end
-    return :(.+($(args...)))
+    return foldl((a, b) -> :($a .+ $b), args)
 end
 
 function electrontemperature_conductivity(Tel,dim::Dimension,Tph,mp,cond)

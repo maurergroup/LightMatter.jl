@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "6c3c855b7f24b37201f5c527395a89e02d021552"
+project_hash = "f602a2613ccdc64390a25db7649974c07b254e6f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ab3815fc06f9c171ee81277f00ecee19b47e0b91"
@@ -423,6 +423,12 @@ weakdeps = ["StaticArrays"]
 
     [deps.ExponentialUtilities.extensions]
     ExponentialUtilitiesStaticArraysExt = "StaticArrays"
+
+[[deps.ExportAll]]
+deps = ["Test"]
+git-tree-sha1 = "8b16199c80d7a0bd7ac1d05d52b51e3e0a9f8c0f"
+uuid = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
+version = "0.1.2"
 
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
