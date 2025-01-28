@@ -31,7 +31,6 @@ function generate_expressions(sim,laser,dim)
     return exprs
 end
 
-
 function generate_initialconditions(sim,mp,initialtemps,dim)
     if sim.Systems.NonEqElectrons == true
         if sim.Systems.ElectronTemperature == false
@@ -59,7 +58,7 @@ end
 function generate_parameters(sim,las,mp,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
-            μ = find_chemicalpotential(mp.n0,initialtemps["Tel"],mp.DOS[1],cons.kB,mp.egrid)
+            μ = find_chemicalpotential(mp.n0[1],initialtemps["Tel"],mp.DOS[1],cons.kB,mp.egrid)
             p = (las=las,mp=mp,dim=dim,Tel=initialtemps["Tel"],μ=μ)
         elseif sim.Systems.PhononTemperature == true
             p=(las=las,mp=mp,dim=dim,cond=zeros(dim.length))
@@ -94,7 +93,7 @@ function build_loopbody(sys,sim)
     if sim.Systems.ElectronTemperature == true && sim.Systems.NonEqElectrons == true
         push!(exprs,:(μ = find_chemicalpotential(u.noe[i],u.Tel[i],mp.DOS[i],cons.kB,mp.egrid)))
     else 
-        push!(exprs,:(μ = find_chemicalpotential(mp.n0,Tel,mp.DOS[1],cons.kB,mp.egrid)))
+        push!(exprs,:(μ = find_chemicalpotential(mp.n0[i],Tel,mp.DOS[i],cons.kB,mp.egrid)))
     end
 
     if sim.ParameterApprox.EmbeddingMethod == true
@@ -155,10 +154,6 @@ function variable_renaming(sim)
         push!(new_name,:Tph)
         push!(old_name,:(p.cond[i]))
         push!(new_name,:cond)
-    end
-    if sim.Systems.PhononTemperature == true && sim.Systems.NonEqElectrons == false 
-        push!(old_name,:(mp.n))
-        push!(new_name,:n)
     end
     old_name = Tuple(old_name)
     new_name = Tuple(new_name)

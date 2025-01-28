@@ -4,11 +4,12 @@ function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim)
     write_simsettings(fid["Settings"],sim)
     write_materialproperties(fid["Parameters"],mp,dim,cons)
 
-    results = seperate_results(sol,initial_temps,mp,sim)
+    results = seperate_results(sol,initial_temps,mp,sim,dim)
     fid["Miscellaneous"]["Time Span"] = results["times"]
-    μs = pp_chemicalpotential(results["Tel"],results["n"],mp,cons)
+    μs = pp_chemicalpotential(results["Tel"],results["noe"],mp,cons,sim)
     fid["Miscellaneous"]["Chemical Potential"] = μs
     FD = pp_FermiDistribution(results["Tel"],mp,cons,μs)
+
     write_laser(fid["Miscellaneous"],las,dim,results["times"],mp)
 
     create_group(fid["Miscellaneous"],"System Equations")
@@ -109,35 +110,60 @@ function write_dimsdict(dim)
     end
 end
 
-function seperate_results(sol,initial_temps,mp,sim)
-    l = length(sol[:,1].x)
-    vals =  Dict{String,Any}("Tel"=>0.0,"Tph"=>0.0,"fneq"=>0.0,"n"=>0.0,"times"=>sol.t)
-    if l == 1
-        vals["Tel"] = [initial_temps["Tel"]]
-        vals["Tph"] = [initial_temps["Tel"]]
-        vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 1)...,dims=3)
-        vals["n"] = mp.n0
-    elseif l== 2
-        vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
-        vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
-        vals["n"] = mp.n0
-    elseif l==3
-        vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
-        vals["Tph"] = [initial_temps["Tel"]]
-        vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 3)...,dims=3)
-        vals["n"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
-    elseif l==4
-        if sim.ParameterApprox.EmbeddingMethod == true
-            vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 3),dims=1)
-            vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 4),dims=1)
-            vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 2)...,dims=3)
-            vals["n"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
-        else
-            vals["Tel"] = stack(getindex.(getfield.(sol.u, :x), 1),dims=1)
-            vals["Tph"] = stack(getindex.(getfield.(sol.u, :x), 3),dims=1)
-            vals["fneq"] = cat(getindex.(getfield.(sol.u, :x), 4)...,dims=3)
-            vals["n"] = stack(getindex.(getfield.(sol.u, :x), 2),dims=1)
+function seperate_results(sol,initial_temps,mp,sim,dim)
+    fields = propertynames(sol[1])
+    vals = generate_valuedict(sol,mp,dim,fields)
+    populate_value_dict!(sol,fields,vals)
+    populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
+    merge!(vals,Dict("times" => sol.t))
+    return vals
+end
+
+function generate_valuedict(sol,mp,dim,fields)
+    vals = Dict{String,Union{Real,AbstractArray}}()
+    for i in fields
+        if i in [:Tel, :Tph, :noe]
+            merge!(vals,Dict(String(i)=>zeros(length(sol.t),dim.length)))
+        elseif i == :fneq
+            merge!(vals,Dict(String(i)=>zeros(length(sol.t),dim.length,length(mp.egrid))))
         end
+    end
+    return vals
+end
+
+function populate_value_dict!(sol,fields,vals)
+    for t in eachindex(sol.t)
+        array = ArrayPartition(sol[t])
+        for f in eachindex(fields)
+            vals[String(fields[f])][t,:,:] .= array.x[f]
+        end
+    end
+    return vals
+end
+
+function remove_TTM_explicit_electrons!(vals,fields,sim)
+    if sim.ParameterApprox.EmbeddingMethod == true
+        for i in [:fneq,:noe]
+            if i in fields
+                vals[String(i)] = vals[String(i)][:,1,:]
+            end
+        end
+    end
+    return vals
+end
+
+function populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
+    if :Tel ∉ fields
+        merge!(vals,Dict("Tel"=>[initial_temps["Tel"]]))
+    end
+    if :Tph ∉ fields
+        merge!(vals,Dict("Tph"=>[initial_temps["Tph"]]))
+    end
+    if :noe ∉ fields
+        merge!(vals,Dict("noe"=>mp.n0))
+    end
+    if :fneq ∉ fields
+        merge!(vals,Dict("fneq" => zeros(length(sol.t),dim.length,length(mp.egrid))))
     end
     return vals
 end
@@ -232,15 +258,19 @@ function pp_neqelectronelectronenergychange(relax,mp)
     return uee
 end
 
-function pp_chemicalpotential(Tel,n,mp,cons)
+function pp_chemicalpotential(Tel,n,mp,cons,sim)
     cp = zeros(size(Tel))
-    if typeof(n) == Float64
+    if sim.Systems.NonEqElectrons == true
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            if sim.ParameterApprox.EmbeddingMethod == true
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            else
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            end
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            cp[:,i] .= find_chemicalpotential.(mp.n0[i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
         end
     end
     return cp
@@ -289,7 +319,7 @@ end
 
 function write_numberofparticles(f,results,sim,mp,relax,μ)
     if sim.Systems.NonEqElectrons == true
-        f["Number of Electrons"] = results["n"]
+        f["Number of Electrons"] = results["noe"]
         if sim.Interactions.ElectronElectron == true
             f["dn / dt"] = pp_changeinparticles(relax.ee,mp,μ)
         end
@@ -378,7 +408,7 @@ function write_laser(f,las,dim,timepoints,mp)
                  ("Transport Type",las.Transport)]
     las_dict=Dict(tuple_las)
     dict_to_hdf5(f["Laser"],las_dict)
-    laser=laser_factory(las,dim)
+    #laser=laser_factory(las,dim)
     f["Laser"]["Temporal Profile"] = pp_temporalprofile(las,dim,timepoints,mp)
 end
 
@@ -396,31 +426,16 @@ function write_minimum(f,results,FD,sim)
     f["Electronic Temperature"]["Temperature"] = results["Tel"]
     f["Electronic Temperature"]["Distribution"] = FD
     f["Phononic Temperature"]["Temperature"] = results["Tph"]
-    f["Number Of Particles"]["Particle Number"] = results["n"]
+    f["Number Of Particles"]["Particle Number"] = results["noe"]
     f["Non Eq Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
     if sim.Systems.NonEqElectrons == true
-        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
+        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(3,1,2))
     end
 end
     
 function output_functions(f,sim,las,dim)
-    sys,key_list = function_builder(sim,las,dim,sys_output=true)
-    f["Name of Method"] = method_name(key_list)
-    for i in key_list
-        f[i] = string(sys)
-    end
-end
-
-function method_name(key_list)
-    if length(key_list) == 1
-        return "Athermal Electron Generation"
-    elseif length(key_list) == 2
-        return "Two-Temperature Model"
-    elseif length(key_list) == 3
-        return "Athermal Electrons with Electron Relaxation"
-    elseif length(key_list) == 4
-        return "AthEM with Electron & Phonon Relaxation"
-    elseif length(key_list) == 7
-        return "Embedded AthEM inside Two-Temperature Model"
+    sys = function_builder(sim,las,dim)
+    for i in keys(sys)
+        f[i] = string(sys[i])
     end
 end
