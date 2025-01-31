@@ -19,8 +19,7 @@ end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
     bulkDOS = readdlm(bulk)
-    bulkDOSspl = Interpolations.interpolate(bulkDOS[:,1],bulkDOS[:,2]*n,SteffenMonotonicInterpolation())
-    bulkDOSspl=extrapolate(bulkDOSspl,Flat())
+    bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]*n)
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
@@ -40,12 +39,12 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::D
 end
 
 function DOSScale(Temp,bulk,Energies)
-    fd = FermiDirac(0.0,0.0,8.617e-5,Energies)
+    fd = FermiDirac(0.0,0.0,cons.kB,Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = extended_Bode(Energies,fd.*(u*Temp[i,:] .- bulk))
+        f(u) = extended_Bode(u*fd.*Temp[i,:],Energies) - extended_Bode(fd.*bulk,Energies)
         x0 = 1
         prob = ZeroProblem(f,x0)
-        rescale = solve(prob,Order16();atol=1e-10,rtol=1e-10)
+        rescale = solve(prob,Order1();atol=1e-10,rtol=1e-10)
         Temp[i,:] = Temp[i,:]*rescale
     end
     return Temp
@@ -57,11 +56,7 @@ function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
         zDOS[i,:]=TotalDOS[:,2]*n
     end
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
-    heights=vcat(heights,findmax(heights)[1]+0.1)
-    heights=vcat(heights,findmax(heights)[1]+0.1)
-    zDOSspl=Vector{Any}(undef,length(egrid))
+    zDOSspl=Vector{spl}(undef,length(egrid))
     for x in eachindex(zDOSspl)
         zDOSspl[x]=get_interpolate(heights,zDOS[:,x])
     end
@@ -109,7 +104,6 @@ end
 
 function get_slabgeometry(file_path)
     atom_data = []
-    top_constraint = [Inf,0]
     i=1
     geom = readdlm(file_path)
     for l in eachindex(geom[:,1])
@@ -134,7 +128,7 @@ end
     constant at the calculated boundaries and electronic distributions whose energy range is wide
     enough to capture all thermal and non-thermal behaviour.
 """
-get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xvals,extrapolate=true)
+get_interpolate(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xvals,extrapolation = ExtrapolationType.Constant)
 """
     Sets up and solves the non-linear problem of determing the chemical potential at the current 
     electronic temperature.

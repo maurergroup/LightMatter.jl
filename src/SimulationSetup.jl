@@ -93,7 +93,7 @@ end
     Cph::Float64 #Constant heat capacity for phonons
     egrid::Vector{Float64} # Energy grid to solve neq electrons on
     τ::Float64 #Scalar value for the Fermi Liquid Theory relaxation time
-    n0::Float64
+    n0::Vector{Float64}
     τep::Float64
 end
 """
@@ -199,7 +199,10 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
     erange = build_egrid(las.hv)#
-    n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,erange)
+    n0 = zeros(dim.length)
+    for i in eachindex(n0)
+        n0[i] = get_thermalparticles(0.0,1e-32,DOS[i],8.617e-5,erange)
+    end
     τep = τf*las.hv/8.617e-5/debye
 
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,

@@ -151,7 +151,7 @@ function spatial_z_laser(las::Laser,slab::Dimension)
             return :(1/mp.ϵ)
         else
             l=slab.grid[end]
-            return :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[z]./mp.ϵ))
+            return :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[i]./mp.ϵ))
         end
     elseif las.Transport == "Combined"
         if typeof(slab) == Homogeneous
