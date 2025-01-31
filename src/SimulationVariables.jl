@@ -56,10 +56,6 @@ function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
         zDOS[i,:]=TotalDOS[:,2]*n
     end
-    #= zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
-    zDOS=vcat(zDOS,transpose(bulkDOS(egrid)))
-    heights=vcat(heights,findmax(heights)[1]+0.1)
-    heights=vcat(heights,findmax(heights)[1]+0.1) =#
     zDOSspl=Vector{spl}(undef,length(egrid))
     for x in eachindex(zDOSspl)
         zDOSspl[x]=get_interpolate(heights,zDOS[:,x])
