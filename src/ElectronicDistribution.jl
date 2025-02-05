@@ -3,7 +3,7 @@ function athemdistribution_factory(sim::SimulationSettings,laser::Expr)
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-    athemexcite=:($laser*athemexcitation($ftot,mp.egrid,DOS,las.hv))
+    athemexcite=:($laser*Lightmatter.athemexcitation($ftot,mp.egrid,DOS,las.hv))
     return build_athemdistribution(athemexcite,Elecelec,Elecphon)
 end
 
@@ -38,11 +38,11 @@ function athem_electronelectroninteraction(sim::SimulationSettings)
 end
 
 function athem_electronelectronscattering()
-    feq = :(FermiDirac(Tel,μ,cons.kB,mp.egrid))
+    feq = :(Lightmatter.FermiDirac(Tel,μ,cons.kB,mp.egrid))
     ftot = :($feq.+fneq)
     τee = :(mp.τ*(μ.+mp.FE)^2 ./((mp.egrid.-μ).^2 .+(pi*cons.kB*Tel)^2))
-    goal = :(extended_Bode($ftot.*DOS(mp.egrid).*mp.egrid,mp.egrid))
-    frel = :(find_relaxeddistribution(mp.egrid,$goal,n,DOS,cons.kB))
+    goal = :(Lightmatter.extended_Bode($ftot.*DOS(mp.egrid).*mp.egrid,mp.egrid))
+    frel = :(Lightmatter.find_relaxeddistribution(mp.egrid,$goal,n,DOS,cons.kB))
     Δfee = Expr(:call,:.-,:(fneq.+$frel),feq)
     return Expr(:call,:./,Δfee,τee)
 end
@@ -68,7 +68,7 @@ function athem_electronphononinteraction(sim::SimulationSettings)
 end
 
 function athem_electronparticlechange()
-    return :([get_noparticles(relax_dis,DOS,mp.egrid)])
+    return :([Lightmatter.get_noparticles(relax_dis,DOS,mp.egrid)])
 end
 
 @inline function dFDdE(kB::Float64,Tel::Real,μ::Float64,E::Union{Vector{Float64},Float64})

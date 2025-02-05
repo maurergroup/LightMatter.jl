@@ -11,7 +11,7 @@ end
 
 function phonontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.PhononHeatCapacity == true
-        return :(nonlinear_phononheatcapacity(Tph,mp.n,cons.kB,mp.θ))
+        return :(Lightmatter.nonlinear_phononheatcapacity(Tph,mp.n,cons.kB,mp.θ))
     else
         return :(mp.Cph)
     end
@@ -26,7 +26,7 @@ end
 function phonontemperature_source(sim::SimulationSettings)
     if sim.Systems.NonEqElectrons == true
         if sim.Interactions.ElectronPhonon == true
-            return :(neqelectron_phonontransfer(fneq,mp.egrid,mp.τep,DOS))
+            return :(Lightmatter.neqelectron_phonontransfer(fneq,mp.egrid,mp.τep,DOS))
         else
             return 0.0
         end
@@ -36,5 +36,5 @@ function phonontemperature_source(sim::SimulationSettings)
 end
 
 function neqelectron_phonontransfer(fneq,egrid,τep,DOS)
-    return get_internalenergy(fneq./τep,DOS,egrid)
+    return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
 end

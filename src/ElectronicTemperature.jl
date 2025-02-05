@@ -16,7 +16,7 @@ end
 
 function electrontemperature_heatcapacity(sim::SimulationSettings)
     if sim.ParameterApprox.ElectronHeatCapacity == true
-        return :(nonlinear_electronheatcapacity(cons.kB,Tel,μ,DOS,mp.egrid))
+        return :(Lightmatter.nonlinear_electronheatcapacity(cons.kB,Tel,μ,DOS,mp.egrid))
     else
         return :(mp.γ*Tel)
     end
@@ -29,7 +29,7 @@ end
 function electronphonon_coupling(sim)
     if sim.Interactions.ElectronPhonon == true
         if sim.ParameterApprox.ElectronPhononCoupling==true
-            return :(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid))
+            return :(Lightmatter.nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid))
         else
             return :(-mp.g*(Tel-Tph))
         end
@@ -45,18 +45,20 @@ function nonlinear_electronphononcoupling(hbar,kB,λ,DOS,Tel,μ,Tph,egrid)
 end
 
 function build_athemelectron(Δu)
-    return :( 1/(c_T(μ,Tel,DOS,cons.kB,mp.egrid)*p_μ(μ,Tel,DOS,cons.kB,mp.egrid)-p_T(μ,Tel,DOS,cons.kB,mp.egrid)*c_μ(μ,Tel,DOS,cons.kB,mp.egrid))*(p_μ(μ,Tel,DOS,cons.kB,mp.egrid)*$Δu-c_μ(μ,Tel,DOS,cons.kB,mp.egrid)*Δn))
+    return :( 1/(Lightmatter.c_T(μ,Tel,DOS,cons.kB,mp.egrid)*Lightmatter.p_μ(μ,Tel,DOS,cons.kB,mp.egrid)
+    -Lightmatter.p_T(μ,Tel,DOS,cons.kB,mp.egrid)*Lightmatter.c_μ(μ,Tel,DOS,cons.kB,mp.egrid))*
+    (Lightmatter.p_μ(μ,Tel,DOS,cons.kB,mp.egrid)*$Δu-Lightmatter.c_μ(μ,Tel,DOS,cons.kB,mp.egrid)*Δn))
 end
 
 function elec_energychange(egrid,relax_dis,DOS)
-    return get_internalenergy(relax_dis,DOS,egrid)
+    return Lightmatter.get_internalenergy(relax_dis,DOS,egrid)
 end
 
 function athem_electempenergychange(sim,dim)
     args = Vector{Union{Expr,Symbol}}(undef,0)
     push!(args,:(elec_energychange(mp.egrid,relax_dis,DOS)))
     if sim.Systems.PhononTemperature == true
-       push!(args,:(nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid)))
+       push!(args,:(Lightmatter.nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid)))
     end
     if typeof(dim) != Homogeneous
         push!(args,:(cond))

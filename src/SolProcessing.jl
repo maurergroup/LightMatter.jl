@@ -66,9 +66,9 @@ function write_simsettings(f,sim)
 end
 
 function write_materialproperties(f,mp,dim,cons)
-    tuple_mp = [("Extinction Coefficient / nm^-1",mp.ϵ),
-                ("Valence Band Minimum / eV",mp.FE),
-                ("Electronic Specific Heat Capacity / eV/fs/nm^3/K^2",mp.γ),
+    tuple_mp = [("Extinction Coefficient (nm)",mp.ϵ),
+                ("Valence Band Minimum (eV)",mp.FE),
+                ("Electronic Specific Heat Capacity (eV fs^-1 nm^-3 K^-2)",mp.γ),
                 ("Debye Temperature / K",mp.θ),
                 ("Number of Atoms / nm^3",mp.n),
                 ("Room Temperature Diffusive Thermal Conductivity / eV/fs/m/K",mp.κ),

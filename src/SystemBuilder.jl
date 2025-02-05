@@ -73,7 +73,7 @@ end
 
 function simulation_construction(sys,sim)
     if sim.Systems.ElectronTemperature == true && sim.Systems.PhononTemperature == true
-        expr_cond = :(cond = electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
+        expr_cond = :(cond = Lightmatter.electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
     else
         expr_cond = :(nothing)
     end
@@ -91,9 +91,9 @@ function build_loopbody(sys,sim)
     exprs = Vector{Expr}(undef,0)
     push!(exprs,variable_renaming(sim))
     if sim.Systems.ElectronTemperature == true && sim.Systems.NonEqElectrons == true
-        push!(exprs,:(μ = find_chemicalpotential(u.noe[i],u.Tel[i],mp.DOS[i],cons.kB,mp.egrid)))
+        push!(exprs,:(μ = Lightmatter.find_chemicalpotential(u.noe[i],u.Tel[i],mp.DOS[i],cons.kB,mp.egrid)))
     else 
-        push!(exprs,:(μ = find_chemicalpotential(mp.n0[i],Tel,mp.DOS[i],cons.kB,mp.egrid)))
+        push!(exprs,:(μ = Lightmatter.find_chemicalpotential(mp.n0[i],Tel,mp.DOS[i],cons.kB,mp.egrid)))
     end
 
     if sim.ParameterApprox.EmbeddingMethod == true
