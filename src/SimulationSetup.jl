@@ -185,16 +185,16 @@ end
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
     ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
-    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1)
+    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1,skip=0)
     
-    fermien=get_FermiEnergy(dos)
+    fermien=get_FermiEnergy(dos,skip)
     if sim.Spatial_DOS == true
-        DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance)
+        DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
         if typeof(dim) == Homogeneous
-            DOS = [generate_DOS(dos,noatoms)]
+            DOS = [generate_DOS(dos,noatoms,skip)]
         else
-            DOS = fill(generate_DOS(dos,noatoms),dim.length)
+            DOS = fill(generate_DOS(dos,noatoms,skip),dim.length)
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)

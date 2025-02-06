@@ -3,8 +3,8 @@
     top of the valence band. This is used within Fermi Liquid Theory Relaxation Time where it is scaled
     based on the Fermi Energy^2. In all other places, the Fermi Energy is defined as 0.0.
 """
-function get_FermiEnergy(File::String)
-    TotalDOS::Matrix{Float64}=readdlm(File)
+function get_FermiEnergy(File,skip)
+    TotalDOS::Matrix{Float64}=readdlm(File,skipstart=skip)
     Nonzero = findfirst(!=(0.0),TotalDOS[:,2])
     return abs(TotalDOS[Nonzero,1])
 end
@@ -12,13 +12,13 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,n)
-    TotalDOS::Matrix{Float64}=readdlm(File)
+function generate_DOS(File::String,n,skip)
+    TotalDOS::Matrix{Float64}=readdlm(File,skipstart=skip)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
 end
 
-function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance)
-    bulkDOS = readdlm(bulk)
+function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance,skip)
+    bulkDOS = readdlm(bulk,skipstart=skip)
     bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]*n)
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
