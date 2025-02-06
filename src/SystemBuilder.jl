@@ -132,8 +132,8 @@ function build_loopbody(sys,sim)
 end
 
 function variable_renaming(sim)
-    old_name=[:(p.mp.DOS[i]),:(p.mp),:(p.las)]
-    new_name=[:DOS,:mp,:las]
+    old_name=[:(p.mp.DOS[i]),:(p.mp),:(p.las),:(p.dim)]
+    new_name=[:DOS,:mp,:las,:dim]
     if sim.Systems.NonEqElectrons == true
         push!(old_name,:(u.fneq[i,:]))
         push!(new_name,:fneq)
