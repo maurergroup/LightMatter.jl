@@ -68,8 +68,8 @@ end
 
 function electrontemperature_conductivity(Tel,dim::Dimension,Tph,mp,cond)
     Depthderivative(Tel,dim.dz,cond)
-    cond[1]=0.0
-    cond[end]=0.0
+    #= cond[1]=0.0
+    cond[end]=0.0 =#
     K=mp.κ*Tel./Tph
     Depthderivative((cond.*K),dim.dz,cond)
 end

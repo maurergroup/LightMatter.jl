@@ -73,7 +73,7 @@ end
 
 function simulation_construction(sys,sim)
     if sim.Systems.ElectronTemperature == true && sim.Systems.PhononTemperature == true
-        expr_cond = :(cond = Lightmatter.electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
+        expr_cond = :(Lightmatter.electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
     else
         expr_cond = :(nothing)
     end
@@ -148,6 +148,10 @@ function variable_renaming(sim)
     if sim.Systems.ElectronTemperature == true
         push!(old_name,:(u.Tel[i]))
         push!(new_name,:Tel)
+        if sim.Systems.PhononTemperature == true
+            push!(old_name,:(p.cond))
+            push!(new_name,:cond)
+        end
     end
     if sim.Systems.PhononTemperature == true
         push!(old_name,:(u.Tph[i]))
