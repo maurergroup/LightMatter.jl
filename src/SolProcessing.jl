@@ -404,7 +404,7 @@ function write_laser(f,las,dim,timepoints,mp)
                  ("Full-Width at Half Maximum / fs",las.FWHM),
                  ("Fluence / eV/nm^2",las.Power),
                  ("Photon Energy / eV",las.hv),
-                 ("Reflectivity",las.R),
+                 ("Reflectivity",mp.R),
                  ("Transport Type",las.Transport)]
     las_dict=Dict(tuple_las)
     dict_to_hdf5(f["Laser"],las_dict)
@@ -416,7 +416,7 @@ function pp_temporalprofile(las,dim,timepoints,mp)
     temp_prof = zeros(length(timepoints),length(dim.grid))
     if typeof(las) == Gaussian
         for i in eachindex(timepoints)
-            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-las.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
+            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-mp.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
         end
     end
     return temp_prof

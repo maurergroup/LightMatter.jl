@@ -121,7 +121,7 @@ function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Dimension,Tp
     depthderivative!((cond.*K),dim.dz,cond)
 end
 
-function electrontemperature_conductivity(Tel::Vector{<:Real},dim::Homogeneous,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
+function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Homogeneous,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
     return [0.0]
 end
 """
