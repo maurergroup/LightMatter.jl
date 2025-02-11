@@ -1,8 +1,13 @@
+abstract type Simulation end
 """
-    Type that all abstract types will derive from
+    The supertype for the different laser types. Each laser type requires a struct which holds the laser parameters.
+    Each laser type also has a functor defined for it which returns the equation describing how the laser evolves 
+    over time. Lasers are centred on t = 0
 """
-abstract type Simulation end #Overarching type that holds all simulation settings
-abstract type Laser <: Simulation end
+abstract type Laser end
+"""
+    A convenience type definition to make type specificity easier throughout the code
+"""
 spl=DataInterpolations.LinearInterpolation
 """
     Booleans for interactions between different ODE systems are held within this struct.
@@ -95,6 +100,7 @@ end
     τ::Float64 #Scalar value for the Fermi Liquid Theory relaxation time
     n0::Vector{Float64}
     τep::Float64
+    R::Real # Reflectivity of the sample
 end
 """
     Struct that holds constants
@@ -185,7 +191,7 @@ end
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
     ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
-    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1,skip=0)
+    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1,skip=0,reflectivity=0.0)
     
     fermien=get_FermiEnergy(dos,skip)
     if sim.Spatial_DOS == true
@@ -206,8 +212,7 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     τep = τf*las.hv/8.617e-5/debye
 
     matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep)
-
+    DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep,R=reflectivity)
     return matpat
 end
 

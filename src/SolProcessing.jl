@@ -4,7 +4,7 @@ function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim)
     write_simsettings(fid["Settings"],sim)
     write_materialproperties(fid["Parameters"],mp,dim,cons)
 
-    results = seperate_results(sol,initial_temps,mp,sim,dim)
+    results = seperate_results(sol,initial_temps,mp,dim)
     fid["Miscellaneous"]["Time Span"] = results["times"]
     μs = pp_chemicalpotential(results["Tel"],results["noe"],mp,cons,sim)
     fid["Miscellaneous"]["Chemical Potential"] = μs
@@ -110,7 +110,7 @@ function write_dimsdict(dim)
     end
 end
 
-function seperate_results(sol,initial_temps,mp,sim,dim)
+function seperate_results(sol,initial_temps,mp,dim)
     fields = propertynames(sol[1])
     vals = generate_valuedict(sol,mp,dim,fields)
     populate_value_dict!(sol,fields,vals)

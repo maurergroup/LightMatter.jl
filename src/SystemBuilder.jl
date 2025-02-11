@@ -16,7 +16,7 @@ end
 function generate_expressions(sim,laser,dim)
     exprs = Dict{String,Union{Expr,Vector{Expr}}}()
     if sim.Systems.ElectronTemperature == true
-        merge!(exprs,Dict("Tel" => electrontemperature_factory(sim,laser,dim)))
+        merge!(exprs,Dict("Tel" => electrontemperature_factory(sim,laser)))
     end
     if sim.Systems.PhononTemperature == true
         merge!(exprs,Dict("Tph" => phonontemperature_factory(sim)))
@@ -25,7 +25,7 @@ function generate_expressions(sim,laser,dim)
         merge!(exprs,Dict("fneq" => athemdistribution_factory(sim,laser)))
         if sim.Interactions.ElectronElectron == true
             merge!(exprs,Dict("noe" => athem_electronparticlechange()))
-            merge!(exprs,Dict("relax" => athem_electronelectronscattering()))
+            merge!(exprs,Dict("relax" => :(athem_electronelectronscattering(Tel,μ,mp,fneq,DOS,n))))
         end
     end
     return exprs
@@ -73,7 +73,7 @@ end
 
 function simulation_construction(sys,sim)
     if sim.Systems.ElectronTemperature == true && sim.Systems.PhononTemperature == true
-        expr_cond = :(Lightmatter.electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
+        expr_cond = :(Lightmatter.electrontemperature_conductivity!(u.Tel,p.dim,u.Tph,p.mp,p.cond))
     else
         expr_cond = :(nothing)
     end
