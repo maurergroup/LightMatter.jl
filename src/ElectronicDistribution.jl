@@ -17,7 +17,7 @@ end
     and returns a expr which is their broadcasted sum. All 3 compenents therefore need to be in
     a form where they can be summed e.g. negatives must be included in the original expression.
 """
-function build_athemdistribution(athemexcite::Expr,Elecelec::Expr,Elecphon::Expr)
+function build_athemdistribution(athemexcite::Expr,Elecelec::Union{Expr,Real},Elecphon::Union{Expr,Real})
     args = (athemexcite,Elecelec,Elecphon)
     return foldl((a, b) -> :($a .+ $b), args)
 end
