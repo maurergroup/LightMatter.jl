@@ -12,18 +12,27 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,n,skip)
+function generate_DOS(File::String,V,skip)
     TotalDOS::Matrix{Float64}=readdlm(File,skipstart=skip)
-    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2].*n)
+    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2]./V)
 end
 
-function spatial_DOS(folder::String,geometry::String,bulk::String,n::Real,dim::Dimension,tolerance,skip)
+function get_unitcellvolume(geometry_file::String)
+    geometry = readdlm(geometry_file)
+    vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
+    a = vectors[1,2:4]
+    b = vectors[2,2:4]
+    c = vectors[3,2:4]
+    return abs(dot(a,cross(b,c)))/1000 # converts Å^3 to nm^3
+end
+
+function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,Vsurf,dim::Dimension,tolerance,skip)
     bulkDOS = readdlm(bulk,skipstart=skip)
-    bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]*n)
+    bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]./Vbulk)
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
-    zDOS = build_zDOSArray(egrid,folder,files,heights,bulkDOSspl,n)
+    zDOS = build_zDOSArray(egrid,folder,files,heights,Vsurf)
     Temp=zeros(dim.length,length(egrid))
     for z in eachindex(dim.grid)
         for E in eachindex(egrid)
@@ -50,11 +59,11 @@ function DOSScale(Temp,bulk,Energies)
     return Temp
 end
 
-function build_zDOSArray(egrid,folder,files,heights,bulkDOS,n)
+function build_zDOSArray(egrid,folder,files,heights,Vsurf)
     zDOS=Matrix{Float64}(undef,length(heights),length(egrid))
     for i in eachindex(files)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
-        zDOS[i,:]=TotalDOS[:,2]*n
+        zDOS[i,:]=TotalDOS[:,2]./Vsurf
     end
     zDOSspl=Vector{spl}(undef,length(egrid))
     for x in eachindex(zDOSspl)
