@@ -197,7 +197,7 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     Vbulk = get_unitcellvolume(bulkgeometry)
     if sim.Spatial_DOS == true
         Vsurf = get_unitcellvolume(surfacegeometry)
-        DOS = spatial_DOS(folder,geometry,dos,Vbulk,Vsurf,dim,layer_tolerance,skip)
+        DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,Vsurf,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
         if typeof(dim) == Homogeneous
             DOS = [generate_DOS(dos,Vbulk,skip)]
