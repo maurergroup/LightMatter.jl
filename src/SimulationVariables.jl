@@ -17,7 +17,7 @@ function generate_DOS(File::String,V,skip)
     return get_interpolate(TotalDOS[:,1],TotalDOS[:,2]./V)
 end
 
-function get_unitcellvolume(geometry_file::String,bulk::Bool)
+function get_unitcellvolume(geometry_file::String)
     geometry = readdlm(geometry_file)
     vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
     if bulk

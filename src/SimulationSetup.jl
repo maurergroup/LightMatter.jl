@@ -194,10 +194,9 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     folder=Nothing,surfacegeometry="",bulkgeometry="",layer_tolerance=0.1,skip=0,reflectivity=0.0)
     
     fermien=get_FermiEnergy(dos,skip)
-    Vbulk = get_unitcellvolume(bulkgeometry,true)
+    Vbulk = get_unitcellvolume(bulkgeometry)
     if sim.Spatial_DOS == true
-        Vsurf = get_unitcellvolume(surfacegeometry,false)
-        DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,Vsurf,dim,layer_tolerance,skip)
+        DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,noatoms,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
         if typeof(dim) == Homogeneous
             DOS = [generate_DOS(dos,Vbulk,skip)]
