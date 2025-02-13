@@ -27,13 +27,13 @@ function get_unitcellvolume(geometry_file::String)
     return abs(dot(a,cross(b,c)))/1000*atoms # converts Å^3 to nm^3
 end
 
-function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,Vsurf,dim::Dimension,tolerance,skip)
+function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,noatoms,dim::Dimension,tolerance,skip)
     bulkDOS = readdlm(bulk,skipstart=skip)
     bulkDOSspl = get_interpolate(bulkDOS[:,1],bulkDOS[:,2]./Vbulk)
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance)
     DOS_1 = readdlm(folder*files[1],skipstart=4)
     egrid = DOS_1[:,1]
-    zDOS = build_zDOSArray(egrid,folder,files,heights,Vsurf)
+    zDOS = build_zDOSArray(egrid,folder,files,heights,noatoms)
     Temp=zeros(dim.length,length(egrid))
     for z in eachindex(dim.grid)
         for E in eachindex(egrid)
@@ -60,11 +60,11 @@ function DOSScale(Temp,bulk,Energies)
     return Temp
 end
 
-function build_zDOSArray(egrid,folder,files,heights,Vsurf)
+function build_zDOSArray(egrid,folder,files,heights,noatoms)
     zDOS=Matrix{Float64}(undef,length(heights),length(egrid))
     for i in eachindex(files)
         TotalDOS=readdlm(folder*files[i],skipstart=4)
-        zDOS[i,:]=TotalDOS[:,2]./Vsurf
+        zDOS[i,:]=TotalDOS[:,2]*noatoms
     end
     zDOSspl=Vector{spl}(undef,length(egrid))
     for x in eachindex(zDOSspl)
