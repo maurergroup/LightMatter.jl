@@ -190,7 +190,7 @@ end
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
-    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="",secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,
+    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="",bulk=true,secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,
     folder=Nothing,surfacegeometry="",bulkgeometry="",layer_tolerance=0.1,skip=0,reflectivity=0.0)
     
     fermien=get_FermiEnergy(dos,skip)
@@ -199,9 +199,17 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
         DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,noatoms,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
         if typeof(dim) == Homogeneous
-            DOS = [generate_DOS(dos,Vbulk,skip)]
+                if bulk 
+                    DOS = [generate_DOS(dos,1/Vbulk,skip)]
+                else 
+                    DOS = [generate_DOS(dos,noatoms,skip)]
+                end
         else
-            DOS = fill(generate_DOS(dos,Vbulk,skip),dim.length)
+            if bulk 
+                DOS = fill(generate_DOS(dos,1/Vbulk,skip),dim.length)
+            else 
+                DOS = fill(generate_DOS(dos,noatoms,skip),dim.length)
+            end
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)

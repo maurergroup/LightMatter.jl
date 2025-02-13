@@ -12,9 +12,9 @@ end
     Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
-function generate_DOS(File::String,V,skip)
+function generate_DOS(File::String,unit_scalar,skip)
     TotalDOS::Matrix{Float64}=readdlm(File,skipstart=skip)
-    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2]./V)
+    return get_interpolate(TotalDOS[:,1],TotalDOS[:,2]*unit_scalar)
 end
 
 function get_unitcellvolume(geometry_file::String)
