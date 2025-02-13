@@ -28,7 +28,7 @@ function get_unitcellvolume(geometry_file::String,bulk::Bool)
     a = vectors[1,2:4]
     b = vectors[2,2:4]
     c = vectors[3,2:4]
-    return abs(dot(a,cross(b,c)))/1000/atoms # converts Å^3 to nm^3
+    return abs(dot(a,cross(b,c)))/1000*atoms # converts Å^3 to nm^3
 end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,Vsurf,dim::Dimension,tolerance,skip)
