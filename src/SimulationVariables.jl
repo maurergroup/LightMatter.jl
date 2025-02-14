@@ -20,11 +20,11 @@ end
 function get_unitcellvolume(geometry_file::String)
     geometry = readdlm(geometry_file)
     vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
-    atoms = sum(x->x=="atom", geometry[:,1])
+    #atoms = sum(x->x=="atom", geometry[:,1])
     a = vectors[1,2:4]
     b = vectors[2,2:4]
     c = vectors[3,2:4]
-    return abs(dot(a,cross(b,c)))/1000*atoms # converts Å^3 to nm^3
+    return abs(dot(a,cross(b,c)))/1000 # converts Å^3 to nm^3
 end
 
 function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,noatoms,dim::Dimension,tolerance,skip)
