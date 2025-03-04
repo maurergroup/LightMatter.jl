@@ -153,4 +153,3 @@ end
     value or across an energy window - given by whether E is a Real or Vector.
 """
 @inline FermiDirac(Tel::Real,μ::Real,kB::Real,E::Union{Vector{<:Real},Real}) = 1 ./(exp.((E.-μ)./(kB*Tel)).+1)
-

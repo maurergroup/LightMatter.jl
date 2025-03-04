@@ -68,7 +68,7 @@ function generate_parameters(sim,las,mp,initialtemps,dim)
     else
         p=(las=las,mp=mp,dim=dim,noe=mp.n0,cond=zeros(dim.length))
     end
-    return p
+    return p 
 end
 
 function simulation_construction(sys,sim)

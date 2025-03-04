@@ -1,3 +1,6 @@
+"""
+    Type that all Simulation settings types will be a subtype of
+"""
 abstract type Simulation end
 """
     The supertype for the different laser types. Each laser type requires a struct which holds the laser parameters.
@@ -10,18 +13,24 @@ abstract type Laser end
 """
 spl=DataInterpolations.LinearInterpolation
 """
-    Booleans for interactions between different ODE systems are held within this struct.
-    They are used as flags to determine whether couplings should evaluate to a function
-    if true or 0.0 if set to false
+    struct Interaction <:Simulation
+        ElectronElectron::Bool # Provides whether electron electron interactions are enabled
+        ElectronPhonon::Bool   # Provides whether electron phonon interactions are enabled
+    end
 """
 @kwdef struct Interaction <:Simulation
     ElectronElectron::Bool
     ElectronPhonon::Bool
 end
 """
-    Booleans for whether parameters are variable or static. In the case, of the chemical potential
-    it is updated via a struct whereas the rest are flags for function calls. If set to true then
-    the non-linear/updating form is used.
+    struct ParameterApproximation <:Simulation
+        ElectronPhononCoupling::Bool # Sets the electron-phonon coupling to non-linear from constant
+        ElectronHeatCapacity::Bool # Sets the electron heat capacity to non-linear from constant
+        PhononHeatCapacity::Bool # Sets the phonon heat capacity to non-linear from constant
+        EmbeddingMethod::Bool # Sets the higher order method (e.g. AthEM) to only the top level of the slab
+    end
+
+    True represents that the non-linear forms are enabled. 
 """
 @kwdef struct ParameterApproximation <:Simulation
     ElectronPhononCoupling::Bool
@@ -113,15 +122,11 @@ end
     Generates the simulation_settings struct with user inputs and defaults or user settings and a dictionary generated from an input
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
-function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=true,elecelecint=true,elecphonint=true,
-    phononheatcapacity=true,electemp=true,phonontemp=true,zDOS=false,embedding=false)
+function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=false,elecelecint=false,elecphonint=false,
+    nlphonheat=false,electemp=false,phonontemp=false,zDOS=false,embedding=false)
     
-    if noneqelec==false
-        elecelecint=false
-    end
-
     params=ParameterApproximation(ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
-    PhononHeatCapacity=phononheatcapacity,EmbeddingMethod=embedding)
+    PhononHeatCapacity=nlphonheat,EmbeddingMethod=embedding)
 
     interact=Interaction(ElectronElectron=elecelecint,ElectronPhonon=elecphonint)
     
@@ -198,18 +203,10 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     if sim.Spatial_DOS == true
         DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,noatoms,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
-        if typeof(dim) == Homogeneous
-                if bulk 
-                    DOS = [generate_DOS(dos,1/Vbulk,skip)]
-                else 
-                    DOS = [generate_DOS(dos,noatoms,skip)]
-                end
-        else
-            if bulk 
-                DOS = fill(generate_DOS(dos,1/Vbulk,skip),dim.length)
-            else 
-                DOS = fill(generate_DOS(dos,noatoms,skip),dim.length)
-            end
+        if bulk 
+            DOS = fill(generate_DOS(dos,1/Vbulk,skip),dim.length)
+        else 
+            DOS = fill(generate_DOS(dos,noatoms,skip),dim.length)
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)

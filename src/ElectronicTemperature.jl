@@ -15,18 +15,18 @@ function electrontemperature_factory(sim::SimulationSettings,laser::Expr)
     end
 end
 """
-    build_electronTTM(Source::Expr,Spatial::Expr,ElecPhon::Expr,HeatCapacity::Expr)
+    build_electronTTM(Source::Expr,Spatial::Symbol,ElecPhon::Expr,HeatCapacity::Expr)
     Builds a combine expression of the expressions for the energy input, electorn-phonon coupling,
-    thermal conductivity and the electronic heat capacity. The first three terms of summed to find
+    thermal conductivity and the electronic heat capacity. The first three terms are summed to find
     the change in internal energy of the thermal system and divided by the heat capacity to change the 
     internal energy into a temperature.
 """
-function build_electronTTM(Source::Expr,Spatial::Union{Expr,Symbol},ElecPhon::Expr,HeatCapacity::Expr)
+function build_electronTTM(Source::Expr,Spatial::Symbol,ElecPhon::Expr,HeatCapacity::Expr)
     return Expr(:call,:/,Expr(:call,:+,Source,Spatial,ElecPhon),HeatCapacity)
 end
 """
     electrontemperature_heatcapacity(sim::SimulationSettings)
-    Returns the expression for how the electronic temepratures thermal conductivity should be 
+    Returns the expression for how the electronic temperatures heat capacity should be 
     calculated. This can be done either via a linear relation between the speciic heat(γ) and
     Tel or via a more accurate but complex non-linear relationship. The keyword to be set 
     in define_simulation_settings is nlelecheat = true.
