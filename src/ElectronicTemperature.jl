@@ -117,6 +117,7 @@ end
 function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Dimension,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
     depthderivative!(Tel,dim.dz,cond)
     cond[1] = 0.0
+    cond[end] = 0.0
     K=mp.κ*Tel./Tph
     depthderivative!((cond.*K),dim.dz,cond)
 end
