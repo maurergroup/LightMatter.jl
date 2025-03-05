@@ -72,12 +72,15 @@ function generate_parameters(sim,las,mp,initialtemps,dim)
 end
 
 function simulation_construction(sys,sim)
+    cond_exprs = []
     if sim.Systems.ElectronTemperature == true && sim.Systems.PhononTemperature == true
-        expr_cond = :(Lightmatter.electrontemperature_conductivity!(u.Tel,p.dim,u.Tph,p.mp,p.cond))
-    else
-        expr_cond = :(nothing)
+        push!(cond_exprs,:(Lightmatter.electrontemperature_conductivity!(u.Tel,p.dim,u.Tph,p.mp,p.cond)))
     end
+    if sim.DistributionConductivity == true
+        push!(cond_exprs,:(Lightmatter.electron_distribution_transport(p.mp.v_g,u.fneq,p.f_cond,p.dim.dz)))
+    end 
     loop_body = build_loopbody(sys,sim)
+    expr_cond = Expr(:block,cond_exprs...)
     return quote
         println(t)
         $expr_cond

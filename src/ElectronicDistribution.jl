@@ -18,7 +18,7 @@ end
     a form where they can be summed e.g. negatives must be included in the original expression.
 """
 function build_athemdistribution(athemexcite::Expr,Elecelec::Union{Expr,Real},Elecphon::Union{Expr,Real})
-    args = (athemexcite,Elecelec,Elecphon)
+    args = (athemexcite,Elecelec,Elecphon,:f_cond)
     return foldl((a, b) -> :($a .+ $b), args)
 end
 """
@@ -153,3 +153,15 @@ end
     value or across an energy window - given by whether E is a Real or Vector.
 """
 @inline FermiDirac(Tel::Real,μ::Real,kB::Real,E::Union{Vector{<:Real},Real}) = 1 ./(exp.((E.-μ)./(kB*Tel)).+1)
+
+function electron_distribution_transport(v_g,f,Δf,dim)
+    Δf = similar(f)
+    for i in 1:size(f, 1)-1
+        Δf[i,:] = ((f[i+1,:] .- f[i,:]) ./ dz).*v_g
+    end
+    Δf[end,:] = ((f[end,:] .- f[end-1,:]) ./ dz).*v_g
+end
+
+function electron_distribution_transport(v_g,f,Δf,dim::Homogenous)
+    return zeros(size(f))
+end

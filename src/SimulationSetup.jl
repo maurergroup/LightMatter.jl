@@ -110,6 +110,7 @@ end
     n0::Vector{Float64}
     τep::Float64
     R::Real # Reflectivity of the sample
+    v_g::Vector{<:Real}
 end
 """
     Struct that holds constants
@@ -117,6 +118,7 @@ end
 struct Constants
     kB::Float64
     hbar::Float64
+    me::Float64
 end
 """
     Generates the simulation_settings struct with user inputs and defaults or user settings and a dictionary generated from an input
@@ -217,7 +219,9 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
     end
     τep = τf*las.hv/8.617e-5/debye
 
-    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,
+    v_g = get_fermigas_velocity(erange,fermien)
+
+    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,v_g = v_g,
     DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep,R=reflectivity)
     return matpat
 end
@@ -237,9 +241,16 @@ function build_egrid(hv)
     return egrid
 end
 
+function get_fermigas_velocity(egrid,EF)
+    eV_to_J(E) = E/6.242e18
+    ms_to_nmfs(v) = v*1e-6
+    v_g = ms_to_nmfs.(sqrt.(2*eV_to_J.(egrid.+EF)./cons.me))
+    return v_g
+end
+
 function grid_builder(l,Espan)
     gh,weights = gausshermite(l)
     return ((gh .- minimum(gh)) ./ (maximum(gh)/(Espan/2))) .- (Espan/2) 
 end
 
-const cons=Constants(8.617e-5,0.6582)
+const cons=Constants(8.617e-5,0.6582,3.109e-31)
