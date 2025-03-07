@@ -56,6 +56,7 @@ end
     Interactions::Interaction
     Systems::SystemComponents
     Spatial_DOS::Bool
+    DistributionConductivity::Bool
 end
 """
     Dimension is the parent type of all dimensionality information
@@ -125,7 +126,7 @@ end
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
 function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=false,elecelecint=false,elecphonint=false,
-    nlphonheat=false,electemp=false,phonontemp=false,zDOS=false,embedding=false)
+    nlphonheat=false,electemp=false,phonontemp=false,zDOS=false,embedding=false,distributionconductivity=false)
     
     params=ParameterApproximation(ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
     PhononHeatCapacity=nlphonheat,EmbeddingMethod=embedding)
@@ -134,7 +135,8 @@ function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec
     
     components=SystemComponents(ElectronTemperature=electemp,PhononTemperature=phonontemp,NonEqElectrons=noneqelec)
 
-    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components,Spatial_DOS=zDOS)
+    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components,Spatial_DOS=zDOS
+    ,DistributionConductivity = distributionconductivity)
     
     return sim_settings
 end

@@ -100,7 +100,7 @@ end
 """
 function athem_electempenergychange(sim::SimulationSettings)
     args = Vector{Union{Expr,Symbol}}(undef,0)
-    push!(args,:(elec_energychange(mp.egrid,relax_dis,DOS)))
+    push!(args,:(Lightmatter.elec_energychange(mp.egrid,relax_dis,DOS)))
     if sim.Systems.PhononTemperature == true
        push!(args,:(Lightmatter.nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid)))
     end
@@ -123,7 +123,7 @@ function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Dimension,Tp
 end
 
 function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Homogeneous,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
-    return [0.0]
+    nothing
 end
 """
     depthderivative!(vec::Vector{<:Real},dz::Real,Diff::Vector{<:Real})

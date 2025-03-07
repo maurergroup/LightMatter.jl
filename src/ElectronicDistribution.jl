@@ -155,13 +155,12 @@ end
 @inline FermiDirac(Tel::Real,μ::Real,kB::Real,E::Union{Vector{<:Real},Real}) = 1 ./(exp.((E.-μ)./(kB*Tel)).+1)
 
 function electron_distribution_transport(v_g,f,Δf,dim)
-    Δf = similar(f)
     for i in 1:size(f, 1)-1
-        Δf[i,:] = ((f[i+1,:] .- f[i,:]) ./ dz).*v_g
+        Δf[i,:] = ((f[i+1,:] .- f[i,:]) ./ dim.dz).*v_g
     end
-    Δf[end,:] = ((f[end,:] .- f[end-1,:]) ./ dz).*v_g
+    Δf[end,:] = -((f[end,:] .- f[end-1,:]) ./ dim.dz).*v_g
 end
 
-function electron_distribution_transport(v_g,f,Δf,dim::Homogenous)
-    return zeros(size(f))
+function electron_distribution_transport(v_g,f,Δf,dim::Homogeneous)
+    nothing
 end
