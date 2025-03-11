@@ -10,7 +10,7 @@
 """
 function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}},initialtemps::Dict{String, <:Real},
     tspan::Tuple{Real,Real},sim::SimulationSettings,mp::MaterialParameters,las::Laser,dim::Dimension
-    ;save=2.0,tolerance=1e-4,max_step=0.1,min_step=0.01)
+    ;save=2.0,tolerance=1e-4,max_step=0.1,min_step=0.01,callbacks=CallbackSet())
 
     u0 = generate_initialconditions(sim,mp,initialtemps,dim)
     p = generate_parameters(sim,las,mp,initialtemps,dim)
@@ -20,6 +20,6 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}},initialtemps:
     solve(ODEProblem(simulation_problem!,u0,(0.0,0.1),p),Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step)
     println("Running main dynamics")
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step)
+    sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
     return sol
 end

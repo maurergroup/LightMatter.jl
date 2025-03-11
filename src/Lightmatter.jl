@@ -11,7 +11,7 @@ include("PhononicTemperature.jl")
 include("SimulationVariables.jl")
 include("DOS_Geometry.jl")
 include("ElectronicDistribution.jl")
-include("SimulationConfigurations.jl")
+include("RunDynamics.jl")
 include("SystemBuilder.jl")
 include("SolProcessing.jl")
 
