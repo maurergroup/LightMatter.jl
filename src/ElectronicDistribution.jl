@@ -156,10 +156,10 @@ end
 
 function electron_distribution_transport!(v_g,f,Δf,dim)
     for i in 2:size(f, 1)-1
-        Δf[i,:] = ((f[i+1,:] .- f[i-1,:]) ./ (2*dim.dz)).*v_g
+        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dim.dz .* v_g
     end
-    Δf[1,:] = ((f[2,:] .- f[1,:]) ./ dim.dz).*v_g
-    Δf[end,:] = ((f[end,:] .- f[end-1,:]) ./ dim.dz).*v_g
+    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dim.dz .*v_g
+    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dim.dz .* v_g
 end
 
 function electron_distribution_transport!(v_g,f,Δf,dim::Homogeneous)
