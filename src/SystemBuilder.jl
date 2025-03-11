@@ -59,14 +59,14 @@ function generate_parameters(sim,las,mp,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
             μ = find_chemicalpotential(mp.n0[1],initialtemps["Tel"],mp.DOS[1],cons.kB,mp.egrid)
-            p = (las=las,mp=mp,dim=dim,Tel=initialtemps["Tel"],μ=μ,f_cond=zeros(dim.length))
+            p = (las=las,mp=mp,dim=dim,Tel=initialtemps["Tel"],μ=μ,f_cond=zeros(dim.length,length(mp.egrid)))
         elseif sim.Systems.PhononTemperature == true
             p=(las=las,mp=mp,dim=dim,cond=zeros(dim.length),f_cond=zeros(dim.length,length(mp.egrid)))
         else
-            p=(las=las,mp=mp,dim=dim,f_cond=zeros(dim.length))
+            p=(las=las,mp=mp,dim=dim,f_cond=zeros(dim.length,length(mp.egrid)))
         end
     else
-        p=(las=las,mp=mp,dim=dim,noe=mp.n0,cond=zeros(dim.length),f_cond=zeros(dim.length,length(mp.egrid)))
+        p=(las=las,mp=mp,dim=dim,noe=mp.n0,cond=zeros(dim.length))
     end
     return p 
 end

@@ -32,7 +32,7 @@ function athemexcitation(ftot::Vector{<:Real},egrid::Vector{<:Real},DOS::spl,hv:
     Δfneqh = athem_holegeneration(egrid,DOS,ftotspl,hv)
     Δfneqe = athem_electrongeneration(egrid,DOS,ftotspl,hv)
     pc_sf = get_noparticles(Δfneqe,DOS,egrid) / get_noparticles(Δfneqh,DOS,egrid)
-    Δfneqtot = (pc_sf*Δfneqe).-Δfneqh
+    Δfneqtot = Δfneqe.-(pc_sf*Δfneqh)
     return Δfneqtot./get_internalenergy(Δfneqtot,DOS,egrid)
 end
 """

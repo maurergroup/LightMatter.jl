@@ -154,10 +154,10 @@ end
 
 function populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
     if :Tel ∉ fields
-        merge!(vals,Dict("Tel"=>[initial_temps["Tel"]]))
+        merge!(vals,Dict("Tel"=>fill(initial_temps["Tel"],dim.length)))
     end
     if :Tph ∉ fields
-        merge!(vals,Dict("Tph"=>[initial_temps["Tph"]]))
+        merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],dim.length)))
     end
     if :noe ∉ fields
         merge!(vals,Dict("noe"=>mp.n0))
@@ -429,7 +429,12 @@ function write_minimum(f,results,FD,sim)
     f["Number Of Particles"]["Particle Number"] = results["noe"]
     f["Non Eq Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
     if sim.Systems.NonEqElectrons == true
-        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(3,1,2))
+        if size(FD,1) != size(results["fneq"],1)
+            FD = repeat(FD,size(results["fneq"],1), 1, 1)
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(1,3,2))
+        else
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(1,3,2))
+        end
     end
 end
     
