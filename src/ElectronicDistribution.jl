@@ -153,8 +153,12 @@ end
     value or across an energy window - given by whether E is a Real or Vector.
 """
 @inline FermiDirac(Tel::Real,μ::Real,kB::Real,E::Union{Vector{<:Real},Real}) = 1 ./(exp.((E.-μ)./(kB*Tel)).+1)
-
-function electron_distribution_transport!(v_g,f,Δf,dim)
+"""
+    electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dim::Dimension)
+    Calculates the ballistic electron transport in electron distributions. If the type of the Dimension struct is Homogeneous 
+    then there should be no conductivity and returns a zero array at every time step. 
+"""
+function electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dim::Dimension)
     for i in 2:size(f, 1)-1
         Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dim.dz .* v_g
     end

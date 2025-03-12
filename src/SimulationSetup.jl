@@ -214,7 +214,7 @@ function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dime
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = build_egrid(las.hv)#
+    erange = build_egrid(las.hv)
     n0 = zeros(dim.length)
     for i in eachindex(n0)
         n0[i] = get_thermalparticles(0.0,1e-32,DOS[i],8.617e-5,erange)
@@ -244,15 +244,10 @@ function build_egrid(hv)
 end
 
 function get_fermigas_velocity(egrid,EF)
-    eV_to_J(E) = E/6.242e18
+    eV_to_J(E) = E * 1.602e-19
     ms_to_nmfs(v) = v*1e-6
     v_g = ms_to_nmfs.(sqrt.(2*eV_to_J.(egrid.+EF)./cons.me))
     return v_g
-end
-
-function grid_builder(l,Espan)
-    gh,weights = gausshermite(l)
-    return ((gh .- minimum(gh)) ./ (maximum(gh)/(Espan/2))) .- (Espan/2) 
 end
 
 const cons=Constants(8.617e-5,0.6582,3.109e-31)

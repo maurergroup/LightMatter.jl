@@ -110,9 +110,8 @@ end
 """
     electrontemperature_conductivity(Tel::Real,dim::Dimension,Tph::Real,mp::MaterialParameters,cond::Vector{<:Real})
     Calculates the thermal energy passing further into a bulk slab due to thermal conductivity of the electronic bath. 
-    Uses finited differences to calculate the derivatives of the electronic bath due to distance into the slab. If the
-    type of the Dimension struct is Homogeneous then there should be no conductivty and returns 0.0 at every time step. 
-    No boundary conditions are set for the edges of the slab.
+    If the type of the Dimension struct is Homogeneous then there should be no conductivty and returns 0.0 at every time step. 
+    The derivative of the temperature with respect to distance is set to 0 at the boundaries.
 """
 function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Dimension,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
     depthderivative!(Tel,dim.dz,cond)

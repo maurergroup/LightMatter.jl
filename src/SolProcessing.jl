@@ -189,10 +189,10 @@ function write_electronictemperature(f,results,dim,mp,μs,sim,FD,relax)
 end
 
 function pp_FermiDistribution(Tel,mp,cons,μ)
-    FD=zeros(length(Tel[1,:]),length(mp.egrid),length(Tel[:,1]))
+    FD=zeros(length(Tel[:,1]),length(Tel[1,:]),length(mp.egrid))
     Threads.@threads for i in eachindex(Tel[:,1])
         for j in eachindex(Tel[1,:])
-            FD[j,:,i] .= FermiDirac(Tel[i,j],μ[i,j],cons.kB,mp.egrid)
+            FD[i,j,:] .= FermiDirac(Tel[i,j],μ[i,j],cons.kB,mp.egrid)
         end
     end
     return FD
@@ -431,9 +431,9 @@ function write_minimum(f,results,FD,sim)
     if sim.Systems.NonEqElectrons == true
         if size(FD,1) != size(results["fneq"],1)
             FD = repeat(FD,size(results["fneq"],1), 1, 1)
-            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(1,3,2))
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
         else
-            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(1,3,2))
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
         end
     end
 end
