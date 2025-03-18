@@ -62,9 +62,3 @@ end
 function neqelectron_phonontransfer(fneq::Vector{<:Real},egrid::Vector{<:Real},τep::Real,DOS::spl)
     return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
 end
-"""
-    phonon_conductivity()
-    To-Do Add this functionality
-"""
-function phonon_conductivity()
-end
