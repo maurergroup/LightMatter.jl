@@ -24,7 +24,7 @@ function generate_expressions(sim,laser,dim)
     if sim.Systems.NonEqElectrons == true
         merge!(exprs,Dict("fneq" => Lightmatter.athemdistribution_factory(sim,laser)))
         if sim.Interactions.ElectronElectron == true
-            merge!(exprs,Dict("noe" => Lightmatter.athem_electronparticlechange()))
+            merge!(exprs,Dict("noe" => Lightmatter.athem_electronparticlechange(sim)))
             merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel,μ,mp,fneq,DOS,n))))
         end
     end
@@ -78,6 +78,7 @@ function simulation_construction(sys,sim)
     end
     if sim.DistributionConductivity == true
         push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.mp.v_g,u.fneq,p.f_cond,p.dim)))
+        push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(p.mp.v_g,p.mp.egrid,u.noe,p.dim)))
     end 
     loop_body = build_loopbody(sys,sim)
     expr_cond = Expr(:block,cond_exprs...)

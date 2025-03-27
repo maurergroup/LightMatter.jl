@@ -120,8 +120,14 @@ end
     Returns an expression for the change in number of particles due to relax_dis which simply calculates the number of
     particles inside of relax_dis.
 """
-function athem_electronparticlechange()
-    return :([Lightmatter.get_noparticles(relax_dis,DOS,mp.egrid)])
+function athem_electronparticlechange(sim)
+    if sim.DistributionConductivity == true
+        cond = :(n_cond[i])
+    else
+        cond = 0.0
+    end
+    part_change = :(Lightmatter.get_noparticles(relax_dis,DOS,mp.egrid))
+    return Expr(:call,:+,part_change,cond)
 end
 """
     dFDdE(kB::Real,Tel::Real,μ::Real,E::Union{Vector{<:Real},Real})
@@ -168,4 +174,16 @@ end
 
 function electron_distribution_transport!(v_g,f,Δf,dim::Homogeneous)
     nothing
+end
+
+function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::AbstractArray{<:Real},dim::Dimension)
+    Δn = zeros(dim.length)
+    idx_0 = findmin(abs(egrid-0.0))[2]
+    v_F = v_g[idx_0]
+    for i in 2:dim.length -1
+        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dim.dz * v_F
+    end
+    Δn[1] = (n[2] - n[1]) / dim.dz * v_F
+    Δn[end] = (n[end-1] - n[end]) / dim.dz * v_F
+    return Δn
 end

@@ -428,13 +428,16 @@ function write_minimum(f,results,FD,sim)
     f["Phononic Temperature"]["Temperature"] = results["Tph"]
     f["Number Of Particles"]["Particle Number"] = results["noe"]
     f["Non Eq Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
-    if sim.Systems.NonEqElectrons == true
-        if size(FD,1) != size(results["fneq"],1)
+    if sim.DistributionConductivity == true
+        if sim.Systems.ElectronTemperature == false
+            FD = permutedims(FD,(2,1,3))
             FD = repeat(FD,size(results["fneq"],1), 1, 1)
             f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
         else
             f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
         end
+    else
+        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
     end
 end
     
