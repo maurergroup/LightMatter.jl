@@ -176,9 +176,9 @@ function electron_distribution_transport!(v_g,f,Δf,dim::Homogeneous)
     nothing
 end
 
-function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::AbstractArray{<:Real},dim::Dimension)
+function thermal_particle_transport!(v_g::Vector{<:Real},egrid::Vector{<:Real},n::AbstractArray{<:Real},dim::Dimension)
     Δn = zeros(dim.length)
-    idx_0 = findmin(abs(egrid-0.0))[2]
+    idx_0 = findmin(abs.(egrid.-0.0))[2]
     v_F = v_g[idx_0]
     for i in 2:dim.length -1
         Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dim.dz * v_F
