@@ -1,22 +1,36 @@
 """
-    Type that all abstract types will derive from
+    Type that all Simulation settings types will be a subtype of
 """
-abstract type Simulation end #Overarching type that holds all simulation settings
-abstract type Laser <: Simulation end
+abstract type Simulation end
+"""
+    The supertype for the different laser types. Each laser type requires a struct which holds the laser parameters.
+    Each laser type also has a functor defined for it which returns the equation describing how the laser evolves 
+    over time. Lasers are centred on t = 0
+"""
+abstract type Laser end
+"""
+    A convenience type definition to make type specificity easier throughout the code
+"""
 spl=DataInterpolations.LinearInterpolation
 """
-    Booleans for interactions between different ODE systems are held within this struct.
-    They are used as flags to determine whether couplings should evaluate to a function
-    if true or 0.0 if set to false
+    struct Interaction <:Simulation
+        ElectronElectron::Bool # Provides whether electron electron interactions are enabled
+        ElectronPhonon::Bool   # Provides whether electron phonon interactions are enabled
+    end
 """
 @kwdef struct Interaction <:Simulation
     ElectronElectron::Bool
     ElectronPhonon::Bool
 end
 """
-    Booleans for whether parameters are variable or static. In the case, of the chemical potential
-    it is updated via a struct whereas the rest are flags for function calls. If set to true then
-    the non-linear/updating form is used.
+    struct ParameterApproximation <:Simulation
+        ElectronPhononCoupling::Bool # Sets the electron-phonon coupling to non-linear from constant
+        ElectronHeatCapacity::Bool # Sets the electron heat capacity to non-linear from constant
+        PhononHeatCapacity::Bool # Sets the phonon heat capacity to non-linear from constant
+        EmbeddingMethod::Bool # Sets the higher order method (e.g. AthEM) to only the top level of the slab
+    end
+
+    True represents that the non-linear forms are enabled. 
 """
 @kwdef struct ParameterApproximation <:Simulation
     ElectronPhononCoupling::Bool
@@ -42,6 +56,7 @@ end
     Interactions::Interaction
     Systems::SystemComponents
     Spatial_DOS::Bool
+    DistributionConductivity::Bool
 end
 """
     Dimension is the parent type of all dimensionality information
@@ -93,8 +108,10 @@ end
     Cph::Float64 #Constant heat capacity for phonons
     egrid::Vector{Float64} # Energy grid to solve neq electrons on
     τ::Float64 #Scalar value for the Fermi Liquid Theory relaxation time
-    n0::Float64
+    n0::Vector{Float64}
     τep::Float64
+    R::Real # Reflectivity of the sample
+    v_g::Vector{<:Real}
 end
 """
     Struct that holds constants
@@ -102,26 +119,24 @@ end
 struct Constants
     kB::Float64
     hbar::Float64
+    me::Float64
 end
 """
     Generates the simulation_settings struct with user inputs and defaults or user settings and a dictionary generated from an input
     file built within InputFileControl.jl. Temporary : File Control not fully supported
 """
-function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=true,elecelecint=true,elecphonint=true,
-    phononheatcapacity=true,electemp=true,phonontemp=true,zDOS=false,embedding=false)
+function define_simulation_settings(;nlelecphon=false,nlelecheat=false,noneqelec=false,elecelecint=false,elecphonint=false,
+    nlphonheat=false,electemp=false,phonontemp=false,zDOS=false,embedding=false,distributionconductivity=false)
     
-    if noneqelec==false
-        elecelecint=false
-    end
-
     params=ParameterApproximation(ElectronPhononCoupling=nlelecphon,ElectronHeatCapacity=nlelecheat,
-    PhononHeatCapacity=phononheatcapacity,EmbeddingMethod=embedding)
+    PhononHeatCapacity=nlphonheat,EmbeddingMethod=embedding)
 
     interact=Interaction(ElectronElectron=elecelecint,ElectronPhonon=elecphonint)
     
     components=SystemComponents(ElectronTemperature=electemp,PhononTemperature=phonontemp,NonEqElectrons=noneqelec)
 
-    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components,Spatial_DOS=zDOS)
+    sim_settings=SimulationSettings(ParameterApprox=params,Interactions=interact,Systems=components,Spatial_DOS=zDOS
+    ,DistributionConductivity = distributionconductivity)
     
     return sim_settings
 end
@@ -184,27 +199,32 @@ end
     file built within InputFileControl.jl Temporary : File Control not fully supported
 """
 function define_material_parameters(las::Laser,sim::SimulationSettings,dim::Dimension;extcof=0.0,gamma=0.0,debye=0.0
-    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="DOS/Au_DOS.dat",secmomspecfun=0.0
-    ,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,folder=Nothing,geometry=Nothing,layer_tolerance=0.1)
+    ,noatoms=0.0,plasma=0.0,thermalcond=0.0,dos="",bulk=true,secmomspecfun=0.0,elecphon=0.0,ballistic=0.0,cph=0.0,τf=18.0,
+    folder=Nothing,surfacegeometry="",bulkgeometry="",layer_tolerance=0.1,skip=0,reflectivity=0.0)
     
-    fermien=get_FermiEnergy(dos)
+    fermien=get_FermiEnergy(dos,skip)
+    Vbulk = get_unitcellvolume(bulkgeometry)
     if sim.Spatial_DOS == true
-        DOS = spatial_DOS(folder,geometry,dos,noatoms,dim,layer_tolerance)
+        DOS = spatial_DOS(folder,surfacegeometry,dos,Vbulk,noatoms,dim,layer_tolerance,skip)
     elseif sim.Spatial_DOS == false
-        if typeof(dim) == Homogeneous
-            DOS = [generate_DOS(dos,noatoms)]
-        else
-            DOS = fill(generate_DOS(dos,noatoms),dim.length)
+        if bulk 
+            DOS = fill(generate_DOS(dos,1/Vbulk,skip),dim.length)
+        else 
+            DOS = fill(generate_DOS(dos,noatoms,skip),dim.length)
         end
     end
     tau = 128/(sqrt(3)*pi^2*plasma)
-    erange = build_egrid(las.hv)#
-    n0 = get_thermalparticles(0.0,1e-32,DOS[1],8.617e-5,erange)
+    erange = build_egrid(las.hv)
+    n0 = zeros(dim.length)
+    for i in eachindex(n0)
+        n0[i] = get_thermalparticles(0.0,1e-32,DOS[i],8.617e-5,erange)
+    end
     τep = τf*las.hv/8.617e-5/debye
 
-    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,
-    DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep)
+    v_g = get_fermigas_velocity(erange,fermien)
 
+    matpat=MaterialParameters(ϵ=extcof,μ=0.0,γ=gamma,θ=debye,n=noatoms,κ=thermalcond,v_g = v_g,
+    DOS=DOS,λ=secmomspecfun,g=elecphon,δb=ballistic,Cph=cph,egrid=erange,τ = tau,FE=fermien,n0=n0,τep=τep,R=reflectivity)
     return matpat
 end
 
@@ -223,9 +243,11 @@ function build_egrid(hv)
     return egrid
 end
 
-function grid_builder(l,Espan)
-    gh,weights = gausshermite(l)
-    return ((gh .- minimum(gh)) ./ (maximum(gh)/(Espan/2))) .- (Espan/2) 
+function get_fermigas_velocity(egrid,EF)
+    eV_to_J(E) = E * 1.602e-19
+    ms_to_nmfs(v) = v*1e-6
+    v_g = ms_to_nmfs.(sqrt.(2*eV_to_J.(egrid.+EF)./cons.me))
+    return v_g
 end
 
-const cons=Constants(8.617e-5,0.6582)
+const cons=Constants(8.617e-5,0.6582,3.109e-31)
