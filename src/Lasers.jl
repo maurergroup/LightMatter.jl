@@ -1,130 +1,99 @@
-"""
-    The supertype for the different laser types. Each laser type requires a struct which holds the laser parameters.
-    Each laser type also has a functor defined for it which returns the equation describing how the laser evolves 
-    over time. Lasers are centred on t = 0
-"""
 @kwdef struct Gaussian <: Laser
     FWHM::Real
     Power::Real
     hv::Real
-    R::Real
     Transport::String
 end
 @kwdef struct Rectangular <: Laser  
     FWHM::Real
     Power::Real
     hv::Real
-    R::Real
     Transport::String
 end
 @kwdef struct HyperbolicSecant <: Laser
     FWHM::Real
     Power::Real
     hv::Real
-    R::Real
     Transport::String
 end
 @kwdef struct Lorentzian <: Laser
     FWHM::Real
     Power::Real
     hv::Real
-    R::Real
     Transport::String
 end
 """
-    Outer constructor that determines which laser system to build. The parameters can be read in from InputFileControl.jl
-    or you can manually declare them. Temporary: File support not supported
+    define_laser_system(Laser::Symbol;fwhm::Real,fluence::Real,photon_en::Real,R=0.0::Real,transport="Optical"::String)
+    The construcor which assembles the correct laser type for your problem. The currently implemented lasers are Gaussian, 
+    Lorentzian, HyperbolicSecant and Rectangular. All lasers have the following structure,
+    
+    struct laser_type <:Laser
+        FWHM::Real (The full-width half-maximum of the current laser, for rectangular it is half the duration either side of 0)
+        Power::Real (The fluence of the laser before reflection)
+        hv::Real (The frequency or photon energy of the laser)
+        Transport::String (Either Optical, Ballistic or Combined for whether we are considering extinction coefficient, ballistic
+                           length of electrons or both as ways that the laser energy reduces deeper into the slab.)
 """
-function define_laser_system(Laser::Symbol;fwhm::Real,fluence::Real,
-    photon_en::Real,R=0.0::Real,transport="Optical"::String)
+function define_laser_system(Laser::Symbol;FWHM::Real,Power::Real,
+    hv::Real,Transport="Optical"::String)
     if Laser == :Gaussian
-        return Gaussian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R,Transport=transport)
+        return Gaussian(FWHM=FWHM,Power=Power,hv=hv,Transport=Transport)
     elseif Laser == :Lorentzian
-        return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R,Transport=transport)
+        return Lorentzian(FWHM=FWHM,Power=Power,hv=hv,Transport=Transport)
     elseif Laser == :HyperbolicSecant
-        return HyperbolicSecant(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R,Transport=transport)
+        return HyperbolicSecant(FWHM=FWHM,Power=Power,hv=hv,Transport=Transport)
     elseif Laser == :Rectangular
-        return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R,Transport=transport)
+        return Rectangular(FWHM=FWHM,Power=Power,hv=hv,Transport=Transport)
     else
         print("The laser type you chose is currently not implemented, the current options
         are Gaussian, Lorentzian, HyperbolicSecant and Rectangular")
     end
 end
-
-#= function define_laser_system(dict;Laser=dict.laser::Symbol,fwhm=dict.FWHM::Real,
-    fluence=dict.Fluence::Real,photon_en=Dict.hv::Real,R=dict.R::Real)
-    if Laser == "Gaussian"
-        return Gaussian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R)
-    elseif Laser == "Lorentzian"
-        return Lorentzian(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R)
-    elseif Laser == "HyperbolicSecant"
-        return HyperbolicSecant(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R)
-    elseif Laser == "Rectangular"
-        return Rectangular(FWHM=fwhm,Power=fluence,hv=photon_en,
-        R=R)
-    else
-        print("The laser type you chose is currently implemented, the current options
-        are Gaussian, Lorentzian, HyperbolicSecant and Rectangular")
-    end
-end =#
 """
+    laser_factory(las::Laser,dims=Homogeneous()::Dimension)
     Factory builds the laser from three components defining the evolution in time(temporal), the power of the
-    laser(power) and how the laser penetrates into a material(spatial). Returns a Num equation that holds the 
+    laser(power) and how the laser penetrates into a material(spatial). Returns an Expr that holds the 
     relevant parameters and structure of the laser.
 """
 function laser_factory(las::Laser,dims=Homogeneous()::Dimension)
     temporal = las()
-    power = intensity()
+    power = :((1-mp.R)*las.Power)
     spatial = spatial_laser(las,dims)
     return Expr(:call,:*,temporal,spatial,power)
 end
 """
-    Creates the parameters that represent the R(R) of the material and the Fluence(ϕ) of the laser.
-    Returns the component of the laser equation responsible for the laser power absorbed by the material.
-"""
-function intensity()
-    return :((1-las.R)*las.Power)
-end
-"""
-    Normalised Gaussian temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
+    (::Gaussian)()
+    Normalised Gaussian temporal profile
 """
 function (::Gaussian)()
     return :(sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*t^2/las.FWHM^2))
 end
 """
-    Normalised Hyperbolic HyperbolicSecant temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
+    (::HyperbolicSecant)()
+    Normalised Hyperbolic Secant temporal profile
 """
 function (::HyperbolicSecant)()
    return :(log(1+sqrt(2))/las.FWHM * sech(2*log(1+sqrt(2))*(t/las.FWHM))^2)
 end
 """
-    Normalised Lorentzian temporal profile which creates the parameters for the Full-Width at Half-Maximum(FWHM).
+    (::Lorentzian)()
+    Normalised Lorentzian temporal profile
 """
 function (::Lorentzian)()
     lorent = :((1+(4/(1+sqrt(2))*(t/las.FWHM)^2))^-2)
     return :(4*sqrt(sqrt(2)-1)/(pi*las.FWHM)*$lorent)
 end
 """
-    Normalised Rectangular(continuous illumination) temporal profile which creates the parameters
-    for the Full-Width at Half-Maximum(FWHM).
+    (::Rectangular)()
+    Normalised Rectangular temporal profile with illumination lasting 2*FWHM either side of 0 fs.
 """
 function (::Rectangular)()
     return :(-2*las.FWHM≤t≤2*las.FWHM ? 1/(4*las.FWHM) : 0.0)
 end
-
-#
-# To-Do Spatial Lasers
-#
 """
+    spatial_laser(las::Laser,slab::Dimension)
     This builds the equation which defines how the laser energy is absorbed the further from
-    the centre of the spot. This is split into a z and an x/y component.
+    the centre of the spot. This is currently only implemented in the z direction
 """
 function spatial_laser(las::Laser,slab::Dimension)
     z_laser = spatial_z_laser(las,slab)
@@ -151,7 +120,7 @@ function spatial_z_laser(las::Laser,slab::Dimension)
             return :(1/mp.ϵ)
         else
             l=slab.grid[end]
-            return :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[z]./mp.ϵ))
+            return :(1/(mp.ϵ*(1-exp(-$l/mp.ϵ)))*exp.(-dim.grid[i]./mp.ϵ))
         end
     elseif las.Transport == "Combined"
         if typeof(slab) == Homogeneous
@@ -163,10 +132,8 @@ function spatial_z_laser(las::Laser,slab::Dimension)
     end
 end
 """
-    Defines the equation for how the laser pulse diffuses perpendicular to it's incidence angle
-    of incidence. Returns 1 unless the model is 2 or 3D in which it defines a parameter for the length
-    of the slab defined by a capital letter and a parameter for the vector of slab positions in each
-    dimension.
+    spatial_xy_laser(slab::Dimension)
+    To-Do : Not currently working and implemented yet. 
 """
 function spatial_xy_laser(slab::Dimension)
     if typeof(slab) == Cylindrical
