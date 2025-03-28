@@ -1,18 +1,24 @@
 module Lightmatter
 
-using DataInterpolations, DelimitedFiles, Integrals, Roots, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated
+using DataInterpolations, DelimitedFiles, Integrals, Roots, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful
 
-export define_laser_system, define_simulation_settings, define_material_parameters, define_sim_dimensions, function_builder, run_simulation, post_production, cons
+export build_simulation, run_simulation, post_production, Constants
 
-include("SimulationSetup.jl")
+global const units = [u"eV", u"nm", u"fs", u"K"]
+
+include("UnitManagement.jl")
+include("SimulationConstruction.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
 include("PhononicTemperature.jl")
-include("SimulationVariables.jl")
+include("PropertyFunctions.jl")
 include("DOS_Geometry.jl")
 include("ElectronicDistribution.jl")
+include("AthermalElectrons.jl")
+include("PhononicDistribution.jl")
+include("DensityMatrix.jl")
 include("RunDynamics.jl")
-include("SystemBuilder.jl")
-include("SolProcessing.jl")
+include("SystemConstruction.jl")
+include("OutputProcessing.jl")
 
 end

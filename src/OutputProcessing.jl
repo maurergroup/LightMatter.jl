@@ -1,35 +1,26 @@
-function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim)
+function post_production(sol,file_name,initial_temps,output,sim)
     fid = create_datafile_and_structure(file_name)
-    fid_id = fid.id
-    write_simsettings(fid["Settings"],sim)
-    write_materialproperties(fid["Parameters"],mp,dim,cons)
+    write_simulation(fid,sim::Simulation)
 
-    results = seperate_results(sol,initial_temps,mp,dim)
+    results = seperate_results(sol,initial_temps,sim)
     fid["Miscellaneous"]["Time Span"] = results["times"]
-    μs = pp_chemicalpotential(results["Tel"],results["noe"],mp,cons,sim)
+    μs = pp_chemicalpotential(results["Tel"],results["noe"],sim)
     fid["Miscellaneous"]["Chemical Potential"] = μs
-    FD = pp_FermiDistribution(results["Tel"],mp,cons,μs)
+    FD = pp_FermiDistribution(results["Tel"],sim,μs)
 
-    write_laser(fid["Miscellaneous"],las,dim,results["times"],mp)
 
-    create_group(fid["Miscellaneous"],"System Equations")
-    output_functions(fid["Miscellaneous"]["System Equations"],sim,las,dim)
+    create_group(fid,"System Equations")
+    output_functions(fid["System Equations"],sim)
 
     if output=="full"
-        relax=()
-        if sim.Systems.NonEqElectrons == true
-            relax=write_noneqelectrons(fid["Non Eq Electrons"],results,sim,FD,μs,mp,cons,las)
-        end
-        write_electronictemperature(fid["Electronic Temperature"],results,dim,mp,μs,sim,FD,relax)
-        write_phononictemperature(fid["Phononic Temperature"],results,sim,mp,fid_id)
-        write_numberofparticles(fid["Number Of Particles"],results,sim,mp,relax,μs)
+        println("Not Implemented running minimum")
+        write_minimum(fid,results,FD,sim)
         close(fid)
     elseif output=="minimum"
         write_minimum(fid,results,FD,sim)
         close(fid)
     else 
-        println("The only output options are full and minimum. Files cannot be overwritten so the
-        file has been deleted")
+        println("The only output options are full and minimum. Files cannot be easily overwritten so the file has been deleted")
         close(fid)
         rm(file_name)
     end
@@ -37,13 +28,14 @@ end
 
 function create_datafile_and_structure(file_name)
     fid = h5open(file_name,"w")
-    create_group(fid,"Settings")
-    create_group(fid,"Parameters")
+    create_group(fid,"Athermal Electrons")
+    create_group(fid,"Density Matrix")
     create_group(fid,"Electronic Temperature")
     create_group(fid,"Phononic Temperature")
-    create_group(fid,"Number Of Particles")
-    create_group(fid,"Non Eq Electrons")
-    create_group(fid,"Miscellaneous")
+    create_group(fid,"Electronic Distribution")
+    create_group(fid,"Phononic Distribution")
+    create_group(fid,"Laser")
+    create_group(fid,"Structure")
     return fid
 end
 
@@ -53,79 +45,66 @@ function dict_to_hdf5(g,d)
     end
 end
 
-function write_simsettings(f,sim)
-    Ints = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.Interactions, key)) for key ∈ fieldnames(Interaction))
-    create_group(f,"Interactions")
-    dict_to_hdf5(f["Interactions"],Ints)
-    ParamApprox = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.ParameterApprox, key)) for key ∈ fieldnames(ParameterApproximation))
-    create_group(f,"Parameter Approximations")
-    dict_to_hdf5(f["Parameter Approximations"],ParamApprox)
-    comps = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.Systems, key)) for key ∈ fieldnames(SystemComponents))
-    create_group(f,"System Components")
-    dict_to_hdf5(f["System Components"],comps)
+function write_simulation(f,sim::Simulation)
+    athermal = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.athermalelectrons, key)) for key ∈ fieldnames(AthermalElectrons))
+    dict_to_hdf5(f["Athermal Electrons"], athermal)
+    electronic_t = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.electronictemperature, key)) for key ∈ fieldnames(ElectronicTemperature))
+    dict_to_hdf5(f["Electronic Temperature"], electronic_t)
+    phononic_t = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.phononictemperature, key)) for key ∈ fieldnames(PhononicTemperature))
+    dict_to_hdf5(f["Phononic Temperature"], phononic_t)
+    electronic_d = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.electronicdistribution, key)) for key ∈ fieldnames(ElectronicDistribution))
+    dict_to_hdf5(f["Electronic Distribution"], electronic_d)
+    phononic_d = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.phononicdistribution, key)) for key ∈ fieldnames(PhononicDistribution))
+    dict_to_hdf5(f["Phononic Distribution"], phononic_d)
+    density_m = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.densitymatrix, key)) for key ∈ fieldnames(DensityMatrix))
+    dict_to_hdf5(f["Density Matrix"], density_m)
+    laser = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.laser, key)) for key ∈ fieldnames(Laser))
+    dict_to_hdf5(f["Laser"], laser)
+    structure = extract_structure(f, sim.structure)
 end
 
-function write_materialproperties(f,mp,dim,cons)
-    tuple_mp = [("Extinction Coefficient (nm)",mp.ϵ),
-                ("Valence Band Minimum (eV)",mp.FE),
-                ("Electronic Specific Heat Capacity (eV fs^-1 nm^-3 K^-2)",mp.γ),
-                ("Debye Temperature / K",mp.θ),
-                ("Number of Atoms / nm^3",mp.n),
-                ("Room Temperature Diffusive Thermal Conductivity / eV/fs/m/K",mp.κ),
-                ("Second Moment of Phonon Spectrum × Electron-Phonon Mass Enhancement Factor / eV^2",mp.λ),
-                ("Linear Electron-Phonon Coupling Constant / eV/fs/nm^3/K",mp.g),
-                ("Material Dependent Fermi Liquid Lifetime scalar / fs^-1",mp.τ),
-                ("Electron-Phonon Relaxation Time / fs^-1",mp.τep),
-                ("Energy Grid for solving Distributions",mp.egrid),
-                ("Constant Phononic Heat Capacity",mp.Cph)]
-    matpat = Dict(tuple_mp)
-    create_group(f,"Material Parameters")
-    dict_to_hdf5(f["Material Parameters"],matpat)
-    constants = Dict("Boltzmann Constant / eV/K"=>cons.kB,"Reduced Planck's Constant / eVfs"=>cons.hbar)
-    create_group(f,"Constants")
-    dict_to_hdf5(f["Constants"],constants)
-    dimensions = write_dimsdict(dim)
-    create_group(f,"Dimensions")
-    dict_to_hdf5(f["Dimensions"],dimensions)
-    write_DOS(f,mp)
+function extract_structure(f, structure::Structure)
+    create_group(f["Structure"],"Dimension")
+    struc = Dict("Elemental_System" => structure.Elemental_System, "Spatial_DOS" => structure.Spatial_DOS, "egrid" => structure.egrid)
+    merge!(struc, write_DOS(structure))
+
+    dimension = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(structure.dimension, key)) for key ∈ fieldnames(Dimension))
+    dict_to_hdf5(f["Structure"]["Dimension"], dimension)
+    dict_to_hdf5(f["Structure"], struc)
 end
 
-function write_DOS(f,mp)
-    create_group(f,"Density Of States")
-    egrid = collect(range(-10,10,step=0.01))
-    DOS = zeros(length(mp.DOS),length(egrid))
-    for i in eachindex(mp.DOS)
-        DOS[i,:] = mp.DOS[i](egrid)
+function write_DOS(structure::Structure)
+    
+    egrid = collect(range(-20,20,step=0.01))
+    if typeof(structure.DOS) == Vector{spl}
+        DOS = zeros(length(structure.DOS),length(egrid))
+        for i in eachindex(mp.DOS)
+            DOS[i,:] = structure.DOS[i](egrid)
+        end
+    else
+        DOS = zeros(length(egrid))
+        DOS[:] = structure.DOS(egrid)
     end
-    f["Density Of States"]["DOS"] = DOS
-    f["Density Of States"]["Energy Axis"] = egrid
 
+    return Dict("DOS" => DOS)
 end
 
-function write_dimsdict(dim)
-    if typeof(dim) == Homogeneous
-        return Dict("Dimension" => 0)
-    elseif typeof(dim) == Linear
-        return Dict("Dimension" => 1, "Number of Points" => dim.length, "Spacing" => dim.dz, "Grid" => dim.grid)
-    end
-end
-
-function seperate_results(sol,initial_temps,mp,dim)
+function seperate_results(sol,initial_temps,sim)
     fields = propertynames(sol[1])
-    vals = generate_valuedict(sol,mp,dim,fields)
+    vals = generate_valuedict(sol,sim,fields)
     populate_value_dict!(sol,fields,vals)
-    populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
+    populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
     merge!(vals,Dict("times" => sol.t))
     return vals
 end
 
-function generate_valuedict(sol,mp,dim,fields)
+function generate_valuedict(sol,sim,fields)
     vals = Dict{String,Union{Real,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
-            merge!(vals,Dict(String(i)=>zeros(length(sol.t),dim.length)))
+            merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length)))
         elseif i == :fneq
-            merge!(vals,Dict(String(i)=>zeros(length(sol.t),dim.length,length(mp.egrid))))
+            merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
         end
     end
     return vals
@@ -152,18 +131,26 @@ function remove_TTM_explicit_electrons!(vals,fields,sim)
     return vals
 end
 
-function populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
+function populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
     if :Tel ∉ fields
-        merge!(vals,Dict("Tel"=>fill(initial_temps["Tel"],dim.length)))
+        merge!(vals,Dict("Tel"=>fill(initial_temps["Tel"],sim.structure.dimension.length)))
     end
     if :Tph ∉ fields
-        merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],dim.length)))
+        merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],sim.structure.dimension.length)))
     end
     if :noe ∉ fields
-        merge!(vals,Dict("noe"=>mp.n0))
+        if typeof(sim.structure.DOS) == Vector{spl}
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+            end
+        else
+            no_part = fill(sim.structure.dimension.length,get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid))
+        end
+        merge!(vals,Dict("noe" => no_part ))
     end
     if :fneq ∉ fields
-        merge!(vals,Dict("fneq" => zeros(length(sol.t),dim.length,length(mp.egrid))))
+        merge!(vals,Dict("fneq" => zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
     end
     return vals
 end
@@ -188,11 +175,11 @@ function write_electronictemperature(f,results,dim,mp,μs,sim,FD,relax)
     end
 end
 
-function pp_FermiDistribution(Tel,mp,cons,μ)
-    FD=zeros(length(Tel[:,1]),length(Tel[1,:]),length(mp.egrid))
+function pp_FermiDistribution(Tel,sim,μ)
+    FD=zeros(length(Tel[:,1]),length(Tel[1,:]),length(sim.structure.egrid))
     Threads.@threads for i in eachindex(Tel[:,1])
         for j in eachindex(Tel[1,:])
-            FD[i,j,:] .= FermiDirac(Tel[i,j],μ[i,j],cons.kB,mp.egrid)
+            FD[i,j,:] .= FermiDirac(Tel[i,j],μ[i,j],sim.structure.egrid)
         end
     end
     return FD
@@ -252,25 +239,31 @@ function pp_neqelectronelectronenergychange(relax,mp)
     uee = zeros(length(relax[1,1,:]),length(relax[1,:,1]))
     Threads.@threads for i in eachindex(uee[:,1])
         for j in eachindex(uee[i,:])
-            uee[i,j] = elec_energychange(mp.egrid,-1*relax[:,j,i],mp.DOS)
+            uee[i,j] = elec_energychange(sim.structure.egrid,-1*relax[:,j,i],mp.DOS)
         end
     end
     return uee
 end
 
-function pp_chemicalpotential(Tel,n,mp,cons,sim)
+function pp_chemicalpotential(Tel,n,sim)
     cp = zeros(size(Tel))
-    if sim.Systems.NonEqElectrons == true
+    if sim.athermalelectrons.Enabled == true
         Threads.@threads for i in eachindex(Tel[1,:])
-            if sim.ParameterApprox.EmbeddingMethod == true
-                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            if typeof(sim.structure.DOS) == Vector{spl}
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS[i]),Ref(sim.structure.egrid))
             else
-                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS),Ref(sim.structure.egrid))
             end
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
-            cp[:,i] .= find_chemicalpotential.(mp.n0[i],Tel[:,i],Ref(mp.DOS[i]),cons.kB,Ref(mp.egrid))
+            if typeof(sim.structure.DOS) == Vector{spl}
+                n = get_thermalparticles(0.0,1e-32,sim.structure.DOS[i],sim.structure.egrid)
+                cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(sim.structure.DOS[i]),Ref(sim.structure.egrid))
+            else
+                n = get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid)
+                cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(sim.structure.DOS),Ref(sim.structure.egrid))
+            end
         end
     end
     return cp
@@ -311,7 +304,7 @@ function pp_neqelectronphononenergychange(fneq,mp)
     uep = zeros(length(fneq[1,1,:]),length(fneq[1,:,1])) 
     Threads.@threads for i in eachindex(fneq[1,1,:])
         for j in eachindex(fneq[1,:,1])
-            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],mp.egrid,mp.τep,mp.DOS)
+            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],sim.structure.egrid,mp.τep,mp.DOS)
         end
     end
     return uep
@@ -374,7 +367,7 @@ function pp_athemexcitation(ftot,mp,las)
     excite = zeros(size(ftot))
     Threads.@threads for i in eachindex(ftot[1,1,:])
         for j in eachindex(ftot[1,:,1])
-            excite[:,j,i] .= athemexcitation(ftot[:,j,i],mp.egrid,mp.DOS,las.hv)
+            excite[:,j,i] .= athemexcitation(ftot[:,j,i],sim.structure.egrid,mp.DOS,las.hv)
         end
     end
     return FD
@@ -398,20 +391,6 @@ function pp_athemelectronphononrelaxation(fneq,mp)
     return rel
 end
 
-function write_laser(f,las,dim,timepoints,mp)
-    create_group(f,"Laser")
-    tuple_las = [("Laser Form",String(Symbol(typeof(las)))),
-                 ("Full-Width at Half Maximum / fs",las.FWHM),
-                 ("Fluence / eV/nm^2",las.Power),
-                 ("Photon Energy / eV",las.hv),
-                 ("Reflectivity",mp.R),
-                 ("Transport Type",las.Transport)]
-    las_dict=Dict(tuple_las)
-    dict_to_hdf5(f["Laser"],las_dict)
-    #laser=laser_factory(las,dim)
-    f["Laser"]["Temporal Profile"] = pp_temporalprofile(las,dim,timepoints,mp)
-end
-
 function pp_temporalprofile(las,dim,timepoints,mp)
     temp_prof = zeros(length(timepoints),length(dim.grid))
     if typeof(las) == Gaussian
@@ -425,25 +404,25 @@ end
 function write_minimum(f,results,FD,sim)
     f["Electronic Temperature"]["Temperature"] = results["Tel"]
     f["Electronic Temperature"]["Distribution"] = FD
+    create_group(f,"Particle Number")
     f["Phononic Temperature"]["Temperature"] = results["Tph"]
-    f["Number Of Particles"]["Particle Number"] = results["noe"]
-    f["Non Eq Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
-    if sim.DistributionConductivity == true
-        if sim.Systems.ElectronTemperature == false
-            FD = permutedims(FD,(2,1,3))
+    f["Particle Number"] = results["noe"]
+    f["Athermal Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
+    if sim.Systems.NonEqElectrons == true
+        if size(FD,1) != size(results["fneq"],1)
             FD = repeat(FD,size(results["fneq"],1), 1, 1)
-            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
+            f["Electronic Distribution"]["Total Distribution"] = results["fneq"].+FD
         else
-            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
+            f["Electronic Distribution"]["Total Distribution"] = results["fneq"].+FD
         end
-    else
-        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
     end
 end
     
-function output_functions(f,sim,las,dim)
-    sys = function_builder(sim,las,dim)
+function output_functions(f,sim)
+    sys = function_builder(sim)
     for i in keys(sys)
         f[i] = string(sys[i])
     end
+    simulation_expr = simulation_construction(sys,sim)
+    f["Total Equation Block"] = string(simulation_expr)
 end

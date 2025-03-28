@@ -1,15 +1,14 @@
 """
-    electrontemperature_factory(sim::SimulationSettings,laser::Expr)
-    This function takes the SimulationSettings struct and a laser expression and returns an assembled
+    electrontemperature_factory(sim::Simulation,laser::Expr)
+    This function takes the Simulation struct and a laser expression and returns an assembled
     expression for how the electronic temperature should evolve over time. 
 """
-function electrontemperature_factory(sim::SimulationSettings,laser::Expr)
-    if sim.Systems.NonEqElectrons == false
+function electrontemperature_factory(sim::Simulation,laser::Expr)
+    if sim.electronictemperature.AthermalElectron_ElectronCoupling == false
         HeatCapacity = electrontemperature_heatcapacity(sim)
         ElecPhon = electronphonon_coupling(sim)
-        Spatial = :(cond) 
-        return build_electronTTM(laser,Spatial,ElecPhon,HeatCapacity)
-    elseif sim.Systems.NonEqElectrons == true
+        return build_electronTTM(sim,laser,ElecPhon,HeatCapacity)
+    elseif sim.electronictemperature.AthermalElectron_ElectronCoupling == true
         Δu = athem_electempenergychange(sim)
         return build_athemelectron(Δu) 
     end
@@ -21,21 +20,25 @@ end
     the change in internal energy of the thermal system and divided by the heat capacity to change the 
     internal energy into a temperature.
 """
-function build_electronTTM(Source::Expr,Spatial::Symbol,ElecPhon::Expr,HeatCapacity::Expr)
-    return Expr(:call,:/,Expr(:call,:+,Source,Spatial,ElecPhon),HeatCapacity)
+function build_electronTTM(sim::Simulation,Source::Expr,ElecPhon::Expr,HeatCapacity::Expr)
+    args = (Source,ElecPhon)
+    if sim.electronictemperature.Conductivity == true
+        push!(args,:Tel_cond)
+    end
+    return Expr(:call,:/,Expr(:call,:+,args...),HeatCapacity)
 end
 """
-    electrontemperature_heatcapacity(sim::SimulationSettings)
+    electrontemperature_heatcapacity(sim::Simulation)
     Returns the expression for how the electronic temperatures heat capacity should be 
     calculated. This can be done either via a linear relation between the speciic heat(γ) and
     Tel or via a more accurate but complex non-linear relationship. The keyword to be set 
     in define_simulation_settings is nlelecheat = true.
 """
-function electrontemperature_heatcapacity(sim::SimulationSettings)
-    if sim.ParameterApprox.ElectronHeatCapacity == true
-        return :(Lightmatter.nonlinear_electronheatcapacity(cons.kB,Tel,μ,DOS,mp.egrid))
-    else
-        return :(mp.γ*Tel)
+function electrontemperature_heatcapacity(sim::Simulation)
+    if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
+        return :(Lightmatter.nonlinear_electronheatcapacity(Tel,μ,DOS,sim.structure.egrid))
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
+        return :(sim.electronictemperature.γ*Tel)
     end
 end
 """
@@ -44,34 +47,34 @@ end
     It is defined as the internal energy of the derivative of the Fermi distribution with respect
     to temperature.
 """
-function nonlinear_electronheatcapacity(kB::Real,Tel::Real,μ::Real,DOS::spl,egrid::Vector{<:Real})
-    return extended_Bode(dFDdT(kB,Tel,μ,egrid).*DOS(egrid).*egrid,egrid)
+function nonlinear_electronheatcapacity(Tel::Real,μ::Real,DOS::spl,egrid::Vector{<:Real})
+    return extended_Bode(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid,egrid)
 end
 """
-    electronphonon_coupling(sim::SimulationSettings)
+    electronphonon_coupling(sim::Simulation)
     Returns the expression for how the electron-phonon coupling should be evaulated. It can use a constant
     electron-phonon parameter or a non-linear expression. The keyword to be set in define_simulation_settings
     is nlelecphon = true.
 """
-function electronphonon_coupling(sim::SimulationSettings)
-    if sim.Interactions.ElectronPhonon == true
-        if sim.ParameterApprox.ElectronPhononCoupling==true
-            return :(Lightmatter.nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid))
-        else
-            return :(-mp.g*(Tel-Tph))
+function electronphonon_coupling(sim::Simulation)
+    if sim.electronictemperature.Electron_PhononCoupling == true
+        if sim.electronictemperature.ElectronPhononCouplingValue == :variable
+            return :(Lightmatter.nonlinear_electronphononcoupling(sim.electronictemperature.λ,sim.electronictemperature.ω,DOS,Tel,μ,Tph,sim.structure.egrid))
+        elseif sim.electronictemperature.ElectronPhononCouplingValue == :constant
+            return :(-sim.electronictemperature.g*(Tel-Tph))
         end
     else
         return 0.0
     end
 end
 """
-    nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::spl,Tel::Real,μ::Real,Tph::Real,egrid::Vector{<:Real})
+    nonlinear_electronphononcoupling(λ::Real,ω::Real,DOS::spl,Tel::Real,μ::Real,Tph::Real,egrid::Vector{<:Real})
     Calculates the non-linear electron phonon coupling by calculating g. The equation for which can be found as equation 8 in
     Z. Lin, L. V. Zhigilei and V. Celli, Phys. Rev. B, 2008, 77, 075133.
 """
-function nonlinear_electronphononcoupling(hbar::Real,kB::Real,λ::Real,DOS::spl,Tel::Real,μ::Real,Tph::Real,egrid::Vector{<:Real})
-    prefac=pi*kB*λ/DOS(μ)/hbar
-    g=prefac.*extended_Bode(DOS(egrid).^2 .*-dFDdE(kB,Tel,μ,egrid),egrid)
+function nonlinear_electronphononcoupling(λ::Real,ω::Real,DOS::spl,Tel::Real,μ::Real,Tph::Real,egrid::Vector{<:Real})
+    prefac=pi*Constants.kB*λ*ω/DOS(μ)/Constants.ħ
+    g=prefac.*extended_Bode(DOS(egrid).^2 .*-dFDdE(Tel,μ,egrid),egrid)
     return -g*(Tel-Tph)
 end
 """
@@ -81,9 +84,9 @@ end
     expression used here. 
 """
 function build_athemelectron(Δu::Expr)
-    return :( 1/(Lightmatter.c_T(μ,Tel,DOS,cons.kB,mp.egrid)*Lightmatter.p_μ(μ,Tel,DOS,cons.kB,mp.egrid)
-    -Lightmatter.p_T(μ,Tel,DOS,cons.kB,mp.egrid)*Lightmatter.c_μ(μ,Tel,DOS,cons.kB,mp.egrid))*
-    (Lightmatter.p_μ(μ,Tel,DOS,cons.kB,mp.egrid)*$Δu-Lightmatter.c_μ(μ,Tel,DOS,cons.kB,mp.egrid)*Δn))
+    return :( 1/(Lightmatter.c_T(μ,Tel,DOS,sim.structure.egrid)*Lightmatter.p_μ(μ,Tel,DOS,sim.structure.egrid)
+    -Lightmatter.p_T(μ,Tel,DOS,sim.structure.egrid)*Lightmatter.c_μ(μ,Tel,DOS,sim.structure.egrid))*
+    (Lightmatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu-Lightmatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*Δn))
 end
 """
     elec_energychange(egrid::Vector{<:Real},relax_dis::Vector{<:Real},DOS::spl)
@@ -94,35 +97,33 @@ function elec_energychange(egrid::Vector{<:Real},relax_dis::Vector{<:Real},DOS::
     return Lightmatter.get_internalenergy(relax_dis,DOS,egrid)
 end
 """
-    athem_electempenergychange(sim::SimulationSettings)
+    athem_electempenergychange(sim::Simulation)
     Creates the expression for how the internal energy of the electron temperature should increase during an AthEM calculation.
     This includes the source term from AthEM as well as thermal conductivity and electron-phonon coupling. 
 """
-function athem_electempenergychange(sim::SimulationSettings)
+function athem_electempenergychange(sim::Simulation)
     args = Vector{Union{Expr,Symbol}}(undef,0)
-    push!(args,:(Lightmatter.elec_energychange(mp.egrid,relax_dis,DOS)))
+    push!(args,:(Lightmatter.elec_energychange(sim.structure.egrid,relax_dis,DOS)))
     if sim.Systems.PhononTemperature == true
-       push!(args,:(Lightmatter.nonlinear_electronphononcoupling(cons.hbar,cons.kB,mp.λ,DOS,Tel,μ,Tph,mp.egrid)))
+       push!(args,electronphonon_coupling(sim::Simulation))
     end
-    push!(args,:(cond))
-    return foldl((a, b) -> :($a .+ $b), args)
+    if sim.electronictemperature.Conductivity == true
+        push!(args,:(cond))
+    end
+    return Expr(:call,:+,args...)
 end
 """
-    electrontemperature_conductivity(Tel::Real,dim::Dimension,Tph::Real,mp::MaterialParameters,cond::Vector{<:Real})
+    electrontemperature_conductivity!(Tel::Vector{<:Real},sim::Simulation,Tph::Vector{<:Real},cond::Vector{<:Real})
     Calculates the thermal energy passing further into a bulk slab due to thermal conductivity of the electronic bath. 
-    If the type of the Dimension struct is Homogeneous then there should be no conductivty and returns 0.0 at every time step. 
     The derivative of the temperature with respect to distance is set to 0 at the boundaries.
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Dimension,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
-    depthderivative!(Tel,dim.dz,cond)
+function electrontemperature_conductivity!(Tel::Vector{<:Real},sim::Simulation,Tph::Vector{<:Real},cond::Vector{<:Real})
+    dz = sim.structure.dimension.spacing
+    depthderivative!(Tel,dz,cond)
     cond[1] = 0.0
     cond[end] = 0.0
-    K=mp.κ*Tel./Tph
-    depthderivative!((cond.*K),dim.dz,cond)
-end
-
-function electrontemperature_conductivity!(Tel::Vector{<:Real},dim::Homogeneous,Tph::Vector{<:Real},mp::MaterialParameters,cond::Vector{<:Real})
-    nothing
+    K=sim.electronictemperature.κ*Tel./Tph
+    depthderivative!((cond.*K),dz,cond)
 end
 """
     depthderivative!(vec::Vector{<:Real},dz::Real,Diff::Vector{<:Real})
