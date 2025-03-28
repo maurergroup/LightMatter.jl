@@ -6,7 +6,6 @@ version = "1.0.4"
 [deps]
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 GeneralizedGenerated = "6b9d7cbe-bcb9-11e9-073f-15a7a543e2eb"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
@@ -18,3 +17,5 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 
 [compat]
 GeneralizedGenerated = "0.3"
+DataInterpolations = "8"
+

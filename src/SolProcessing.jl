@@ -4,7 +4,7 @@ function post_production(sol,file_name,initial_temps,output,sim,mp,las,dim)
     write_simsettings(fid["Settings"],sim)
     write_materialproperties(fid["Parameters"],mp,dim,cons)
 
-    results = seperate_results(sol,initial_temps,mp,sim,dim)
+    results = seperate_results(sol,initial_temps,mp,dim)
     fid["Miscellaneous"]["Time Span"] = results["times"]
     μs = pp_chemicalpotential(results["Tel"],results["noe"],mp,cons,sim)
     fid["Miscellaneous"]["Chemical Potential"] = μs
@@ -66,9 +66,9 @@ function write_simsettings(f,sim)
 end
 
 function write_materialproperties(f,mp,dim,cons)
-    tuple_mp = [("Extinction Coefficient / nm^-1",mp.ϵ),
-                ("Valence Band Minimum / eV",mp.FE),
-                ("Electronic Specific Heat Capacity / eV/fs/nm^3/K^2",mp.γ),
+    tuple_mp = [("Extinction Coefficient (nm)",mp.ϵ),
+                ("Valence Band Minimum (eV)",mp.FE),
+                ("Electronic Specific Heat Capacity (eV fs^-1 nm^-3 K^-2)",mp.γ),
                 ("Debye Temperature / K",mp.θ),
                 ("Number of Atoms / nm^3",mp.n),
                 ("Room Temperature Diffusive Thermal Conductivity / eV/fs/m/K",mp.κ),
@@ -110,7 +110,7 @@ function write_dimsdict(dim)
     end
 end
 
-function seperate_results(sol,initial_temps,mp,sim,dim)
+function seperate_results(sol,initial_temps,mp,dim)
     fields = propertynames(sol[1])
     vals = generate_valuedict(sol,mp,dim,fields)
     populate_value_dict!(sol,fields,vals)
@@ -154,10 +154,10 @@ end
 
 function populate_unpropagatedvalues!(sol,initial_temps,fields,mp,dim,vals)
     if :Tel ∉ fields
-        merge!(vals,Dict("Tel"=>[initial_temps["Tel"]]))
+        merge!(vals,Dict("Tel"=>fill(initial_temps["Tel"],dim.length)))
     end
     if :Tph ∉ fields
-        merge!(vals,Dict("Tph"=>[initial_temps["Tph"]]))
+        merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],dim.length)))
     end
     if :noe ∉ fields
         merge!(vals,Dict("noe"=>mp.n0))
@@ -189,10 +189,10 @@ function write_electronictemperature(f,results,dim,mp,μs,sim,FD,relax)
 end
 
 function pp_FermiDistribution(Tel,mp,cons,μ)
-    FD=zeros(length(Tel[1,:]),length(mp.egrid),length(Tel[:,1]))
+    FD=zeros(length(Tel[:,1]),length(Tel[1,:]),length(mp.egrid))
     Threads.@threads for i in eachindex(Tel[:,1])
         for j in eachindex(Tel[1,:])
-            FD[j,:,i] .= FermiDirac(Tel[i,j],μ[i,j],cons.kB,mp.egrid)
+            FD[i,j,:] .= FermiDirac(Tel[i,j],μ[i,j],cons.kB,mp.egrid)
         end
     end
     return FD
@@ -404,7 +404,7 @@ function write_laser(f,las,dim,timepoints,mp)
                  ("Full-Width at Half Maximum / fs",las.FWHM),
                  ("Fluence / eV/nm^2",las.Power),
                  ("Photon Energy / eV",las.hv),
-                 ("Reflectivity",las.R),
+                 ("Reflectivity",mp.R),
                  ("Transport Type",las.Transport)]
     las_dict=Dict(tuple_las)
     dict_to_hdf5(f["Laser"],las_dict)
@@ -416,7 +416,7 @@ function pp_temporalprofile(las,dim,timepoints,mp)
     temp_prof = zeros(length(timepoints),length(dim.grid))
     if typeof(las) == Gaussian
         for i in eachindex(timepoints)
-            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-las.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
+            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-mp.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
         end
     end
     return temp_prof
@@ -428,8 +428,16 @@ function write_minimum(f,results,FD,sim)
     f["Phononic Temperature"]["Temperature"] = results["Tph"]
     f["Number Of Particles"]["Particle Number"] = results["noe"]
     f["Non Eq Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
-    if sim.Systems.NonEqElectrons == true
-        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+permutedims(FD,(3,1,2))
+    if sim.DistributionConductivity == true
+        if sim.Systems.ElectronTemperature == false
+            FD = permutedims(FD,(2,1,3))
+            FD = repeat(FD,size(results["fneq"],1), 1, 1)
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
+        else
+            f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
+        end
+    else
+        f["Non Eq Electrons"]["Total Distribution"] = results["fneq"].+FD
     end
 end
     

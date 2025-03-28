@@ -16,16 +16,16 @@ end
 function generate_expressions(sim,laser,dim)
     exprs = Dict{String,Union{Expr,Vector{Expr}}}()
     if sim.Systems.ElectronTemperature == true
-        merge!(exprs,Dict("Tel" => electrontemperature_factory(sim,laser,dim)))
+        merge!(exprs,Dict("Tel" => Lightmatter.electrontemperature_factory(sim,laser)))
     end
     if sim.Systems.PhononTemperature == true
-        merge!(exprs,Dict("Tph" => phonontemperature_factory(sim)))
+        merge!(exprs,Dict("Tph" => Lightmatter.phonontemperature_factory(sim)))
     end
     if sim.Systems.NonEqElectrons == true
-        merge!(exprs,Dict("fneq" => athemdistribution_factory(sim,laser)))
+        merge!(exprs,Dict("fneq" => Lightmatter.athemdistribution_factory(sim,laser)))
         if sim.Interactions.ElectronElectron == true
-            merge!(exprs,Dict("noe" => athem_electronparticlechange()))
-            merge!(exprs,Dict("relax" => athem_electronelectronscattering()))
+            merge!(exprs,Dict("noe" => Lightmatter.athem_electronparticlechange(sim)))
+            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel,μ,mp,fneq,DOS,n))))
         end
     end
     return exprs
@@ -59,25 +59,29 @@ function generate_parameters(sim,las,mp,initialtemps,dim)
     if sim.Systems.NonEqElectrons==true
         if sim.Systems.ElectronTemperature==false
             μ = find_chemicalpotential(mp.n0[1],initialtemps["Tel"],mp.DOS[1],cons.kB,mp.egrid)
-            p = (las=las,mp=mp,dim=dim,Tel=initialtemps["Tel"],μ=μ)
+            p = (las=las,mp=mp,dim=dim,Tel=initialtemps["Tel"],μ=μ,f_cond=zeros(dim.length,length(mp.egrid)))
         elseif sim.Systems.PhononTemperature == true
-            p=(las=las,mp=mp,dim=dim,cond=zeros(dim.length))
+            p=(las=las,mp=mp,dim=dim,cond=zeros(dim.length),f_cond=zeros(dim.length,length(mp.egrid)))
         else
-            p=(las=las,mp=mp,dim=dim)
+            p=(las=las,mp=mp,dim=dim,f_cond=zeros(dim.length,length(mp.egrid)))
         end
     else
         p=(las=las,mp=mp,dim=dim,noe=mp.n0,cond=zeros(dim.length))
     end
-    return p
+    return p 
 end
 
 function simulation_construction(sys,sim)
+    cond_exprs = []
     if sim.Systems.ElectronTemperature == true && sim.Systems.PhononTemperature == true
-        expr_cond = :(cond = electrontemperature_conductivity(u.Tel,p.dim,u.Tph,p.mp,p.cond))
-    else
-        expr_cond = :(nothing)
+        push!(cond_exprs,:(Lightmatter.electrontemperature_conductivity!(u.Tel,p.dim,u.Tph,p.mp,p.cond)))
     end
+    if sim.DistributionConductivity == true
+        push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.mp.v_g,u.fneq,p.f_cond,p.dim)))
+        push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(p.mp.v_g,p.mp.egrid,u.noe,p.dim)))
+    end 
     loop_body = build_loopbody(sys,sim)
+    expr_cond = Expr(:block,cond_exprs...)
     return quote
         println(t)
         $expr_cond
@@ -91,9 +95,9 @@ function build_loopbody(sys,sim)
     exprs = Vector{Expr}(undef,0)
     push!(exprs,variable_renaming(sim))
     if sim.Systems.ElectronTemperature == true && sim.Systems.NonEqElectrons == true
-        push!(exprs,:(μ = find_chemicalpotential(u.noe[i],u.Tel[i],mp.DOS[i],cons.kB,mp.egrid)))
+        push!(exprs,:(μ = Lightmatter.find_chemicalpotential(u.noe[i],u.Tel[i],mp.DOS[i],cons.kB,mp.egrid)))
     else 
-        push!(exprs,:(μ = find_chemicalpotential(mp.n0[i],Tel,mp.DOS[i],cons.kB,mp.egrid)))
+        push!(exprs,:(μ = Lightmatter.find_chemicalpotential(mp.n0[i],Tel,mp.DOS[i],cons.kB,mp.egrid)))
     end
 
     if sim.ParameterApprox.EmbeddingMethod == true
@@ -132,11 +136,13 @@ function build_loopbody(sys,sim)
 end
 
 function variable_renaming(sim)
-    old_name=[:(p.mp.DOS[i]),:(p.mp),:(p.las)]
-    new_name=[:DOS,:mp,:las]
+    old_name=[:(p.mp.DOS[i]),:(p.mp),:(p.las),:(p.dim)]
+    new_name=[:DOS,:mp,:las,:dim]
     if sim.Systems.NonEqElectrons == true
         push!(old_name,:(u.fneq[i,:]))
         push!(new_name,:fneq)
+        push!(old_name,:(p.f_cond[i,:]))
+        push!(new_name,:f_cond)
         if sim.Systems.ElectronTemperature == false
             push!(old_name,:(p.Tel))
             push!(new_name,:Tel)
@@ -148,6 +154,10 @@ function variable_renaming(sim)
     if sim.Systems.ElectronTemperature == true
         push!(old_name,:(u.Tel[i]))
         push!(new_name,:Tel)
+        if sim.Systems.PhononTemperature == true
+            push!(old_name,:(p.cond))
+            push!(new_name,:cond)
+        end
     end
     if sim.Systems.PhononTemperature == true
         push!(old_name,:(u.Tph[i]))
