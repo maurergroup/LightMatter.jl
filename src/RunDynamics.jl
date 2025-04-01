@@ -9,10 +9,10 @@
     perform the dynamics but this may be flexible in the future. Tolerance defines both the absolute and relative tolerance. 
 """
 function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}},initialtemps::Dict{String, <:Real},
-    tspan::Tuple{Real,Real},sim::SimulationSettings,mp::MaterialParameters,las::Laser,dim::Dimension
+    tspan::Tuple{Real,Real},sim::Simulation
     ;save=2.0,tolerance=1e-4,max_step=0.1,min_step=0.01,callbacks=CallbackSet())
 
-    u0 = generate_initialconditions(sim,mp,initialtemps,dim)
+    u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
     simulation_expr = simulation_construction(sys,sim)
     simulation_problem! = mk_function((:du,:u,:p,:t),(),simulation_expr)

@@ -3,9 +3,9 @@ function post_production(sol,file_name,initial_temps,output,sim)
     write_simulation(fid,sim::Simulation)
 
     results = seperate_results(sol,initial_temps,sim)
-    fid["Miscellaneous"]["Time Span"] = results["times"]
+    fid["Time Span"] = results["times"]
     μs = pp_chemicalpotential(results["Tel"],results["noe"],sim)
-    fid["Miscellaneous"]["Chemical Potential"] = μs
+    fid["Chemical Potential"] = μs
     FD = pp_FermiDistribution(results["Tel"],sim,μs)
 
 
@@ -45,22 +45,30 @@ function dict_to_hdf5(g,d)
     end
 end
 
+function convert_symbols_to_strings(dict)
+    return Dict(
+        k => (v isa Symbol ? String(v) : v) 
+        for (k, v) in dict
+    )
+end
+
 function write_simulation(f,sim::Simulation)
-    athermal = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.athermalelectrons, key)) for key ∈ fieldnames(AthermalElectrons))
-    dict_to_hdf5(f["Athermal Electrons"], athermal)
-    electronic_t = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.electronictemperature, key)) for key ∈ fieldnames(ElectronicTemperature))
-    dict_to_hdf5(f["Electronic Temperature"], electronic_t)
-    phononic_t = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.phononictemperature, key)) for key ∈ fieldnames(PhononicTemperature))
-    dict_to_hdf5(f["Phononic Temperature"], phononic_t)
-    electronic_d = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.electronicdistribution, key)) for key ∈ fieldnames(ElectronicDistribution))
-    dict_to_hdf5(f["Electronic Distribution"], electronic_d)
-    phononic_d = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.phononicdistribution, key)) for key ∈ fieldnames(PhononicDistribution))
-    dict_to_hdf5(f["Phononic Distribution"], phononic_d)
-    density_m = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.densitymatrix, key)) for key ∈ fieldnames(DensityMatrix))
-    dict_to_hdf5(f["Density Matrix"], density_m)
-    laser = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(sim.laser, key)) for key ∈ fieldnames(Laser))
-    dict_to_hdf5(f["Laser"], laser)
-    structure = extract_structure(f, sim.structure)
+    athermal = Dict{String,Any}(String(key)=>getfield(sim.athermalelectrons, key) for key ∈ fieldnames(AthermalElectrons))
+    dict_to_hdf5(f["Athermal Electrons"], convert_symbols_to_strings(athermal))
+    electronic_t = Dict{String,Any}(String(key)=>getfield(sim.electronictemperature, key) for key ∈ fieldnames(ElectronicTemperature))
+    dict_to_hdf5(f["Electronic Temperature"], convert_symbols_to_strings(electronic_t))
+    phononic_t = Dict{String,Any}(String(key)=>getfield(sim.phononictemperature, key) for key ∈ fieldnames(PhononicTemperature))
+    dict_to_hdf5(f["Phononic Temperature"], convert_symbols_to_strings(phononic_t))
+    electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
+    dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
+    phononic_d = Dict{String,Any}(String(key)=>getfield(sim.phononicdistribution, key) for key ∈ fieldnames(PhononicDistribution))
+    dict_to_hdf5(f["Phononic Distribution"], convert_symbols_to_strings(phononic_d))
+    density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
+    dict_to_hdf5(f["Density Matrix"], convert_symbols_to_strings(density_m))
+    laser = Dict{String,Any}(String(key)=>getfield(sim.laser, key) for key ∈ fieldnames(Laser))
+    dict_to_hdf5(f["Laser"], convert_symbols_to_strings(laser))
+    
+    extract_structure(f, sim.structure)
 end
 
 function extract_structure(f, structure::Structure)
@@ -68,9 +76,9 @@ function extract_structure(f, structure::Structure)
     struc = Dict("Elemental_System" => structure.Elemental_System, "Spatial_DOS" => structure.Spatial_DOS, "egrid" => structure.egrid)
     merge!(struc, write_DOS(structure))
 
-    dimension = Dict{String,Union{Float64,Bool}}(String(key)=>convert(Bool,getfield(structure.dimension, key)) for key ∈ fieldnames(Dimension))
-    dict_to_hdf5(f["Structure"]["Dimension"], dimension)
-    dict_to_hdf5(f["Structure"], struc)
+    dimension = Dict{String,Any}(String(key)=>getfield(structure.dimension, key) for key ∈ fieldnames(Dimension))
+    dict_to_hdf5(f["Structure"]["Dimension"], convert_symbols_to_strings(dimension))
+    dict_to_hdf5(f["Structure"], convert_symbols_to_strings(struc))
 end
 
 function write_DOS(structure::Structure)
@@ -145,7 +153,7 @@ function populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
                 no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
             end
         else
-            no_part = fill(sim.structure.dimension.length,get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid))
+            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
         end
         merge!(vals,Dict("noe" => no_part ))
     end
@@ -404,11 +412,10 @@ end
 function write_minimum(f,results,FD,sim)
     f["Electronic Temperature"]["Temperature"] = results["Tel"]
     f["Electronic Temperature"]["Distribution"] = FD
-    create_group(f,"Particle Number")
     f["Phononic Temperature"]["Temperature"] = results["Tph"]
     f["Particle Number"] = results["noe"]
     f["Athermal Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
-    if sim.Systems.NonEqElectrons == true
+    if sim.athermalelectrons.Enabled == true
         if size(FD,1) != size(results["fneq"],1)
             FD = repeat(FD,size(results["fneq"],1), 1, 1)
             f["Electronic Distribution"]["Total Distribution"] = results["fneq"].+FD

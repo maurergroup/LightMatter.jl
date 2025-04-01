@@ -21,7 +21,7 @@ end
     internal energy into a temperature.
 """
 function build_electronTTM(sim::Simulation,Source::Expr,ElecPhon::Expr,HeatCapacity::Expr)
-    args = (Source,ElecPhon)
+    args = Union{Expr,Symbol,Real}[Source,ElecPhon]
     if sim.electronictemperature.Conductivity == true
         push!(args,:Tel_cond)
     end
@@ -113,16 +113,15 @@ function athem_electempenergychange(sim::Simulation)
     return Expr(:call,:+,args...)
 end
 """
-    electrontemperature_conductivity!(Tel::Vector{<:Real},sim::Simulation,Tph::Vector{<:Real},cond::Vector{<:Real})
+    electrontemperature_conductivity!(Tel::Vector{<:Real},κ::Real,dz::Real,Tph::Vector{<:Real},cond::Vector{<:Real})
     Calculates the thermal energy passing further into a bulk slab due to thermal conductivity of the electronic bath. 
     The derivative of the temperature with respect to distance is set to 0 at the boundaries.
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Real},sim::Simulation,Tph::Vector{<:Real},cond::Vector{<:Real})
-    dz = sim.structure.dimension.spacing
+function electrontemperature_conductivity!(Tel::Vector{<:Real},κ::Real,dz::Real,Tph::Vector{<:Real},cond::Vector{<:Real})
     depthderivative!(Tel,dz,cond)
     cond[1] = 0.0
     cond[end] = 0.0
-    K=sim.electronictemperature.κ*Tel./Tph
+    K=κ.*Tel./Tph
     depthderivative!((cond.*K),dz,cond)
 end
 """

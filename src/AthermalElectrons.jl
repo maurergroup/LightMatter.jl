@@ -4,7 +4,7 @@
     expression for how the AthEM non-equilibrium electrons should propagate.
 """
 function athemdistribution_factory(sim::Simulation,laser_expr::Expr)
-    feq = :(FermiDirac(Tel,μ,sim.structure.egrid))
+    feq = :(Lightmatter.FermiDirac(Tel,μ,sim.structure.egrid))
     ftot = :($feq.+fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
@@ -19,11 +19,11 @@ end
     a form where they can be summed e.g. negatives must be included in the original expression.
 """
 function build_athemdistribution(sim::Simulation,athemexcite::Expr,Elecelec::Union{Expr,Real},Elecphon::Union{Expr,Real})
-    args = (athemexcite,Elecelec,Elecphon)
+    args = Union{Expr,Symbol,Real}[athemexcite,Elecelec,Elecphon]
     if sim.athermalelectrons.Conductivity == true
         push!(args,:f_cond)
     end
-    return Expr(:call,:+,(args)...)
+    return Expr(:call,:(.+),(args)...)
 end
 """
     athemexcitation(ftot::Vector{<:Real},egrid::Vector{<:Real},DOS::spl,hv::Real,M::Union{Real,Vector{<:Real}}))
@@ -62,7 +62,7 @@ end
     Returns an expression of the requested matrix element.
     :unity returns the 1.0 such that there is no matrix element 
 """
-function athemexcitation_matrixelement(sim::Simulation)
+function athemexcitation_matrixelements(sim::Simulation)
     if sim.athermalelectrons.ExcitationMatrixElements == :unity
         return :(1.0)
     end
@@ -178,19 +178,40 @@ function electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<
     Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g
     Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g
 end
+
+function electron_distribution_transport!(v_g::Vector{Vector{<:Real}},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dz::Real)
+    for i in 2:size(f, 1)-1
+        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g[i]
+    end
+    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g[1]
+    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g[end]
+end
 """
     thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dim::Dimension)
     Provides a restoring force to the equilibrium particle distribution due to the the relaxation from non-eq electron to equilibrium
     electron occuring berfore particle equilibration in the non-thermal system when trasnport is enabled. Uses the fermi velocity as 
     the resotring velocity.
 """
-function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dim::Dimension)
+function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dz::Real)
     idx_0 = findmin(abs(egrid-0.0))[2]
     v_F = v_g[idx_0]
     for i in 2:dim.length -1
-        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dim.spacing * v_F
+        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
     end
-    Δn[1] = (n[2] - n[1]) / dim.spacing * v_F
-    Δn[end] = (n[end-1] - n[end]) / dim.spacing * v_F
+    Δn[1] = (n[2] - n[1]) / dz * v_F
+    Δn[end] = (n[end-1] - n[end]) / dz * v_F
+    return Δn
+end
+
+function thermal_particle_transport(v_g::Vector{Vector{<:Real}},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dz::Real)
+    idx_0 = findmin(abs(egrid-0.0))[2]
+    for i in 2:dim.length -1
+        v_F = v_g[i][idx_0]
+        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
+    end
+    v_F1 = v_g[1][idx_0]
+    Δn[1] = (n[2] - n[1]) / dz * v_F1
+    v_Fend = v_g[end][idx_0]
+    Δn[end] = (n[end-1] - n[end]) / dz * v_Fend
     return Δn
 end

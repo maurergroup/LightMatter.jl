@@ -1,5 +1,5 @@
 """
-    laser_factory(las::Laser,dims=Homogeneous()::Dimension)
+    laser_factory(sim::Simulation)
     Factory builds the laser from three components defining the evolution in time(temporal), the power of the
     laser(power) and how the laser penetrates into a material(spatial). Returns an Expr that holds the 
     relevant parameters and structure of the laser.
@@ -18,18 +18,18 @@ end
 function temporal_laser(sim::Simulation)
     type = sim.laser.envelope
     if type == :Gaussian
-        return :(sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*t^2/las.FWHM^2))
+        return :(sqrt(4*log(2)/pi)/sim.laser.FWHM*exp(-4*log(2)*t^2/sim.laser.FWHM^2))
     elseif type == :HyperbolicSecant
-        return :(log(1+sqrt(2))/las.FWHM * sech(2*log(1+sqrt(2))*(t/las.FWHM))^2)
+        return :(log(1+sqrt(2))/sim.laser.FWHM * sech(2*log(1+sqrt(2))*(t/sim.laser.FWHM))^2)
     elseif type == :Lorentzian
-        lorent = :((1+(4/(1+sqrt(2))*(t/las.FWHM)^2))^-2)
-        return :(4*sqrt(sqrt(2)-1)/(pi*las.FWHM)*$lorent)
+        lorent = :((1+(4/(1+sqrt(2))*(t/sim.laser.FWHM)^2))^-2)
+        return :(4*sqrt(sqrt(2)-1)/(pi*sim.laser.FWHM)*$lorent)
     elseif type == :Rectangular
-        return :(-2*las.FWHM≤t≤2*las.FWHM ? 1/(4*las.FWHM) : 0.0)
+        return :(-2*sim.laser.FWHM≤t≤2*sim.laser.FWHM ? 1/(4*sim.laser.FWHM) : 0.0)
     end
 end
 """
-    spatial_laser(las::Laser,slab::Dimension)
+    spatial_laser(sim::Simulation)
     This builds the equation which defines how the laser energy is absorbed the further from
     the centre of the spot. This is currently only implemented in the z direction
 """
@@ -45,21 +45,21 @@ end
     along the z-axis
 """
 function spatial_z_laser(sim::Simulation)
-    if sim.laser.Transport == "Ballistic"
+    if sim.laser.Transport == :ballistic
         if sim.structure.dimension.length == 1
             return :(1/sim.laser.δb)
         else
             l = sim.structure.dimension.grid[end]
             return :(1/(sim.laser.δb*(1-exp(-$l/sim.laser.δb)))*exp.(-sim.structure.dimension.grid[i]./sim.laser.δb))
         end
-    elseif sim.laser.Transport == "Optical"
+    elseif sim.laser.Transport == :optical
         if sim.structure.dimension.length == 1
             return :(1/sim.laser.ϵ)
         else
             l = sim.structure.dimension.grid[end]
             return :(1/(sim.laser.ϵ*(1-exp(-$l/sim.laser.ϵ)))*exp.(-sim.structure.dimension.grid[i]./sim.laser.ϵ))
         end
-    elseif sim.laser.Transport == "Combined"
+    elseif sim.laser.Transport == :combined
         if sim.structure.dimension.length == 1
             return :(1/(sim.laser.δb+sim.laser.ϵ))
         else
