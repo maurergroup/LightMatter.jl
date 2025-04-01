@@ -117,7 +117,7 @@ end
     Calculates the thermal energy passing further into a bulk slab due to thermal conductivity of the electronic bath. 
     The derivative of the temperature with respect to distance is set to 0 at the boundaries.
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Real},κ::Real,dz::Real,Tph::Vector{<:Real},cond::Vector{<:Real})
+function electrontemperature_conductivity!(Tel::Vector{<:Real},κ::Union{Real,Vector{<:Real}},dz::Real,Tph::Vector{<:Real},cond::Vector{<:Real})
     depthderivative!(Tel,dz,cond)
     cond[1] = 0.0
     cond[end] = 0.0

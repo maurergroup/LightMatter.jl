@@ -68,7 +68,11 @@ function generate_initialconditions(sim::Simulation,initialtemps::Dict{String, <
 end
 
 function generate_parameters(sim::Simulation,initialtemps::Dict{String, <:Real})
-    p = (sim=sim,)
+    if sim.structure.Elemental_System > 1
+        p = (sim=sim,matsim=sim_seperation(sim))
+    else
+        p = (sim=sim,)
+    end
     if sim.electronictemperature.Conductivity == true
         p = (; p..., Tel_cond = zeros(sim.structure.dimension.length))
     end
@@ -82,10 +86,16 @@ function generate_parameters(sim::Simulation,initialtemps::Dict{String, <:Real})
         p = (; p..., Δn = zeros(sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-        if typeof(sim.structure.DOS) == Vector{spl}
+        if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
             no_part=zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
                 no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+            end
+        elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
             end
         else
             no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
@@ -93,10 +103,16 @@ function generate_parameters(sim::Simulation,initialtemps::Dict{String, <:Real})
         p = (; p..., Tel = initialtemps["Tel"], noe = no_part)
     end
     if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == false
-        if typeof(sim.structure.DOS) == Vector{spl}
+        if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
             no_part=zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
                 no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+            end
+        elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
             end
         else
             no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
@@ -130,10 +146,10 @@ end
 function conductivity_expressions(sim::Simulation)
     cond_exprs = []
     if sim.electronictemperature.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.electrontemperature_conductivity!(u.Tel,p.sim.electronictemperature.κ,sim.structure.dimension.spacing,u.Tph,p.Tel_cond)))
+        push!(cond_exprs,:(Lightmatter.electrontemperature_conductivity!(u.Tel,p.sim.electronictemperature.κ,p.sim.structure.dimension.spacing,u.Tph,p.Tel_cond)))
     end
     if sim.phononictemperature.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.phonontemperature_conductivity!(u.Tph,p.sim.phononictemperature.κ,sim.structure.dimension.spacing,p.Tph_cond)))
+        push!(cond_exprs,:(Lightmatter.phonontemperature_conductivity!(u.Tph,p.sim.phononictemperature.κ,p.sim.structure.dimension.spacing,p.Tph_cond)))
     end
     if sim.athermalelectrons.Conductivity == true
         push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(sim.athermalelectrons.v_g,u.fneq,p.f_cond,p.sim.structure.dimension.spacing)))
@@ -143,7 +159,6 @@ function conductivity_expressions(sim::Simulation)
     end 
     return cond_exprs
 end
-
 
 function build_loopbody(sys,sim::Simulation)
     exprs = Vector{Expr}(undef,0)
@@ -234,12 +249,8 @@ function variable_renaming(sim::Simulation)
     end
     old_name = Tuple(old_name)
     new_name = Tuple(new_name)
-    #return Expr(:local, Expr(:(=), Expr(:tuple, new_name...), Expr(:tuple, old_name...)))
-    #return Expr(:(=), Expr(:tuple,new_name...), Expr(:tuple,old_name...))
     assignments = [:(local $(lhs) = $(rhs)) for (lhs, rhs) in zip(new_name, old_name)]
     return quote
         $(assignments...)
     end
 end
-
-

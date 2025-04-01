@@ -73,7 +73,7 @@ end
     If the type of the Dimension struct is Homogeneous then there should be no conductivty and returns 0.0 at every time step. 
     The derivative of the temperature with respect to distance is set to 0 at the boundaries.
 """
-function phonontemperature_conductivity!(Tph::Vector{<:Real},κ::Real,dz::Real,cond::Vector{<:Real})
+function phonontemperature_conductivity!(Tph::Vector{<:Real},κ::Union{Real,Vector{<:Real}},dz::Real,cond::Vector{<:Real})
     depthderivative!(Tph,dz,cond)
     cond[1] = 0.0
     cond[end] = 0.0

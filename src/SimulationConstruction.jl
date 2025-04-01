@@ -435,10 +435,10 @@ function DOS_initialization(bulk_DOS,bulk_geometry,DOS_folder,slab_geometry,atom
                 DOS = generate_DOS(bulk_DOS,1/Vbulk) 
             end
         else
-            Vbulk_vec = zeros(length(bulk_DOS))
-            DOS = Vector(undef,length(bulk_DOS))
+            Vbulk = zeros(length(bulk_DOS))
+            DOS = Vector{spl}(undef,length(bulk_DOS))
             for i in eachindex(bulk_DOS)
-                Vbulk_vec[i] = get_unitcellvolume(bulk_geometry[i])
+                Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
                 if spatial_DOS == true 
                     DOS[i] = spatial_DOS(DOS_folder[i],slab_geometry[i],bulk_DOS[i],Vbulk[i],dimension,atomic_layer_tolerance)
                 else

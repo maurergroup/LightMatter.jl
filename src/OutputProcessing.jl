@@ -84,9 +84,14 @@ end
 function write_DOS(structure::Structure)
     
     egrid = collect(range(-20,20,step=0.01))
-    if typeof(structure.DOS) == Vector{spl}
+    if typeof(structure.DOS) == Vector{spl} && structure.Elemental_System == 1
         DOS = zeros(length(structure.DOS),length(egrid))
         for i in eachindex(mp.DOS)
+            DOS[i,:] = structure.DOS[i](egrid)
+        end
+    elseif structure.Elemental_System > 1
+        DOS = zeros(length(structure.DOS),length(egrid))
+        for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)
         end
     else
@@ -110,7 +115,11 @@ function generate_valuedict(sol,sim,fields)
     vals = Dict{String,Union{Real,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
-            merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length)))
+            if i == :noe && sim.athermalelectrons.Enabled == false
+                nothing
+            else
+                merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length)))
+            end
         elseif i == :fneq
             merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
         end
@@ -147,20 +156,49 @@ function populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
         merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],sim.structure.dimension.length)))
     end
     if :noe ∉ fields
-        if typeof(sim.structure.DOS) == Vector{spl}
-            no_part=zeros(sim.structure.dimension.length)
-            for j in eachindex(sim.structure.dimension.grid)
-                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
-            end
-        else
-            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
-        end
-        merge!(vals,Dict("noe" => no_part ))
+        merge!(vals,Dict("noe" => particlenumber_values(sim) ))
     end
     if :fneq ∉ fields
         merge!(vals,Dict("fneq" => zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
     end
     return vals
+end
+
+function particlenumber_values(sim)
+    if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
+        if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+            end
+        elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
+            end
+        else
+            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
+        end
+        return no_part
+    end
+    if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == false
+        if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+            end
+        elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
+            no_part=zeros(sim.structure.dimension.length)
+            for j in eachindex(sim.structure.dimension.grid)
+                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
+            end
+        else
+            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
+        end
+        return no_part
+    end
 end
 
 function write_electronictemperature(f,results,dim,mp,μs,sim,FD,relax)
@@ -265,9 +303,13 @@ function pp_chemicalpotential(Tel,n,sim)
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
-            if typeof(sim.structure.DOS) == Vector{spl}
+            if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
                 n = get_thermalparticles(0.0,1e-32,sim.structure.DOS[i],sim.structure.egrid)
                 cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(sim.structure.DOS[i]),Ref(sim.structure.egrid))
+            elseif sim.structure.Elemental_System > 1
+                idx = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
+                n = get_thermalparticles(0.0,1e-32,sim.structure.DOS[idx],sim.structure.egrid)
+                cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(sim.structure.DOS[idx]),Ref(sim.structure.egrid))
             else
                 n = get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid)
                 cp[:,i] .= find_chemicalpotential.(n,Tel[:,i],Ref(sim.structure.DOS),Ref(sim.structure.egrid))
