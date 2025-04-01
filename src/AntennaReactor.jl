@@ -20,13 +20,13 @@ function sim_seperation(sim::Simulation)
 
     new_sim = Vector{Simulation}(undef,1:sim.structure.Elemental_System)
     for i in 1:sim.structure.Elemental_System
-        new_sim[i] = build_Simulation(laser=lasers[i],electronictemperature=Tels[i],phononictemperature=Tphs[i],
-                                    athermalelectrons=neqs[i],structure=structures[i])
+        new_sim[i] = build_Simulation(laser=lasers[i],electronictemperature=tels[i],phononictemperature=tphs[i],
+                                    athermalelectrons=neqs[i],structure=structs[i])
     end
     return new_sim
 end
 
-function split_struct(data<:SimulationTypes)
+function split_struct(data::SimulationTypes)
     field_values = map(f -> getfield(data, f), fieldnames(typeof(data)))
     value_indices = findall(x -> x isa Vector, field_values)
     
@@ -56,4 +56,19 @@ function split_structure(structure::Structure)
             (f == :DOS ? [field_values[f][i]] : field_values[f] for f in fieldnames(typeof(structure)))...
         ) for i in 1:length(field_values[:DOS])
     ]
+end
+
+function cut_offloop()
+    for h in heights
+        # Determine which region the current height falls into
+        for i in 1:length(cutoffs)
+            if h < cutoffs[i]
+                subindex = i
+                break
+            else
+                subindex = length(cutoffs) + 1  # If beyond the highest cutoff
+            end
+        end
+        println("Height: $h, Subindex: $subindex")
+    end
 end
