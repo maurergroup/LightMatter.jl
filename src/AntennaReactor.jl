@@ -12,9 +12,21 @@ function antenna_reactor_system(sys,sim::Simulation)
 end
 
 function sim_seperation(sim::Simulation)
+    lasers = split_struct(sim.laser)
+    tels = split_struct(sim.electronictemperature)
+    tphs = split_struct(sim.phononictemeprature)
+    neqs = split_struct(sim.athermalelectrons)
+    structs = split_structure(sim.structure)
+
+    new_sim = Vector{Simulation}(undef,1:sim.structure.Elemental_System)
+    for i in 1:sim.structure.Elemental_System
+        new_sim[i] = build_Simulation(laser=lasers[i],electronictemperature=Tels[i],phononictemperature=Tphs[i],
+                                    athermalelectrons=neqs[i],structure=structures[i])
+    end
+    return new_sim
 end
 
-function split_struct(data)
+function split_struct(data<:SimulationTypes)
     field_values = map(f -> getfield(data, f), fieldnames(typeof(data)))
     value_indices = findall(x -> x isa Vector, field_values)
     
@@ -29,5 +41,19 @@ function split_struct(data)
         typeof(data)(
             map((val, idx) -> idx in value_indices ? [val[i]] : val, field_values, 1:length(field_values))...
         ) for i in 1:n
+    ]
+end
+
+function split_structure(structure::Structure)
+    field_values = Dict(f => getfield(structure, f) for f in fieldnames(typeof(structure)))
+    
+    if !(:DOS in keys(field_values) && field_values[:DOS] isa Vector)
+        return [structure]  # Return as-is if the specified field is not a vector
+    end
+    
+    return [
+        typeof(structure)(
+            (f == :DOS ? [field_values[f][i]] : field_values[f] for f in fieldnames(typeof(structure)))...
+        ) for i in 1:length(field_values[:DOS])
     ]
 end
