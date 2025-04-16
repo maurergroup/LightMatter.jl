@@ -86,7 +86,7 @@ function write_DOS(structure::Structure)
     egrid = collect(range(-20,20,step=0.01))
     if typeof(structure.DOS) == Vector{spl} && structure.Elemental_System == 1
         DOS = zeros(length(structure.DOS),length(egrid))
-        for i in eachindex(mp.DOS)
+        for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)
         end
     elseif structure.Elemental_System > 1
@@ -452,20 +452,46 @@ function pp_temporalprofile(las,dim,timepoints,mp)
 end
 
 function write_minimum(f,results,FD,sim)
-    f["Electronic Temperature"]["Temperature"] = results["Tel"]
-    f["Electronic Temperature"]["Distribution"] = FD
-    f["Phononic Temperature"]["Temperature"] = results["Tph"]
-    f["Particle Number"] = results["noe"]
-    f["Athermal Electrons"]["Non-Equilibrium Distribution"] = results["fneq"]
+    write_dataset(f["Electronic Temperature"],"Temperature",results["Tel"])
+    #f["Electronic Temperature"]["Temperature"][:] = results["Tel"]
+    write_dataset(f["Electronic Temperature"],"Distribution",FD)
+    #f["Electronic Temperature"]["Distribution"][:] = FD
+    write_dataset(f["Phononic Temperature"],"Temperature",results["Tph"])
+    #f["Phononic Temperature"]["Temperature"][:] = results["Tph"]
+    write_dataset(f,"Particle Number",results["noe"])
+    #f["Particle Number"][:] = results["noe"]
+    write_dataset(f["Athermal Electrons"],"Non-Equilibrium Distribution",results["fneq"])
+    #f["Athermal Electrons"]["Non-Equilibrium Distribution"][:] = results["fneq"]
     if sim.athermalelectrons.Enabled == true
         if size(FD,1) != size(results["fneq"],1)
             FD = repeat(FD,size(results["fneq"],1), 1, 1)
-            f["Electronic Distribution"]["Total Distribution"] = results["fneq"].+FD
+            FD_tot = results["fneq"].+FD
+            write_dataset(f["Electronic Distribution"],"Total Distribution",FD_tot)
+            #f["Electronic Distribution"]["Total Distribution"][:] = FD_tot
         else
-            f["Electronic Distribution"]["Total Distribution"] = results["fneq"].+FD
+            FD_tot = results["fneq"].+FD
+            write_dataset(f["Electronic Distribution"],"Total Distribution",FD_tot)
+            #f["Electronic Distribution"]["Total Distribution"][:] = FD_tot
         end
     end
 end
+
+function write_dataset(file,dataset,data)
+    dims = size(data)
+
+    if ndims(data) == 1
+        chunk_size = size(data)  # Safe chunking for 1D
+    elseif ndims(data) == 2
+        chunk_size = min.(dims, (1, dims[2]))  # Safe chunking for 2D
+    elseif ndims(data) == 3
+        chunk_size = min.(dims, (1, dims[2], dims[3]))  # Safe chunking for 3D
+    else
+        error("Unsupported data dimensionality: $(ndims(data))D")
+    end
+
+    HDF5.write_dataset(file, dataset, data, chunk=chunk_size, shuffle=true, deflate=3)
+end
+
     
 function output_functions(f,sim)
     sys = function_builder(sim)

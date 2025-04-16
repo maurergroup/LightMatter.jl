@@ -4,7 +4,7 @@
     based on the Fermi Energy^2. In all other places, the Fermi Energy is defined as 0.0.
 """
 function get_FermiEnergy(File)
-    TotalDOS::Matrix{Float64}=readdlm(File)
+    TotalDOS::Matrix{Float64}=readdlm(File,comments=true)
     Nonzero = findfirst(!=(0.0),TotalDOS[:,2])
     return abs(TotalDOS[Nonzero,1])
 end
@@ -13,30 +13,32 @@ end
     is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
 """
 function generate_DOS(File::String,unit_scalar)
-    TotalDOS::Matrix{Float64}=readdlm(File)
+    TotalDOS::Matrix{Float64}=readdlm(File,comments=true)
     return get_interpolant(TotalDOS[:,1],TotalDOS[:,2]*unit_scalar)
 end
 """
     Gets the unit cell volume as the bulk DOS in FHI-AIMS is in the units of states/eV/V_UC
+    Multiplying DOS by 1 / the result gives you the DOS in eV^-1nm^-3
 """
 function get_unitcellvolume(geometry_file::String)
-    geometry = readdlm(geometry_file)
+    geometry = readdlm(geometry_file,comments=true)
+    #atoms = count(x->x=="atom", geometry[:,1])
     vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
     a = vectors[1,2:4]
     b = vectors[2,2:4]
     c = vectors[3,2:4]
-    return abs(dot(a,cross(b,c)))/1000 # converts Å^3 to nm^3
+    return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
 """
     Overarching scheme for reading in a folder of atom projected DOS and returning a vector which matches that of
     Dimension.grid where each point in the vector is the DOS for that layer. This means taking the DOS from the folder
-    interpolating in the Z-direction and extrapolating to bulk where necessary. Everything is currently 1D
+    interpolating in the Z-direction and extrapolating to bulk where necessary. Everything is currently 1Dcomments=true
 """
 function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,dim::Dimension,tolerance)
-    bulkDOS = readdlm(bulk) #reads in the bulk DOS
+    bulkDOS = readdlm(bulk,comments=true) #reads in the bulk DOS
     bulkDOSspl = get_interpolant(bulkDOS[:,1],bulkDOS[:,2]./Vbulk) #creates a spline for the bulk DOS
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance) #get a vector of file names and their respective heights
-    DOS_1 = readdlm(folder*files[1]) #Reads in a trial DOS 
+    DOS_1 = readdlm(folder*files[1],comments=true) #Reads in a trial DOS 
     egrid = DOS_1[:,1]#Pulls the energy grid from the trial DOS as all folder DOS should be solved on same x-axis
     zDOS = build_zDOSArray(egrid,folder,files,heights)#Builds a vector in energy of splines of the DOS in the z direction
     Temp=zeros(dim.length,length(egrid)) #Temporary file to be filled with values from the interpolation vector above
@@ -46,7 +48,7 @@ function spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk,dim::Dim
         end
     end
     DOSScale(Temp,bulkDOSspl(egrid),egrid) #Scales all DOS' to the bulk dos to ensure particle conservation
-    zgridDOS=Vector{Any}(undef,dim.length)
+    zgridDOS=Vector{spl}(undef,dim.length)
     for i in eachindex(zgridDOS) 
         zgridDOS[i]=get_interpolant(egrid, Temp[i,:]) # Builds the final array in the z-direction of splines of the DOS in energy
     end
@@ -72,7 +74,7 @@ end
 function build_zDOSArray(egrid,folder,files,heights)
     zDOS=Matrix{Float64}(undef,length(heights),length(egrid))
     for i in eachindex(files)
-        TotalDOS=readdlm(folder*files[i])
+        TotalDOS=readdlm(folder*files[i],comments=true)
         zDOS[i,:]=TotalDOS[:,2]
     end
     zDOSspl=Vector{spl}(undef,length(egrid))
@@ -131,7 +133,7 @@ end
 function get_slabgeometry(file_path)
     atom_data = []
     i=1
-    geom = readdlm(file_path)
+    geom = readdlm(file_path,comments=true)
     for l in eachindex(geom[:,1])
         if geom[l,1] == "atom"
             if l != size(geom,1)
@@ -157,3 +159,30 @@ end
     but can be used elsewhere in the code when an interpolation is required.
 """
 get_interpolant(xvals,yvals) = DataInterpolations.LinearInterpolation(yvals,xvals,extrapolation = ExtrapolationType.Constant)
+
+function DOS_initialization(bulk_DOS,bulk_geometry,DOS_folder,slab_geometry,atomic_layer_tolerance,dimension, zDOS, DOS)
+    if DOS !== nothing
+        return DOS
+    else
+        if bulk_DOS isa String
+            Vbulk = get_unitcellvolume(bulk_geometry)
+            if zDOS == true 
+                DOS = spatial_DOS(DOS_folder,slab_geometry,bulk_DOS,Vbulk,dimension,atomic_layer_tolerance)
+            else
+                DOS = generate_DOS(bulk_DOS,1/Vbulk) 
+            end
+        else
+            Vbulk = zeros(length(bulk_DOS))
+            DOS = Vector{spl}(undef,length(bulk_DOS))
+            for i in eachindex(bulk_DOS)
+                Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
+                if zDOS == true 
+                    DOS[i] = spatial_DOS(DOS_folder[i],slab_geometry[i],bulk_DOS[i],Vbulk[i],dimension,atomic_layer_tolerance)
+                else
+                    DOS[i] = generate_DOS(bulk_DOS[i],1/Vbulk[i])
+                end
+            end
+        end
+        return DOS
+    end
+end

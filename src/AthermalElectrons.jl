@@ -1,7 +1,15 @@
 """
-    athemdistribution_factory(sim::Simulation,laser::Expr)
-    This function takes the Simulation struct and a laser expression and returns an assembled
-    expression for how the AthEM non-equilibrium electrons should propagate.
+    athemdistribution_factory(sim::Simulation, laser_expr::Expr)
+
+    Constructs the time evolution of the non-equilibrium distribution in the AthEM model
+    Find out more at https://arxiv.org/abs/2503.09479
+
+    # Arguments
+    - `sim`: Simulation struct containing physical and model parameters.
+    - `laser_expr`: Expression representing the laser excitation term.
+
+    # Returns
+    - The total expression for the evolution of the athermal electron distribution, combining excitation and scattering terms.
 """
 function athemdistribution_factory(sim::Simulation,laser_expr::Expr)
     feq = :(Lightmatter.FermiDirac(Tel,μ,sim.structure.egrid))
@@ -13,10 +21,18 @@ function athemdistribution_factory(sim::Simulation,laser_expr::Expr)
     return build_athemdistribution(sim,athemexcite,Elecelec,Elecphon)
 end
 """
-    build_athemdistribution(athemexcite::Expr,Elecelec::Expr,Elecphon::Expr)
-    Takes 3 expressions for the excitaiton, electorn interaction and phonon interaction
-    and returns a expr which is their broadcasted sum. All 3 compenents therefore need to be in
-    a form where they can be summed e.g. negatives must be included in the original expression.
+    build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Real}, Elecphon::Union{Expr, Real})
+
+    Combines excitation and scattering contributions into a single broadcasted sum expression in the AthEM model
+
+    # Arguments
+    - `sim`: The simulation object.
+    - `athemexcite`: Expression for athermal excitation.
+    - `Elecelec`: Electron-electron scattering Expr or 0.0 if disabled
+    - `Elecphon`: Electron-phonon scattering Expr or 0.0 if disabled
+
+    # Returns
+    - A broadcasted summation of all interaction terms.
 """
 function build_athemdistribution(sim::Simulation,athemexcite::Expr,Elecelec::Union{Expr,Real},Elecphon::Union{Expr,Real})
     args = Union{Expr,Symbol,Real}[athemexcite,Elecelec,Elecphon]
@@ -214,4 +230,17 @@ function thermal_particle_transport(v_g::Vector{Vector{<:Real}},egrid::Vector{<:
     v_Fend = v_g[end][idx_0]
     Δn[end] = (n[end-1] - n[end]) / dz * v_Fend
     return Δn
+end
+
+function FE_initalization(bulk_DOS)
+    if bulk_DOS isa String
+        FE=get_FermiEnergy(bulk_DOS)
+        return FE
+    else
+        FE = zeros(length(bulk_DOS))
+        for i in eachindex(bulk_DOS)
+            FE[i] = get_FermiEnergy(bulk_DOS[i])
+        end
+        return FE
+    end
 end

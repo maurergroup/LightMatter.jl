@@ -60,7 +60,7 @@ end
     length::Union{Int,Vector{Int}} #The length of the grid, not the depth of the slab
     grid::AbstractArray{<:Real} #The grid the simulation is solved over
     spacing::Union{Real,Vector{<:Real}} #The spacing between grid points
-    InterfaceHeight::Union{Real,Vector{<:Real}}
+    InterfaceHeight::Union{Real,Vector{<:Real}} # Height sorted list of the interfaces between materials
 end
 
 function build_Dimension(grid=[0.0],cutoff=0.0)
@@ -338,7 +338,7 @@ end
     Electron_PhononCoupling::Bool = false
 end
 """
-    struct Systems <: SimulationTypes
+    struct Simulation <: SimulationTypes
         densitymatrix::DensityMatrix
         electronictemperature::ElectronicTemperature
         phononictemperature::PhononicTemperature
@@ -420,48 +420,6 @@ function build_Simulation(;densitymatrix::Union{DensityMatrix,NamedTuple,Nothing
     return Simulation(densitymatrix=densitymatrix,electronictemperature=electronictemperature,phononictemperature=phononictemperature,athermalelectrons=athermalelectrons,
     electronicdistribution=electronicdistribution,phononicdistribution=phononicdistribution,structure=structure,laser=laser)
 end
-"""
-    There is no more dim so need to organise that as well as needs to come from structure.dimension.length as well as number of atoms 
-"""
-function DOS_initialization(bulk_DOS,bulk_geometry,DOS_folder,slab_geometry,atomic_layer_tolerance,dimension, spatial_DOS, DOS)
-    if DOS !== nothing
-        return DOS
-    else
-        if bulk_DOS isa String
-            Vbulk = get_unitcellvolume(bulk_geometry)
-            if spatial_DOS == true 
-                DOS = spatial_DOS(DOS_folder,slab_geometry,bulk_DOS,Vbulk,dimension,layer_tolerance)
-            else
-                DOS = generate_DOS(bulk_DOS,1/Vbulk) 
-            end
-        else
-            Vbulk = zeros(length(bulk_DOS))
-            DOS = Vector{spl}(undef,length(bulk_DOS))
-            for i in eachindex(bulk_DOS)
-                Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
-                if spatial_DOS == true 
-                    DOS[i] = spatial_DOS(DOS_folder[i],slab_geometry[i],bulk_DOS[i],Vbulk[i],dimension,atomic_layer_tolerance)
-                else
-                    DOS[i] = generate_DOS(bulk_DOS[i],1/Vbulk[i])
-                end
-            end
-        end
-        return DOS
-    end
-end
-
-function FE_initalization(bulk_DOS)
-    if bulk_DOS isa String
-        FE=get_FermiEnergy(bulk_DOS)
-        return FE
-    else
-        FE = zeros(length(bulk_DOS))
-        for i in eachindex(bulk_DOS)
-            FE[i] = get_FermiEnergy(bulk_DOS[i])
-        end
-        return FE
-    end
-end
 
 function build_egrid(hv)
     egrid = collect(range(-2*hv,2*hv,step=0.01))
@@ -476,148 +434,4 @@ function build_egrid(hv)
         end
     end
     return egrid
-end
-
-function build_group_velocity(v_g,FE,Conductivity,conductive_velocity,structure)
-    if isnothing(v_g)
-        if Conductivity == true
-            if Conductive_velocity == :fermigas
-                if structure.Elemental_System > 1
-                    elements = structure.Elemental_System
-                    v_g = Vector{Vector{<:Real}}(undef,elements)
-                    grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in 1:Elemental_System
-                        length = length(grids[i])
-                        v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE),length)
-                    end
-                else
-                    return get_fermigas_velocity(Ref(structure.egrid),FE)
-                end
-            elseif Conductive_velocity == :effectiveoneband
-                if structure.Elemental_System != 1
-                    if structure.Spatial_DOS == true
-                        for i in 1:structure.dimension.length
-                            v_g[i] = effective_one_band_velocity(structure.DOS[i],egrid,FE[i])
-                        end
-                    else
-                        v_g = fill(zeros(length(structure.egrid)),structure.dimension.length)
-                        grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight) 
-                        for i in 1:structure.Elemental_System
-                            for j in grids[i]
-                                v_g[j] = effective_one_band_velocity(structure.DOS[i],egrid,FE[i])
-                            end
-                        end
-                    end
-                else
-                    if structure.Spatial_DOS == true
-                        v_g = effective_one_band_velocity(structure.DOS[end],egrid,FE)
-                    else
-                        v_g = effective_one_band_velocity(structure.DOS,egrid,FE)
-                    end
-                end
-            end
-        else 
-            return [0.0]
-        end
-    else
-        if Conductivity == true
-            if conductive_velocity == :constant
-                if structure.Elemental_System > 1
-                    elements = structure.Elemental_System
-                    v_g = Vector{Vector{<:Real}}(undef,elements)
-                    grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in 1:Elemental_System
-                        length = length(grids[i])
-                        v_g[i] = fill(convert_units(v_g),length)
-                    end
-                else
-                    return convert_units(v_g)
-                end
-            end
-        else 
-            return [0.0]
-        end
-    end
-end
-
-function get_fermigas_velocity(egrid,EF)
-    return sqrt.(2*(egrid.+EF)./Constants.me)
-end
-
-function effective_one_band_velocity(DOS,egrid,FE)
-    k_E = get_dispersionrelation(DOS,egrid,FE)
-    v_g = similar(k_E)
-    if eltype(v_g) <: AbstractVector
-        for j in eachindex(v_g)
-            for i in eachindex(k_E[j])
-                ΔE = egrid[2]-egrid[1]
-                if i == 1 
-                    v_g[j][i] = 1/Constants.ħ * 1/((k_E[j][i+1] - k_E[j][i]) / ΔE)
-                elseif i == length(k_E)
-                    v_g[j][i] = 1/Constants.ħ * 1/((k_E[j][i] - k_E[j][i-1]) / ΔE)
-                else
-                    cd = (k_E[i+1]-k_E[i-1]) / (2*ΔE)
-                    v_g[j][i] = 1/Constants.ħ * (1 / cd)
-                end
-            end
-        end
-    else
-        for i in eachindex(k_E)
-            ΔE = egrid[2]-egrid[1]
-            if i == 1 
-                v_g[i] = 1/Constants.ħ * 1/((k_E[i+1] - k_E[i]) / ΔE)
-            elseif i == length(k_E)
-                v_g[i] = 1/Constants.ħ * 1/((k_E[i] - k_E[i-1]) / ΔE)
-            else
-                cd = (k_E[i+1]-k_E[i-1]) / (2*ΔE)
-                v_g[i] = 1/Constants.ħ * (1 / cd)
-            end
-        end
-    end
-    return v_g
-end
-
-function get_dispersionrelation(DOS,egrid,FE)
-    if DOS isa Vector{spl}
-        k_E=fill(zeros(egrid),length(DOS))
-    else
-        k_E = zeros(length(egrid))
-    end
-    
-    factor = 6*pi #6π^2/σ where σ is a spin factor (2 for electrons)
-    int(u,p) = DOS(u)
-
-    if DOS isa Vector{spl}
-        for v in eachindex(k_E)
-            for (i,E) in enumerate(egrid)
-                prob=IntegralProblem(int,-FE,E)
-                sol = solve(prob,HCubatureJL(initdiv=100),abstol=1e-8,reltol=1e-8)
-                k_E[v][i] = cbrt(factor*sol.u)
-            end
-        end
-    else 
-        for (i,E) in enumerate(egrid)
-            prob=IntegralProblem(int,-FE,E)
-            sol = solve(prob,HCubatureJL(initdiv=100),abstol=1e-8,reltol=1e-8)
-            k_E[i] = cbrt(factor*sol.u)
-        end
-    end
-    return k_E
-end
-
-function split_grid(grid::Vector{<:Real}, cutoffs::Union{Real,Vector{Real}})
-    sorted_cutoffs = sort(isa(cutoffs, Vector) ? cutoffs : [cutoffs])
-    sections = Vector{Vector{<:Real}}()
-    start_idx = 1
-    for cutoff in sorted_cutoffs
-        end_idx = findfirst(x -> x > cutoff, grid)
-        if isnothing(end_idx)
-            push!(sections, grid[start_idx:end])
-            return sections
-        end
-        push!(sections, grid[start_idx:end_idx-1])
-        start_idx = end_idx
-    end
-    push!(sections, grid[start_idx:end])
-    return sections
 end

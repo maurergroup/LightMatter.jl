@@ -10,7 +10,7 @@ export ElectronicDistribution, PhononicDistribution
 global const units = [u"eV", u"nm", u"fs", u"K"]
 
 include("UnitManagement.jl")
-include("SimulationConstruction.jl")
+include("SimulationTypes.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
 include("PhononicTemperature.jl")

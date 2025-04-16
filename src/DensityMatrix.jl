@@ -4,7 +4,7 @@
 # the final few functions of this
 #
 function vonNeumann(dρ,ρ,H,t)
-    dρ .= 1/(1im * Constants.ħ  )*(H*ρ - ρ*H) #0.6852 is hbar in eVfs
+    dρ .= 1/(1im * Constants.ħ  )*(H*ρ - ρ*H)
     return nothing
 end
 
