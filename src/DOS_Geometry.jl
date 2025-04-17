@@ -1,18 +1,35 @@
 """
-    Determines the Fermi energy of the system. This is defined as the distance between the bottom and
-    top of the valence band. This is used within Fermi Liquid Theory Relaxation Time where it is scaled
-    based on the Fermi Energy^2. In all other places, the Fermi Energy is defined as 0.0.
+    get_FermiEnergy(File::String)
+    
+    Calculates the Fermi energy defined as the difference between 0.0 and the
+    bottom of the valence band. Assumes the DOS provided has the Fermi energy
+    set to 0.0.
+
+    # Arguments
+    - 'File': Path to a file containing the density of states data.
+
+    # Returns
+    - The Fermi energy calculated at the bottom of the valence band.
 """
-function get_FermiEnergy(File)
+function get_FermiEnergy(File::String)
     TotalDOS::Matrix{Float64}=readdlm(File,comments=true)
     Nonzero = findfirst(!=(0.0),TotalDOS[:,2])
     return abs(TotalDOS[Nonzero,1])
 end
 """
-    Converts a file location for the DOS into an interpolation object. It assumes that the DOS file
-    is in units of states/atom and therefore scales the number of states by the number of atoms/nm(n).
+    generate_DOS(File::String, unit_scalar::Real)
+    
+    Generates a spline of a DOS from a file. Assumes the structure of the DOS is column 1 is Energy in eV
+    and column 2 is States in eV⁻¹V⁻¹ (volume of unit cell) 
+
+    # Arguments
+    - 'File': Path to the total DOS file.
+    - 'unit_scalar': Scalar to convert the units (1/V in nm⁻³).
+
+    # Returns
+    - An interpolation object representing the DOS.
 """
-function generate_DOS(File::String,unit_scalar)
+function generate_DOS(File::String,unit_scalar::Real)
     TotalDOS::Matrix{Float64}=readdlm(File,comments=true)
     return get_interpolant(TotalDOS[:,1],TotalDOS[:,2]*unit_scalar)
 end
