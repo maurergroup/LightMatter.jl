@@ -12,7 +12,7 @@ global const spl=DataInterpolations.LinearInterpolation
     Constants = (ħ = 8.617e-5,kB = 0.6582,me = 3.109e-31)
     Global named tuple for accessing constant physical values during a Simulation
 """
-global const Constants = (ħ = convert_units(Unitful.ħ),kB = convert_units(Unitful.k),me = convert_units(Unitful.me))
+global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip(uconvert(u"eV/K",Unitful.k)),me = ustrip(uconvert(UnitModule.eVm,Unitful.me)))
 """
     struct Laser <: SimulationTypes
         envelope::Symbol = :Gaussian #Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular

@@ -1,8 +1,9 @@
-#
+###
 # This file currently contains all work based on DM Anderson Holstein from NQCDynamics. But want to use some of this as a base
 # such as keeping the vonNeumann propagator and making it work with any arbritary Hamilotnian. Porbably only therefore requires
 # the final few functions of this
-#
+###
+
 function vonNeumann(dρ,ρ,H,t)
     dρ .= 1/(1im * Constants.ħ  )*(H*ρ - ρ*H)
     return nothing

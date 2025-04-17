@@ -131,9 +131,8 @@ function simulation_construction(sys,sim::Simulation)
 end
 
 function monometallic_system(sys,sim::Simulation)
-    cond_exprs = conductivity_expressions(sim)
+    expr_cond = conductivity_expressions(sim)
     loop_body = build_loopbody(sys,sim)
-    expr_cond = Expr(:block,cond_exprs...)
     return quote
         println(t)
         $expr_cond
@@ -157,7 +156,7 @@ function conductivity_expressions(sim::Simulation)
             push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(sim.athermalelectrons.v_g,p.mp.egrid,u.noe,p.dim)))
         end
     end 
-    return cond_exprs
+    return Expr(:block,cond_exprs...)
 end
 
 function build_loopbody(sys,sim::Simulation)

@@ -2,7 +2,7 @@
     #To-Do: Add spatial DOS support to antenna-reactor complex
 ###
 """
-    antenna_reactor_system(sys::Dict{String,Expr}, sim::Simulation)
+    antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
 
     Constructs the main expression for an antenna reactor simulation system.
 
@@ -13,9 +13,9 @@
     # Returns
     - An expression block containing the time output, conductivity expressions, and a threaded simulation loop.
 """
-function antenna_reactor_system(sys::Dict{String,Expr},sim::Simulation)
+function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
     expr_cond = conductivity_expressions(sim) # Expr block for the conductivity of each system
-    loop_body = ar_build_loopbody(sys,sim) # Expr block for the body of a threaded for loop over the systems and depth
+    loop_body = ar_build_loopbody(sys, sim) # Expr block for the body of a threaded for loop over the systems and depth
     return quote 
         println(t)
         $expr_cond
@@ -25,7 +25,7 @@ function antenna_reactor_system(sys::Dict{String,Expr},sim::Simulation)
     end # The whole simulation that is propgated as one Expr block
 end
 """
-    ar_build_loopbody(sys::Dict{String,Expr}, sim::Simulation)
+    ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
 
     Builds the core loop body expression for the antenna reactor simulation.
 
@@ -36,11 +36,11 @@ end
     # Returns
     - An expression representing the simulation loop body.
 """
-function ar_build_loopbody(sys::Dict{String,Expr},sim::Simulation)
-    exprs = Vector{Expr}(undef,0) # Miscellaneous expressions at the top of the loop
-    push!(exprs,:(X = Lightmatter.mat_picker(p.sim.structure.dimension.grid[i],p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
-    push!(exprs,ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to Lightmatter.jl
-    push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n,Tel,DOS,sim.structure.egrid))) # Calculates the current chemical potential
+function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
+    exprs = Vector{Expr}(undef, 0) # Miscellaneous expressions at the top of the loop
+    push!(exprs, :(X = Lightmatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
+    push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to Lightmatter.jl
+    push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid))) # Calculates the current chemical potential
 
     if sim.athermalelectrons.EmbeddedAthEM == true 
         # Embeds AthEM to reduce computational cost - do not use with non-eq transport but with both electronic and phononic temperature
@@ -123,15 +123,15 @@ function ar_variable_renaming(sim::Simulation)
         push!(new_name, :DOS)
     end
     if sim.athermalelectrons.Enabled == true
-        push!(old_name,:(u.fneq[i,:]))
-        push!(new_name,:fneq)
+        push!(old_name, :(u.fneq[i,:]))
+        push!(new_name, :fneq)
         if sim.athermalelectrons.Conductivity == true
-            push!(old_name,:(p.f_cond[i,:]))
-            push!(new_name,:f_cond)
+            push!(old_name, :(p.f_cond[i,:]))
+            push!(new_name, :f_cond)
         end
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-            push!(old_name,:(p.Tel))
-            push!(new_name,:Tel)
+            push!(old_name, :(p.Tel))
+            push!(new_name, :Tel)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
@@ -140,8 +140,8 @@ function ar_variable_renaming(sim::Simulation)
         end
     end
     if sim.electronictemperature.Enabled == true
-        push!(old_name,:(u.Tel[i]))
-        push!(new_name,:Tel)
+        push!(old_name, :(u.Tel[i]))
+        push!(new_name, :Tel)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
@@ -152,11 +152,11 @@ function ar_variable_renaming(sim::Simulation)
         end
     end
     if sim.phononictemperature.Enabled == true
-        push!(old_name,:(u.Tph[i]))
-        push!(new_name,:Tph)
+        push!(old_name, :(u.Tph[i]))
+        push!(new_name, :Tph)
         if sim.phononictemperature.Conductivity == true
-            push!(old_name,:(p.Tph_cond[i]))
-            push!(new_name,:Tph_cond)
+            push!(old_name, :(p.Tph_cond[i]))
+            push!(new_name, :Tph_cond)
         end
     end
     old_name = Tuple(old_name)
@@ -188,10 +188,10 @@ function sim_seperation(sim::Simulation)
     neqs   = conditional_split(sim.athermalelectrons, sim.athermalelectrons.Enabled)
     structs = split_structure(sim.structure)
 
-    new_sim = Vector{SimulationTypes}(undef,sim.structure.Elemental_System) #Build and fill vector of simulation objects
+    new_sim = Vector{SimulationTypes}(undef, sim.structure.Elemental_System) #Build and fill vector of simulation objects
     for i in 1:sim.structure.Elemental_System 
-        new_sim[i] = build_Simulation(laser=lasers[i],electronictemperature=tels[i],phononictemperature=tphs[i],
-                                    athermalelectrons=neqs[i],structure=structs[i])
+        new_sim[i] = build_Simulation(laser=lasers[i], electronictemperature=tels[i], phononictemperature=tphs[i],
+                                    athermalelectrons=neqs[i], structure=structs[i])
     end
     return new_sim
 end
@@ -207,7 +207,7 @@ end
     # Returns
     - A vector of the subsystem with scalar data extracted from the original vector fields.
 """
-function split_struct(data::SimulationTypes,number::Int)
+function split_struct(data::SimulationTypes, number::Int)
     field_values = map(f -> getfield(data, f), fieldnames(typeof(data))) #Extracts all values from fields of subssytem into dict
     value_indices = findall(x -> x isa Vector, field_values) # Determines which fields of the subsystem need splitting 
 

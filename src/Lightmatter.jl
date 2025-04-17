@@ -10,6 +10,13 @@ export ElectronicDistribution, PhononicDistribution
 global const units = [u"eV", u"nm", u"fs", u"K"]
 
 include("UnitManagement.jl")
+using .UnitModule
+
+function __init__()
+    Unitful.register(UnitModule)
+    Unitful.preferunits(UnitModule.eVm, u"nm", u"fs", u"K")
+end
+
 include("SimulationTypes.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
