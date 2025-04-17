@@ -1,19 +1,35 @@
 """
     laser_factory(sim::Simulation)
-    Factory builds the laser from three components defining the evolution in time(temporal), the power of the
-    laser(power) and how the laser penetrates into a material(spatial). Returns an Expr that holds the 
-    relevant parameters and structure of the laser.
+    
+    Assembles the user desired laser expression
+
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Expression for the power of the laser as a function of time and depth
 """
 function laser_factory(sim::Simulation)
     temporal = temporal_laser(sim)
-    power = :((1-sim.laser.R)*sim.laser.ϕ)
+    power = :((1-sim.laser.R) * sim.laser.ϕ)
     spatial = spatial_laser(sim)
-    return Expr(:call,:*,temporal,spatial,power)
+    return Expr(:call, :*, temporal, spatial, power)
 end
 """
     temporal_laser(sim::Simulation)
-    Returns the expression for the requested laser envelope function. Current options are
-    :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular.
+    
+    Assembles the expression for the user desired temporal shape of the laser
+    Currently implemented:
+    - :Gaussian : Gaussian laser shape
+    - :Lorentzian : Lorentzian laser shape
+    - :HyperbolicSecant : Hyperbolic secant laser shape
+    - :Rectangular : Constant illumination style method. The laser is on for 2*FWHM at either side of 0.0 fs
+
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Expression for the temporal shape of the laser
 """
 function temporal_laser(sim::Simulation)
     type = sim.laser.envelope
@@ -30,19 +46,29 @@ function temporal_laser(sim::Simulation)
 end
 """
     spatial_laser(sim::Simulation)
-    This builds the equation which defines how the laser energy is absorbed the further from
-    the centre of the spot. This is currently only implemented in the z direction
+    
+    Assembles the expression for the laser penetration depth. Currently only works in the z-axis
+
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Expression for the spatial shape of the laser
 """
 function spatial_laser(sim::Simulation)
     z_laser = spatial_z_laser(sim)
     return z_laser
 end
 """
-    The z-component of the laser profile is determined by the type of the slab object
-    as well as whether ballistic or optical transport is being considered. It then creates
-    the parameter for the ballistic length of electrons(δb) and the extinction coefficient (ϵ)
-    depending on how the transport is modelled. It is assumed that the laser field is propogating
-    along the z-axis
+    spatial_z_laser(sim::Simulation)
+    
+    Assembles the expression for the laser penetration depth. Currently only works in the z-axis
+
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Expression for the spatial shape of the laser
 """
 function spatial_z_laser(sim::Simulation)
     if sim.laser.Transport == :ballistic

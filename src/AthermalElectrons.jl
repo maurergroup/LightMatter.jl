@@ -11,14 +11,14 @@
     # Returns
     - The total expression for the evolution of the athermal electron distribution, combining excitation and scattering terms.
 """
-function athemdistribution_factory(sim::Simulation,laser_expr::Expr)
-    feq = :(Lightmatter.FermiDirac(Tel,μ,sim.structure.egrid))
-    ftot = :($feq.+fneq)
+function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
+    feq = :(Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid))
+    ftot = :($feq .+ fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
     M = athemexcitation_matrixelements(sim)
-    athemexcite=:($laser_expr*Lightmatter.athemexcitation($ftot,sim.structure.egrid,DOS,sim.laser.hv,$M))
-    return build_athemdistribution(sim,athemexcite,Elecelec,Elecphon)
+    athemexcite = :($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+    return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
 end
 """
     build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Real}, Elecphon::Union{Expr, Real})
@@ -34,12 +34,12 @@ end
     # Returns
     - A broadcasted summation of all interaction terms.
 """
-function build_athemdistribution(sim::Simulation,athemexcite::Expr,Elecelec::Union{Expr,Real},Elecphon::Union{Expr,Real})
-    args = Union{Expr,Symbol,Real}[athemexcite,Elecelec,Elecphon]
+function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Real}, Elecphon::Union{Expr,Real})
+    args = Union{Expr, Symbol, Real}[athemexcite, Elecelec, Elecphon]
     if sim.athermalelectrons.Conductivity == true
-        push!(args,:f_cond)
+        push!(args, :f_cond)
     end
-    return Expr(:call,:(.+),(args)...)
+    return Expr(:call, :(.+), (args)...)
 end
 """
     athemexcitation(ftot::Vector{<:Real}, egrid::Vector{<:Real}, DOS::spl, hv::Real, M::Union{Real,Vector{<:Real}})
@@ -57,12 +57,12 @@ end
     - Normalized excitation change in the distribution.
 """
 function athemexcitation(ftot::Vector{<:Real}, egrid::Vector{<:Real}, DOS::spl, hv::Real, M::Union{Real,Vector{<:Real}})
-    ftotspl = get_interpolant(egrid,ftot)
-    Δfneqh = athem_holegeneration(egrid,DOS,ftotspl,hv,M)
-    Δfneqe = athem_electrongeneration(egrid,DOS,ftotspl,hv,M)
-    pc_sf = get_noparticles(Δfneqe,DOS,egrid) / get_noparticles(Δfneqh,DOS,egrid) # Corrects for particle conservation in the generation shape
-    Δfneqtot = Δfneqe.-(pc_sf*Δfneqh)
-    return Δfneqtot./get_internalenergy(Δfneqtot,DOS,egrid) # Scales the shape of the change by the internal energy to later match with the laser
+    ftotspl = get_interpolant(egrid, ftot)
+    Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv, M)
+    Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv, M)
+    pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
+    Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
+    return Δfneqtot ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
 end
 """
     athem_holegeneration(egrid::Vector{<:Real},DOS::spl,ftotspl::spl,hv::Real,M::Union{Real,Vector{<:Real}})
@@ -79,8 +79,8 @@ end
     # Returns
     - Change in distribution due to hole generation
 """
-function athem_holegeneration(egrid::Vector{<:Real},DOS::spl,ftotspl::spl,hv::Real,M::Union{Real,Vector{<:Real}})
-    return (2*pi/Constants.ħ) .* M .* DOS(egrid.+hv).*ftotspl(egrid).*(1 .-ftotspl(egrid.+hv))
+function athem_holegeneration(egrid::Vector{<:Real}, DOS::spl, ftotspl::spl, hv::Real, M::Union{Real,Vector{<:Real}})
+    return (2*pi/Constants.ħ) .* M .* DOS(egrid.+hv) .* ftotspl(egrid) .* (1 .- ftotspl(egrid.+hv))
 end
 """
     athem_electrongeneration(egrid::Vector{<:Real},DOS::spl,ftotspl::spl,hv::Real,M::Union{Real,Vector{<:Real}})
@@ -97,8 +97,8 @@ end
     # Returns
     - Change in distribution due to electron generation
 """
-function athem_electrongeneration(egrid::Vector{<:Real},DOS::spl,ftotspl::spl,hv::Real,M::Union{Real,Vector{<:Real}})
-    return (2*pi/Constants.ħ) .* M .* DOS(egrid.-hv).*ftotspl(egrid.-hv).*(1 .-ftotspl(egrid))
+function athem_electrongeneration(egrid::Vector{<:Real}, DOS::spl, ftotspl::spl, hv::Real, M::Union{Real,Vector{<:Real}})
+    return (2*pi/Constants.ħ) .* M .* DOS(egrid.-hv) .* ftotspl(egrid.-hv) .* (1 .-ftotspl(egrid))
 end
 """
     athemexcitation_matrixelements(sim::Simulation)
@@ -131,7 +131,7 @@ end
 """
 function athem_electronelectroninteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
-        return :(-1*relax_dis) # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
+        return :(-1 * relax_dis) # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
     else
         return 0.0
     end
@@ -153,12 +153,12 @@ end
     # Returns
     - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
 """
-function athem_electronelectronscattering(Tel::Real,μ::Real,sim::Simulation,fneq::Vector{<:Real},DOS::spl,n::Real,τee::Union{Real,Vector{<:Real}})
-    feq = Lightmatter.FermiDirac(Tel,μ,sim.structure.egrid)
-    ftot = feq.+fneq
-    goal = extended_Bode(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid,sim.structure.egrid)
-    frel = find_relaxeddistribution(sim.structure.egrid,goal,n,DOS)
-    return (fneq.+frel.-feq)./τee
+function athem_electronelectronscattering(Tel::Real, μ::Real, sim::Simulation, fneq::Vector{<:Real}, DOS::spl, n::Real, τee::Union{Real,Vector{<:Real}})
+    feq = Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
+    ftot = feq .+ fneq
+    goal = extended_Bode(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
+    frel = find_relaxeddistribution(sim.structure.egrid, goal, n, DOS)
+    return (fneq.+frel.-feq) ./ τee
 end
 """
     electron_relaxationtime(sim::Simulation)
@@ -177,7 +177,7 @@ function electron_relaxationtime(sim::Simulation)
     if sim.athermalelectrons.ElectronicRelaxation == :constant
         return :(sim.athermalelectrons.τ)
     elseif sim.athermalelectrons.ElectronicRelaxation == :FLT
-        return :(sim.athermalelectrons.τ*(μ.+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+(pi*Constants.kB*Tel)^2))
+        return :(sim.athermalelectrons.τ * (μ.+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))
     end
 end       
 """
@@ -194,11 +194,11 @@ end
     # Returns
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
-function find_relaxeddistribution(egrid::Vector{<:Real},goal::Real,n::Real,DOS::spl)
-    f(u) = goal - find_temperatureandμ(u,n,DOS,egrid)
-    Temp = solve(ZeroProblem(f,1000.0);abstol=1e-10,reltol=1e-10)
-    μ = find_chemicalpotential(n,Temp,DOS,egrid)
-    return FermiDirac(Temp,μ,egrid)
+function find_relaxeddistribution(egrid::Vector{<:Real}, goal::Real, n::Real, DOS::spl)
+    f(u) = goal - find_temperatureandμ(u, n, DOS, egrid)
+    Temp = solve(ZeroProblem(f,1000.0); abstol=1e-10, reltol=1e-10)
+    μ = find_chemicalpotential(n, Temp, DOS, egrid)
+    return FermiDirac(Temp, μ, egrid)
 end
 """
     find_temperatureandμ(Tel::Real,n::Real,DOS::spl,egrid::Vector{<:Real})
@@ -214,9 +214,9 @@ end
     # Returns
     - Internal energy of the current temperature guess.
 """
-function find_temperatureandμ(Tel::Real,n::Real,DOS::spl,egrid::Vector{<:Real})
-    μ = find_chemicalpotential(n,Tel,DOS,egrid)
-    return get_internalenergy(FermiDirac(Tel,μ,egrid),DOS,egrid)
+function find_temperatureandμ(Tel::Real, n::Real, DOS::spl, egrid::Vector{<:Real})
+    μ = find_chemicalpotential(n, Tel, DOS, egrid)
+    return get_internalenergy(FermiDirac(Tel,μ,egrid), DOS, egrid)
 end
 """
     athem_electronelectroninteraction(sim::Simulation)
@@ -232,7 +232,7 @@ end
 function athem_electronphononinteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_PhononCoupling == true 
         τep = phonon_relaxationtime(sim)
-        return :(-fneq./$τep)
+        return :(-fneq ./ $τep)
     else
         return 0.0
     end
@@ -255,7 +255,7 @@ function phonon_relaxationtime(sim::Simulation)
     if sim.athermalelectrons.PhononicRelaxation == :constant
         return :(sim.athermalelectrons.τep)
     elseif sim.athermalelectrons.PhononicRelaxation == :quasi
-        return :(sim.electronictemperature.γ*(Tel+Tph)/(2*sim.electronictemperature.g))
+        return :(sim.electronictemperature.γ * (Tel+Tph) / (2*sim.electronictemperature.g))
     end
 end  
 """
@@ -270,17 +270,18 @@ end
     - Expr for the time dependence of the thermal electron number.
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
-    part_change = :(Lightmatter.get_noparticles(relax_dis,DOS,sim.structure.egrid))
+    part_change = :(Lightmatter.get_noparticles(relax_dis, DOS, sim.structure.egrid))
     args = (part_change)
     if sim.athermalelectrons.Conductivity == true
-        push!(args,:(n_cond[i]))
+        push!(args, :(n_cond[i]))
     end
-    return Expr(:call,:+,args...)
+    return Expr(:call, :+, args...)
 end
 """
     electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dz::Real)
 
-    Computes ballistic transport of an electronic distribution using second-order finite differences.
+    Computes ballistic transport of an electronic distribution using second-order finite differences via a kinetic like model.
+    Uses forward(reverse) difference for the boundaries. 
 
     # Arguments
     - `v_g`: Group velocity vector or vector of vectors(spatially-resolved DOS)
@@ -291,7 +292,7 @@ end
     # Returns
     - In-place change to Δf
 """
-function electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dz::Real)
+function electron_distribution_transport!(v_g::Vector{<:Real}, f::AbstractArray{<:Real}, Δf::AbstractArray{<:Real}, dz::Real)
     for i in 2:size(f, 1)-1
         Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g
     end
@@ -299,7 +300,7 @@ function electron_distribution_transport!(v_g::Vector{<:Real},f::AbstractArray{<
     Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g
 end
 
-function electron_distribution_transport!(v_g::Vector{Vector{<:Real}},f::AbstractArray{<:Real},Δf::AbstractArray{<:Real},dz::Real)
+function electron_distribution_transport!(v_g::Vector{Vector{<:Real}}, f::AbstractArray{<:Real}, Δf::AbstractArray{<:Real}, dz::Real)
     for i in 2:size(f, 1)-1
         Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g[i]
     end
@@ -321,7 +322,7 @@ end
     # Returns
     - Updated transport correction array.
 """
-function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dz::Real)
+function thermal_particle_transport(v_g::Vector{<:Real}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
     idx_0 = findmin(abs(egrid-0.0))[2]
     v_F = v_g[idx_0]
     for i in 2:dim.length -1
@@ -332,7 +333,7 @@ function thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n:
     return Δn
 end
 
-function thermal_particle_transport(v_g::Vector{Vector{<:Real}},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dz::Real)
+function thermal_particle_transport(v_g::Vector{Vector{<:Real}}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
     idx_0 = findmin(abs(egrid-0.0))[2]
     for i in 2:dim.length -1
         v_F = v_g[i][idx_0]
@@ -359,7 +360,7 @@ end
 """
 function FE_initalization(bulk_DOS::Union{String, Vector{String}})
     if bulk_DOS isa String
-        FE=get_FermiEnergy(bulk_DOS)
+        FE = get_FermiEnergy(bulk_DOS)
         return FE
     else
         FE = zeros(length(bulk_DOS))
