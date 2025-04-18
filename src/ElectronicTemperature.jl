@@ -72,7 +72,7 @@ end
     - 'Tel': Temperature of the electronic bath
     - 'μ': Chemical potential of the electronic bath
     - 'DOS': Density-of-states of the system
-    - egrid': Energy grid the simulation is solved over
+    - 'egrid': Energy grid the simulation is solved over
 
     # Returns
     - The current heat capacity of the electronic thermal bath

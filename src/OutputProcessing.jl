@@ -1,23 +1,45 @@
-function post_production(sol,file_name,initial_temps,output,sim)
+###
+# Add keywords to save additional information - change the output::Symbol system
+# Open and close the file regularly so things don't break so easily
+# This generally needs a good tidying
+###
+"""
+    post_production(sol,file_name::String,initial_temps::Dict{String,<:Real},output::Symbol,sim::Simulation)
+    
+    Handles processing, saving the simulation after it has completed. Uses HDF5 file format
+    Currently the only output setting supported is :minimum which only saves the parameters, chemical potential and
+    progated systems
+
+    # Arguments
+    - 'sol': The solution of the simulation
+    - 'file_name': The name the user wishes the file to be saved as 
+    - 'initial_temps': Initial temperature the baths have been set to
+    - 'output': The output method required - may change in future
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing is returned but a file is created
+"""
+function post_production(sol, file_name::String, initial_temps::Dict{String,<:Real}, output::Symbol, sim::Simulation)
     fid = create_datafile_and_structure(file_name)
     write_simulation(fid,sim::Simulation)
 
     results = seperate_results(sol,initial_temps,sim)
     fid["Time Span"] = results["times"]
-    μs = pp_chemicalpotential(results["Tel"],results["noe"],sim)
+    μs = pp_chemicalpotential(results["Tel"], results["noe"], sim)
     fid["Chemical Potential"] = μs
     FD = pp_FermiDistribution(results["Tel"],sim,μs)
 
 
-    create_group(fid,"System Equations")
-    output_functions(fid["System Equations"],sim)
+    create_group(fid, "System Equations")
+    output_functions(fid["System Equations"], sim)
 
-    if output=="full"
+    if output==:Full
         println("Not Implemented running minimum")
         write_minimum(fid,results,FD,sim)
         close(fid)
-    elseif output=="minimum"
-        write_minimum(fid,results,FD,sim)
+    elseif output==:Minimum
+        write_minimum(fid, results, FD, sim)
         close(fid)
     else 
         println("The only output options are full and minimum. Files cannot be easily overwritten so the file has been deleted")
@@ -25,72 +47,149 @@ function post_production(sol,file_name,initial_temps,output,sim)
         rm(file_name)
     end
 end
+"""
+    create_datafile_and_structure(file_name::String)
+    
+    Creates a file with the standard data structure:
+    - Athermal Electrons
+    - Density Matrix
+    - Electronic Temperature
+    - Phononic Temperature
+    - Electronic Distribution
+    - Phononic Distribution
+    - Laser
+    - Structure
 
-function create_datafile_and_structure(file_name)
-    fid = h5open(file_name,"w")
-    create_group(fid,"Athermal Electrons")
-    create_group(fid,"Density Matrix")
-    create_group(fid,"Electronic Temperature")
-    create_group(fid,"Phononic Temperature")
-    create_group(fid,"Electronic Distribution")
-    create_group(fid,"Phononic Distribution")
-    create_group(fid,"Laser")
-    create_group(fid,"Structure")
+    # Arguments
+    - 'file_name': The name the user wishes the file to be saved as 
+
+    # Returns
+    - A created HDF5 file
+"""
+function create_datafile_and_structure(file_name::String)
+    fid = h5open(file_name, "w")
+    create_group(fid, "Athermal Electrons")
+    create_group(fid, "Density Matrix")
+    create_group(fid, "Electronic Temperature")
+    create_group(fid, "Phononic Temperature")
+    create_group(fid, "Electronic Distribution")
+    create_group(fid, "Phononic Distribution")
+    create_group(fid, "Laser")
+    create_group(fid, "Structure")
     return fid
 end
+"""
+    dict_to_hdf5(f,d::Dict{String,Any})
+    
+    Unpacks a dictionary and saves it to the designated file location (f)
 
-function dict_to_hdf5(g,d)
-    for (key,value) in d
-        g[key] = value
+    # Arguments
+    - 'f': Location in the HDF5 file the dictionary information will be saved to
+    - 'd': The dictionary to be unpacked and saved
+
+    # Returns
+    - Nothing returned but dictionary saved to location
+"""
+function dict_to_hdf5(f, d::Dict{String,Any})
+    for (key, value) in d
+        f[key] = value
     end
 end
+"""
+    convert_symbols_to_strings(dict::Dict{Any,Any})
+    
+    Converts any Symbol key values to their respecitve string for saving
 
-function convert_symbols_to_strings(dict)
+    # Arguments
+    - 'dict': The dictionary which needs keys converting
+
+    # Returns
+    - Dictionary with all Symbol keys changed to strings
+"""
+function convert_symbols_to_strings(dict::Dict{Any,Any})
     return Dict(
         k => (v isa Symbol ? String(v) : v) 
         for (k, v) in dict
     )
 end
+"""
+    write_simulation(f,sim::Simulation)
+    
+    Writes all settings and parameters to their respective location in the file (f)
 
+    # Arguments
+    - 'f': File to be written to
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing returned but all parameters and settings wrote to file
+"""
 function write_simulation(f,sim::Simulation)
     athermal = Dict{String,Any}(String(key)=>getfield(sim.athermalelectrons, key) for key ∈ fieldnames(AthermalElectrons))
     dict_to_hdf5(f["Athermal Electrons"], convert_symbols_to_strings(athermal))
+
     electronic_t = Dict{String,Any}(String(key)=>getfield(sim.electronictemperature, key) for key ∈ fieldnames(ElectronicTemperature))
     dict_to_hdf5(f["Electronic Temperature"], convert_symbols_to_strings(electronic_t))
+
     phononic_t = Dict{String,Any}(String(key)=>getfield(sim.phononictemperature, key) for key ∈ fieldnames(PhononicTemperature))
     dict_to_hdf5(f["Phononic Temperature"], convert_symbols_to_strings(phononic_t))
+
     electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
     dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
+
     phononic_d = Dict{String,Any}(String(key)=>getfield(sim.phononicdistribution, key) for key ∈ fieldnames(PhononicDistribution))
     dict_to_hdf5(f["Phononic Distribution"], convert_symbols_to_strings(phononic_d))
+
     density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
     dict_to_hdf5(f["Density Matrix"], convert_symbols_to_strings(density_m))
+
     laser = Dict{String,Any}(String(key)=>getfield(sim.laser, key) for key ∈ fieldnames(Laser))
     dict_to_hdf5(f["Laser"], convert_symbols_to_strings(laser))
     
     extract_structure(f, sim.structure)
 end
+"""
+    extract_structure(f, structure::Structure)
+    
+    Specific way of writing structure settings to the file as both DOS and Dimension need special handling
 
+    # Arguments
+    - 'f': File to be written to
+    - 'structure': Structure settings and parameters
+
+    # Returns
+    - Nothing returned but structure parameters and settings wrote to file
+"""
 function extract_structure(f, structure::Structure)
-    create_group(f["Structure"],"Dimension")
+    create_group(f["Structure"], "Dimension")
     struc = Dict("Elemental_System" => structure.Elemental_System, "Spatial_DOS" => structure.Spatial_DOS, "egrid" => structure.egrid)
     merge!(struc, write_DOS(structure))
 
-    dimension = Dict{String,Any}(String(key)=>getfield(structure.dimension, key) for key ∈ fieldnames(Dimension))
+    dimension = Dict{String,Any}(String(key) => getfield(structure.dimension, key) for key ∈ fieldnames(Dimension))
     dict_to_hdf5(f["Structure"]["Dimension"], convert_symbols_to_strings(dimension))
     dict_to_hdf5(f["Structure"], convert_symbols_to_strings(struc))
 end
+"""
+    write_DOS(structure::Structure)
+    
+    Handles converting the DOS splines into a writable format
 
+    # Arguments
+    - 'structure': Structure settings and parameters
+
+    # Returns
+    - Dictionary of the DOS
+"""
 function write_DOS(structure::Structure)
     
-    egrid = collect(range(-20,20,step=0.01))
+    egrid = collect(range(-20,20, step=0.01))
     if typeof(structure.DOS) == Vector{spl} && structure.Elemental_System == 1
-        DOS = zeros(length(structure.DOS),length(egrid))
+        DOS = zeros(length(structure.DOS), length(egrid))
         for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)
         end
     elseif structure.Elemental_System > 1
-        DOS = zeros(length(structure.DOS),length(egrid))
+        DOS = zeros(length(structure.DOS), length(egrid))
         for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)
         end
@@ -101,33 +200,70 @@ function write_DOS(structure::Structure)
 
     return Dict("DOS" => DOS)
 end
+"""
+    seperate_results(sol, initial_temps::Dict{String,<:Real}, sim::Simulation)
+    
+    Seperates the results held inside of the solution object
+    Also fills all unpropagated subsystems with parameter/temp information where neccessary
 
-function seperate_results(sol,initial_temps,sim)
+    # Arguments
+    - 'sol': The solution of the simulation
+    - 'initial_temps': Initial temperature the baths have been set to
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Dictionary of values of each of the seperated systems 
+"""
+function seperate_results(sol, initial_temps::Dict{String,<:Real}, sim::Simulation)
     fields = propertynames(sol[1])
-    vals = generate_valuedict(sol,sim,fields)
-    populate_value_dict!(sol,fields,vals)
-    populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
+    vals = generate_valuedict(sol, sim, fields)
+    populate_value_dict!(sol, fields, vals)
+    populate_unpropagatedvalues!(sol, initial_temps, fields, sim, vals)
     merge!(vals,Dict("times" => sol.t))
     return vals
 end
+"""
+    generate_valuedict(sol, sim::Simulation, fields::Vector{Symbol})
+    
+    Generates a dictionary of all propagated systems with placeholder arrays
 
-function generate_valuedict(sol,sim,fields)
+    # Arguments
+    - 'sol': The solution of the simulation
+    - 'sim': Simulation settings and parameters
+    - 'fields': Symbolic name of the propgated subsystems
+
+    # Returns
+    - Dictionary of values of each of the propgated subsystems 
+"""
+function generate_valuedict(sol, sim::Simulation, fields::Vector{Symbol})
     vals = Dict{String,Union{Real,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
             if i == :noe && sim.athermalelectrons.Enabled == false
                 nothing
             else
-                merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length)))
+                merge!(vals,Dict(String(i) => zeros(length(sol.t), sim.structure.dimension.length)))
             end
         elseif i == :fneq
-            merge!(vals,Dict(String(i)=>zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
+            merge!(vals,Dict(String(i) => zeros(length(sol.t), sim.structure.dimension.length, length(sim.structure.egrid))))
         end
     end
     return vals
 end
+"""
+    populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{<:Real}})
+    
+    Populates the subsystem dictionary with the reuslting vlaues from the simulation
 
-function populate_value_dict!(sol,fields,vals)
+    # Arguments
+    - 'sol': The solution of the simulation
+    - 'fields': Symbolic name of the propgated subsystems
+    - 'vals': Dictionary of the propgated subsytems with placeholder arrays
+
+    # Returns
+    - The vals dictionary with the actual results inside
+"""
+function populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{<:Real}})
     for t in eachindex(sol.t)
         array = ArrayPartition(sol[t])
         for f in eachindex(fields)
@@ -136,8 +272,21 @@ function populate_value_dict!(sol,fields,vals)
     end
     return vals
 end
+"""
+    remove_TTM_explicit_electrons!(vals::Dict{String,AbstractArray{<:Real}}, fields::Vector{Symbol}, sim::Simulation)
+    
+    WIP!
+    Removes the explicit electron number from the value dictionary for the TTM region when the embedding method is used
 
-function remove_TTM_explicit_electrons!(vals,fields,sim)
+    # Arguments
+    - 'vals': Dictionary of the propgated subsytems with placeholder arrays
+    - 'fields': Symbolic name of the propgated subsystems
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - vals dictionary with the thermal electron number array reduced in size
+"""
+function remove_TTM_explicit_electrons!(vals::Dict{String,AbstractArray{<:Real}}, fields::Vector{Symbol}, sim::Simulation)
     if sim.ParameterApprox.EmbeddingMethod == true
         for i in [:fneq,:noe]
             if i in fields
@@ -147,55 +296,79 @@ function remove_TTM_explicit_electrons!(vals,fields,sim)
     end
     return vals
 end
+"""
+    populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Real}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{<:Real}})
+    
+    Adds placeholder information to any unpropagated fields
 
-function populate_unpropagatedvalues!(sol,initial_temps,fields,sim,vals)
+    # Arguments
+    - 'sol': The solution of the simulation
+    - 'initial_temps': Initial temperature the baths have been set to
+    - 'sim': Simulation settings and parameters
+    - 'fields': Symbolic name of the propgated subsystems
+    - 'vals': Dictionary of the propgated subsytems with placeholder arrays
+
+    # Returns
+    - vals dictionary with the added unpropagated subsystems
+"""
+function populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Real}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{<:Real}})
     if :Tel ∉ fields
-        merge!(vals,Dict("Tel"=>fill(initial_temps["Tel"],sim.structure.dimension.length)))
+        merge!(vals, Dict("Tel" => fill(initial_temps["Tel"], sim.structure.dimension.length)))
     end
     if :Tph ∉ fields
-        merge!(vals,Dict("Tph"=>fill(initial_temps["Tph"],sim.structure.dimension.length)))
+        merge!(vals, Dict("Tph" => fill(initial_temps["Tph"], sim.structure.dimension.length)))
     end
     if :noe ∉ fields
-        merge!(vals,Dict("noe" => particlenumber_values(sim) ))
+        merge!(vals, Dict("noe" => particlenumber_values(sim) ))
     end
     if :fneq ∉ fields
-        merge!(vals,Dict("fneq" => zeros(length(sol.t),sim.structure.dimension.length,length(sim.structure.egrid))))
+        merge!(vals, Dict("fneq" => zeros(length(sol.t), sim.structure.dimension.length, length(sim.structure.egrid))))
     end
     return vals
 end
+"""
+    particlenumber_values(sim::Simulation)
+    
+    Calculates the number of thermal electrons for a system when not propagated
 
-function particlenumber_values(sim)
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Array of the number of thermal electrons at each spatial point
+"""
+function particlenumber_values(sim::Simulation)
     if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
-            no_part=zeros(sim.structure.dimension.length)
+            no_part = zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
-                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
             end
         elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
-            no_part=zeros(sim.structure.dimension.length)
+            no_part = zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
-                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
-                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
+                mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
             end
         else
-            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
+            no_part = fill(get_thermalparticles(0.0,1e-32, sim.structure.DOS,sim.structure.egrid), sim.structure.dimension.length)
         end
         return no_part
     end
     if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == false
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
-            no_part=zeros(sim.structure.dimension.length)
+            no_part = zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
-                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[j],sim.structure.egrid)
+                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
             end
         elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
-            no_part=zeros(sim.structure.dimension.length)
+            no_part = zeros(sim.structure.dimension.length)
             for j in eachindex(sim.structure.dimension.grid)
-                mat = mat_picker(sim.structure.dimension.grid[j],sim.structure.dimension.InterfaceHeight)
-                no_part[j] = get_thermalparticles(0.0,1e-32,sim.structure.DOS[mat],sim.structure.egrid)
+                mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
+                no_part[j] = get_thermalparticles(0.0,1e-32, sim.structure.DOS[mat], sim.structure.egrid)
             end
         else
-            no_part = fill(get_thermalparticles(0.0,1e-32,sim.structure.DOS,sim.structure.egrid),sim.structure.dimension.length)
+            no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS,sim.structure.egrid), sim.structure.dimension.length)
         end
         return no_part
     end

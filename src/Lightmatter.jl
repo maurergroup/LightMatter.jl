@@ -7,15 +7,25 @@ export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, 
 export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure, build_Structure, get_FermiEnergy
 export ElectronicDistribution, PhononicDistribution
 
-global const units = [u"eV", u"nm", u"fs", u"K"]
 
 include("UnitManagement.jl")
 using .UnitModule
+"""
+    __init__()
 
+    Initialises custom unit functions
+"""
 function __init__()
     Unitful.register(UnitModule)
     Unitful.preferunits(UnitModule.eVm, u"nm", u"fs", u"K")
 end
+
+"""
+    Lightmatter_units
+
+    A list of the preferred units in the Lightmatter.jl package
+"""
+global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K",UnitModule.eVm]
 
 include("SimulationTypes.jl")
 include("Lasers.jl")

@@ -1,16 +1,33 @@
+###
+# Could add some more key-word arguemnts such as the algorithm used
+###
 """
-    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}},initialtemps::Dict{String, Real},
-    tspan::Tuple{Real,Real},sim::SimulationSettings,mp::MaterialParameters,las::Laser,dim::Dimension
-    ;save=2.0,tolerance=1e-4,max_step=0.1,min_step=0.01)
+    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Real},
+    tspan::Tuple{Real,Real}, sim::Simulation; 
+    save, tolerance, max_step, min_step, callbacks)
+    
+    Generates the problem the dynamics will solve and then solves the coupled system of ODE's.
+    Currently always uses Tsit5 for the integration routine but in the future that may be user-defined
 
-    Creates the ODE simulation that will be performed as well as performs the ODE itself returning a DiffEq.jl
-    solution object with the final results inside. It first runs a small simulation between 0 and 0.1 to precompile
-    all functions before running the full simulation. Currently, it uses an adaptable time-stepping Runge-Kutta method to 
-    perform the dynamics but this may be flexible in the future. Tolerance defines both the absolute and relative tolerance. 
+    # Arguments
+    - 'sys': Dictionary of ODE equations to be propagated
+    - 'initialtemps': Dictionary of initial temperatures of the bath
+    - 'tspan': Tuple of values for the dynamics to run between (the laser is centred on 0.0)
+    - 'sim': Simulation settings and parameters
+    
+    # Optional Arguments
+    - 'save': The time points the solution is saved at : Defaults to 2.0 fs
+    - 'tolerance': The absolute and relative tolerance value of the dynamics : Defaults to 1e-4
+    - 'max_step': Maximum step size for adaptive integrator : Defaults to 0.1 fs
+    - 'min_step': Minimum step size for adaptive integrator : Defaults to 0.01 fs
+    = 'callbacks': Any user-defined callbacks : Defaults to CallbackSet()
+
+    # Returns
+    - The solution of the dynamics calculation
 """
-function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}},initialtemps::Dict{String, <:Real},
-    tspan::Tuple{Real,Real},sim::Simulation
-    ;save=2.0,tolerance=1e-4,max_step=0.1,min_step=0.01,callbacks=CallbackSet())
+function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Real},
+    tspan::Tuple{Real,Real}, sim::Simulation; 
+    save=2.0, tolerance=1e-4, max_step=0.1, min_step=0.01, callbacks=CallbackSet())
 
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
