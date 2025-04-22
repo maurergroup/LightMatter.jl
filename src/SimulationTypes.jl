@@ -1,20 +1,23 @@
 """
     SimulationTypes
-    Abstract type that holds all information for a SimulationTypes
+    
+    Parent type of all subtypes in Lightmatter.jl
 """
 abstract type SimulationTypes end
 """
     spl=DataInterpolations.LinearInterpolation
+
     A convenience type definition to make type specificity easier throughout the code
 """
 global const spl=DataInterpolations.LinearInterpolation
 """
-    Constants = (ħ = 8.617e-5,kB = 0.6582,me = 3.109e-31)
+    Constants = (ħ = 0.6582 eVfs, kB = 8.617e-5 eV/K, me = 5.686 eVm)
+
     Global named tuple for accessing constant physical values during a Simulation
 """
 global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip(uconvert(u"eV/K",Unitful.k)),me = ustrip(uconvert(UnitModule.eVm,Unitful.me)))
 """
-    struct Laser <: SimulationTypes
+    Laser <: SimulationTypes
         envelope::Symbol = :Gaussian #Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
         FWHM::Real = 10.0 #The Full-Width Half-Maximum of the laser, for rectnagular half the length
         Power::Real = 10.0 #The unabsorbed fluence of the laser
@@ -24,8 +27,8 @@ global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip
         R::Real = 0.0 #The reflectivity of the sample
         δb::Union{Real,Vector{<:Real}} = 1.0 #The ballistic length of electrons
     end
-    Struct that contains the shape and parameters that define the laser, these also include some material parameters
-    such as the inverse absorption coefficient (ϵ) and reflectivity (R).
+    
+    Struct that contains all laser parameters and any material parameters that affect laser absorption
 """
 @kwdef struct Laser <: SimulationTypes
     envelope::Symbol = :Gaussian #Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
