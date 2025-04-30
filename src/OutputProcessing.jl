@@ -90,7 +90,7 @@ end
     # Returns
     - Nothing returned but dictionary saved to location
 """
-function dict_to_hdf5(f, d::Dict{String,Any})
+function dict_to_hdf5(f, d)
     for (key, value) in d
         f[key] = value
     end
@@ -106,7 +106,7 @@ end
     # Returns
     - Dictionary with all Symbol keys changed to strings
 """
-function convert_symbols_to_strings(dict::Dict{Any,Any})
+function convert_symbols_to_strings(dict)
     return Dict(
         k => (v isa Symbol ? String(v) : v) 
         for (k, v) in dict
@@ -235,7 +235,7 @@ end
     # Returns
     - Dictionary of values of each of the propgated subsystems 
 """
-function generate_valuedict(sol, sim::Simulation, fields::Vector{Symbol})
+function generate_valuedict(sol, sim::Simulation, fields)
     vals = Dict{String,Union{Real,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
@@ -263,7 +263,7 @@ end
     # Returns
     - The vals dictionary with the actual results inside
 """
-function populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{<:Real}})
+function populate_value_dict!(sol ,fields, vals)
     for t in eachindex(sol.t)
         array = ArrayPartition(sol[t])
         for f in eachindex(fields)
@@ -286,7 +286,7 @@ end
     # Returns
     - vals dictionary with the thermal electron number array reduced in size
 """
-function remove_TTM_explicit_electrons!(vals::Dict{String,AbstractArray{<:Real}}, fields::Vector{Symbol}, sim::Simulation)
+function remove_TTM_explicit_electrons!(vals, fields, sim::Simulation)
     if sim.ParameterApprox.EmbeddingMethod == true
         for i in [:fneq,:noe]
             if i in fields
@@ -311,7 +311,7 @@ end
     # Returns
     - vals dictionary with the added unpropagated subsystems
 """
-function populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Real}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{<:Real}})
+function populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Real}, fields, sim::Simulation, vals)
     if :Tel ∉ fields
         merge!(vals, Dict("Tel" => fill(initial_temps["Tel"], sim.structure.dimension.length)))
     end
