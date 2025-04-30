@@ -160,11 +160,11 @@ end
 function athem_electempenergychange(sim::Simulation)
     args = Vector{Union{Expr,Symbol}}(undef, 0)
     push!(args, :(Lightmatter.elec_energychange(sim.structure.egrid, relax_dis, DOS)))
-    if sim.Systems.PhononTemperature == true
+    if sim.phononictemperature.Enabled == true
        push!(args, electronphonon_coupling(sim::Simulation))
     end
     if sim.electronictemperature.Conductivity == true
-        push!(args, :(cond))
+        push!(args, :(Tel_cond))
     end
     return Expr(:call, :+, args...)
 end

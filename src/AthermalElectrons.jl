@@ -271,9 +271,9 @@ end
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
     part_change = :(Lightmatter.get_noparticles(relax_dis, DOS, sim.structure.egrid))
-    args = (part_change)
+    args = Vector{Union{Symbol,Expr}}([part_change])
     if sim.athermalelectrons.Conductivity == true
-        push!(args, :(n_cond[i]))
+        push!(args, :n_cond)
     end
     return Expr(:call, :+, args...)
 end
@@ -322,20 +322,19 @@ end
     # Returns
     - Updated transport correction array.
 """
-function thermal_particle_transport(v_g::Vector{<:Real}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
-    idx_0 = findmin(abs(egrid-0.0))[2]
+function thermal_particle_transport!(v_g::Vector{<:Real}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
+    idx_0 = findmin(abs.(egrid.-0.0))[2]
     v_F = v_g[idx_0]
-    for i in 2:dim.length -1
+    for i in 2:length(Δn) -1
         Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
     end
     Δn[1] = (n[2] - n[1]) / dz * v_F
     Δn[end] = (n[end-1] - n[end]) / dz * v_F
-    return Δn
 end
 
-function thermal_particle_transport(v_g::Vector{Vector{<:Real}}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
-    idx_0 = findmin(abs(egrid-0.0))[2]
-    for i in 2:dim.length -1
+function thermal_particle_transport!(v_g::Vector{Vector{<:Real}}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
+    idx_0 = findmin(abs.(egrid.-0.0))[2]
+    for i in 2:length(Δn) -1
         v_F = v_g[i][idx_0]
         Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
     end
@@ -343,7 +342,6 @@ function thermal_particle_transport(v_g::Vector{Vector{<:Real}}, egrid::Vector{<
     Δn[1] = (n[2] - n[1]) / dz * v_F1
     v_Fend = v_g[end][idx_0]
     Δn[end] = (n[end-1] - n[end]) / dz * v_Fend
-    return Δn
 end
 """
     FE_initalization(bulk_DOS::Union{String, Vector{String}})

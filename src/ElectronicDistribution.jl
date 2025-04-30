@@ -84,7 +84,7 @@ end
 function build_group_velocity(v_g::Union{Vector{<:Real},Nothing}, FE::Union{Real,Vector{<:Real}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     if isnothing(v_g)
         if Conductivity == true
-            if Conductive_velocity == :fermigas
+            if conductive_velocity == :fermigas
                 if structure.Elemental_System > 1
                     elements = structure.Elemental_System
                     v_g = Vector{Vector{<:Real}}(undef,elements)
@@ -96,26 +96,26 @@ function build_group_velocity(v_g::Union{Vector{<:Real},Nothing}, FE::Union{Real
                 else
                     return get_fermigas_velocity(Ref(structure.egrid),FE)
                 end
-            elseif Conductive_velocity == :effectiveoneband
+            elseif conductive_velocity == :effectiveoneband
                 if structure.Elemental_System != 1
                     if structure.Spatial_DOS == true
                         for i in 1:structure.dimension.length
-                            v_g[i] = effective_one_band_velocity(structure.DOS[i],egrid,FE[i])
+                            v_g[i] = effective_one_band_velocity(structure.DOS[i],structure.egrid,FE[i])
                         end
                     else
                         v_g = fill(zeros(length(structure.egrid)),structure.dimension.length)
                         grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight) 
                         for i in 1:structure.Elemental_System
                             for j in grids[i]
-                                v_g[j] = effective_one_band_velocity(structure.DOS[i],egrid,FE[i])
+                                v_g[j] = effective_one_band_velocity(structure.DOS[i],structure.egrid,FE[i])
                             end
                         end
                     end
                 else
                     if structure.Spatial_DOS == true
-                        v_g = effective_one_band_velocity(structure.DOS[end],egrid,FE)
+                        v_g = effective_one_band_velocity(structure.DOS[end],structure.egrid,FE)
                     else
-                        v_g = effective_one_band_velocity(structure.DOS,egrid,FE)
+                        v_g = effective_one_band_velocity(structure.DOS,structure.egrid,FE)
                     end
                 end
             end

@@ -68,7 +68,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => Lightmatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim::Simulation)
-            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, τee))))
+            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, $τee))))
         end
     end
     return exprs
@@ -240,9 +240,9 @@ function conductivity_expressions(sim::Simulation)
         push!(cond_exprs,:(Lightmatter.phonontemperature_conductivity!(u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing, p.Tph_cond)))
     end
     if sim.athermalelectrons.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
+        push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-            push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(sim.athermalelectrons.v_g, p.mp.egrid, u.noe, p.dim)))
+            push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(p.sim.athermalelectrons.v_g, p.sim.structure.egrid, u.noe, p.Δn, p.sim.structure.dimension.spacing)))
         end
     end 
     return Expr(:block,cond_exprs...)
@@ -313,10 +313,10 @@ function variable_renaming(sim::Simulation)
     old_name = [:(p.sim)]
     new_name = [:sim]
     if typeof(sim.structure.DOS) == Vector{spl}
-        push!(old_name, :(sim.structure.DOS[i]))
+        push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)
     else
-        push!(old_name, :(sim.structure.DOS))
+        push!(old_name, :(p.sim.structure.DOS))
         push!(new_name, :DOS)
     end
     if sim.athermalelectrons.Enabled == true
@@ -325,6 +325,10 @@ function variable_renaming(sim::Simulation)
         if sim.athermalelectrons.Conductivity == true
             push!(old_name,:(p.f_cond[i,:]))
             push!(new_name,:f_cond)
+            if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
+                push!(old_name,:(p.Δn[i]))
+                push!(new_name,:n_cond)
+            end
         end
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name,:(p.Tel))
