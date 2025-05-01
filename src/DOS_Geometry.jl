@@ -270,7 +270,7 @@ end
     # Returns
     - A spline or vector of splines for the desired DOS structure
 """
-function DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
+function DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::Union{String,Vector{String}}, DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
                             atomic_layer_tolerance::Real, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     if DOS !== nothing
         return DOS

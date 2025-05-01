@@ -92,9 +92,17 @@ function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, 
     end
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
         if typeof(sim.structure.DOS) == Vector{spl}
-            no_part=zeros(sim.structure.dimension.length)
-            for j in eachindex(sim.structure.dimension.grid)
-                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
+            if sim.structure.Elemental_System == 1
+                no_part=zeros(sim.structure.dimension.length)
+                for j in eachindex(sim.structure.dimension.grid)
+                    no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
+                end
+            else
+                no_part=zeros(sim.structure.dimension.length)
+                for j in eachindex(sim.structure.dimension.grid)
+                    x = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
+                    no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[x], sim.structure.egrid)
+                end
             end
         else
             no_part = fill(get_thermalparticles(0.0,1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)

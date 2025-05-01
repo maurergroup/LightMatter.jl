@@ -218,7 +218,7 @@ end
         FE::Union{Real,Vector{<:Real}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
         τ::Union{Real,Vector{<:Real}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
         τep::Union{Real,Vector{<:Real}} # Constant relaxation time for phonons
-        v_g::Union{Vector{<:Real},Vector{Vector{<:Real}}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
+        v_g::Union{Vector{<:Real},Matrix{<:Real}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
     end
 
     Struct that defines and holds all values for the propagation of athermal electrons
@@ -241,7 +241,7 @@ end
     FE::Union{Real,Vector{<:Real}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
     τ::Union{Real,Vector{<:Real}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
     τep::Union{Real,Vector{<:Real}} # Constant relaxation time for phonons
-    v_g::Union{Vector{<:Real},Vector{Vector{<:Real}}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
+    v_g::Union{Vector{<:Real},Matrix{<:Real}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
 end
 """
     build_AthermalElectrons(;structure::Structure, Enabled = false, AthermalElectron_ElectronCoupling = false, 
@@ -281,7 +281,6 @@ function build_AthermalElectrons(; Enabled = false, structure::Structure = build
     τ = convert_units(τ)
     τep = convert_units(τep)
     v_g = build_group_velocity(v_g,FE,Conductivity,Conductive_Velocity,structure)
-
     return AthermalElectrons(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
         ElectronicRelaxation=ElectronicRelaxation, PhononicRelaxation=PhononicRelaxation, 
@@ -353,11 +352,21 @@ end
     # Returns
     - The ElectronicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
-function build_ElectronicTemperature(; Enabled = false, AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
+function build_ElectronicTemperature(; Enabled = false, structure=build_Structure(), AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
                                ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = 1.0, κ = 1.0, λ = 1.0, ω = 1.0, g = 1.0)
 
     γ = convert_units(γ)
-    κ = convert_units(κ)
+    if structure.Elemental_System == 1
+        κ = convert_units(κ)
+    else
+        new_κ = zeros(structure.dimension.length)
+        κ = convert_units(κ)
+        for i in eachindex(κ)
+            X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
+            new_κ[i] = κ[X]
+        end
+        κ = new_κ
+    end
     λ = convert_units(λ)
     ω = convert_units(ω)
     g = convert_units(g)

@@ -21,6 +21,8 @@
     - Nothing is returned but a file is created
 """
 function post_production(sol, file_name::String, initial_temps::Dict{String,<:Real}, output::Symbol, sim::Simulation)
+    temp_name = "temp_"*file_name[1:end-5]*".jld2"
+    @save temp_name sol
     fid = create_datafile_and_structure(file_name)
     write_simulation(fid,sim::Simulation)
 
@@ -46,6 +48,7 @@ function post_production(sol, file_name::String, initial_temps::Dict{String,<:Re
         close(fid)
         rm(file_name)
     end
+    rm(temp_name)
 end
 """
     create_datafile_and_structure(file_name::String)
@@ -469,7 +472,12 @@ function pp_chemicalpotential(Tel,n,sim)
     if sim.athermalelectrons.Enabled == true
         Threads.@threads for i in eachindex(Tel[1,:])
             if typeof(sim.structure.DOS) == Vector{spl}
-                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS[i]),Ref(sim.structure.egrid))
+                if sim.structure.Elemental_System == 1
+                    cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS[i]),Ref(sim.structure.egrid))
+                else
+                    X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
+                    cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS[X]),Ref(sim.structure.egrid))
+                end
             else
                 cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],Ref(sim.structure.DOS),Ref(sim.structure.egrid))
             end

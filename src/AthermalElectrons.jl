@@ -300,12 +300,12 @@ function electron_distribution_transport!(v_g::Vector{<:Real}, f::AbstractArray{
     Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g
 end
 
-function electron_distribution_transport!(v_g::Vector{Vector{<:Real}}, f::AbstractArray{<:Real}, Δf::AbstractArray{<:Real}, dz::Real)
+function electron_distribution_transport!(v_g::Matrix{<:Real}, f::AbstractArray{<:Real}, Δf::AbstractArray{<:Real}, dz::Real)
     for i in 2:size(f, 1)-1
-        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g[i]
+        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g[i,:]
     end
-    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g[1]
-    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g[end]
+    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g[1,:]
+    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g[end,:]
 end
 """
     thermal_particle_transport(v_g::Vector{<:Real},egrid::Vector{<:Real},n::Vector{<:Real},Δn::Vector{<:Real},dz::Real)
@@ -332,15 +332,15 @@ function thermal_particle_transport!(v_g::Vector{<:Real}, egrid::Vector{<:Real},
     Δn[end] = (n[end-1] - n[end]) / dz * v_F
 end
 
-function thermal_particle_transport!(v_g::Vector{Vector{<:Real}}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
+function thermal_particle_transport!(v_g::Matrix{<:Real}, egrid::Vector{<:Real}, n::Vector{<:Real}, Δn::Vector{<:Real}, dz::Real)
     idx_0 = findmin(abs.(egrid.-0.0))[2]
     for i in 2:length(Δn) -1
-        v_F = v_g[i][idx_0]
+        v_F = v_g[i,idx_0]
         Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
     end
-    v_F1 = v_g[1][idx_0]
+    v_F1 = v_g[1,idx_0]
     Δn[1] = (n[2] - n[1]) / dz * v_F1
-    v_Fend = v_g[end][idx_0]
+    v_Fend = v_g[end,idx_0]
     Δn[end] = (n[end-1] - n[end]) / dz * v_Fend
 end
 """

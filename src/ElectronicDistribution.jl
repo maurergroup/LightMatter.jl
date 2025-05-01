@@ -103,13 +103,12 @@ function build_group_velocity(v_g::Union{Vector{<:Real},Nothing}, FE::Union{Real
                             v_g[i] = effective_one_band_velocity(structure.DOS[i],structure.egrid,FE[i])
                         end
                     else
-                        v_g = fill(zeros(length(structure.egrid)),structure.dimension.length)
-                        grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight) 
-                        for i in 1:structure.Elemental_System
-                            for j in grids[i]
-                                v_g[j] = effective_one_band_velocity(structure.DOS[i],structure.egrid,FE[i])
-                            end
+                        v_g = zeros(structure.dimension.length,length(structure.egrid))
+                        for i in 1:size(v_g,1)
+                            j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
+                            v_g[i,:] .= effective_one_band_velocity(structure.DOS[j],structure.egrid,FE[j])
                         end
+                        return v_g
                     end
                 else
                     if structure.Spatial_DOS == true

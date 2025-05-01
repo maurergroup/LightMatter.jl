@@ -258,7 +258,7 @@ function split_grid(grid::Vector{<:Real}, cutoffs::Union{Real,Vector{Real}})
     cutoffs = isa(cutoffs, Vector) ? cutoffs : [cutoffs]
     sections = Vector{Vector{<:Real}}()
     start_idx = 1
-    for cutoff in sorted_cutoffs
+    for cutoff in cutoffs
         end_idx = findfirst(x -> x > cutoff, grid)
         if isnothing(end_idx)
             push!(sections, grid[start_idx:end])
