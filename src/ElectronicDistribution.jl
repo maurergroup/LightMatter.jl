@@ -104,7 +104,7 @@ function build_group_velocity(v_g::Union{Vector{<:Real},Nothing}, FE::Union{Real
                         end
                     else
                         v_g = zeros(structure.dimension.length,length(structure.egrid))
-                        for i in 1:size(v_g,1)
+                        Threads.@threads for i in 1:size(v_g,1)
                             j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
                             v_g[i,:] .= effective_one_band_velocity(structure.DOS[j],structure.egrid,FE[j])
                         end

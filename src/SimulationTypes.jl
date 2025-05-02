@@ -361,7 +361,7 @@ function build_ElectronicTemperature(; Enabled = false, structure=build_Structur
     else
         new_κ = zeros(structure.dimension.length)
         κ = convert_units(κ)
-        for i in eachindex(κ)
+        for i in eachindex(new_κ)
             X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
             new_κ[i] = κ[X]
         end
