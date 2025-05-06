@@ -37,7 +37,7 @@ global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip
 
     FWHM::Real # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Real # The unabsorbed fluence of the laser
-    hv::Real # The photon frequency of the laser
+    hv::Union{Real,Vector{<:Tuple{Real,Real}}} # The photon frequency of the laser
     ϵ::Union{Real, Vector{<:Real}} # The inverse of the absorption coefficient
     R::Real # The reflectivity of the sample
     δb::Union{Real, Vector{<:Real}} # The ballistic length of electrons
@@ -62,7 +62,7 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Real = 10.0, ϕ::Real = 10.0, hv::Real=5.0, Transport::Symbol = :optical,
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Real = 10.0, ϕ::Real = 10.0, hv::Union{Real,Vector{<:Tuple{Real,Real}}}=5.0, Transport::Symbol = :optical,
                       ϵ::Union{Real,Vector{<:Real}} = 1.0, R::Real = 0.0, δb::Union{Real,Vector{<:Real}} = 1.0)
     
     FWHM = convert_units(FWHM)

@@ -208,25 +208,6 @@ function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Union{Real,V
     K=κ.*Tel./Tph
     depthderivative!((cond.*K), dz, cond)
 end
-
-#= function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Union{Real,Vector{<:Real}}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
-    n = length(Tel)
-    K = κ.*Tel./Tph
-    # Apply Neumann boundary conditions (zero gradient)
-    T_left = Tel[2]         # T[0] ≈ T[2]
-    T_right = Tel[end-1]    # T[end+1] ≈ T[end-1]
-
-    # First point (left boundary)
-    cond[1] = K[1] * (Tel[2] - 2*Tel[1] + T_left) / dz^2
-
-    # Interior points
-    for i in 2:n-1
-        cond[i] = K[i] * (Tel[i+1] - 2*Tel[i] + Tel[i-1]) / dz^2
-    end
-
-    # Last point (right boundary)
-    cond[end] = K[end] * (T_right - 2*Tel[end] + Tel[end-1]) / dz^2
-end =#
 """
     depthderivative!(vec::Vector{<:Real}, dz::Real, Diff::Vector{<:Real})
     
