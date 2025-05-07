@@ -65,17 +65,17 @@ function athemexcitation(ftot::Vector{<:Real}, egrid::Vector{<:Real}, DOS::spl, 
     return Δfneqtot ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
 end
 
-function athemexcitation(ftot::Vector{<:Real}, egrid::Vector{<:Real}, DOS::spl, hv::Vector{Real}, M::Union{Real,Vector{<:Real}})
-    Δneqs = zeros(length(hv),length(egrid))
-    for i in eachindex(hv)
+function athemexcitation(ftot::Vector{<:Real}, egrid::Vector{<:Real}, DOS::spl, hv::Matrix{<:Real}, M::Union{Real,Vector{<:Real}})
+    Δneqs = zeros(size(hv,1),length(egrid))
+    for i in 1:size(hv,1)
         ftotspl = get_interpolant(egrid, ftot)
-        Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv[i][1], M)
-        Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv[i][1], M)
+        Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv[i,1], M)
+        Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv[i,1], M)
         pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
         Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
-        Δneqs[i,:] .= Δfneqtot .* hv[i][2] ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
+        Δneqs[i,:] .= Δfneqtot .* hv[i,2] ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
     end
-    return vec(sum(Δneqs, dims=1)) # Returns the sum of the different frequency changes
+    return vec(sum(Δneqs, dims=1))  # Returns the sum of the different frequency changes
 end
 """
     athem_holegeneration(egrid::Vector{<:Real},DOS::spl,ftotspl::spl,hv::Real,M::Union{Real,Vector{<:Real}})

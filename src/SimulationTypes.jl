@@ -37,7 +37,7 @@ global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip
 
     FWHM::Real # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Real # The unabsorbed fluence of the laser
-    hv::Union{Real,Vector{<:Tuple{Real,Real}}} # The photon frequency of the laser
+    hv::Union{Real, Matrix{<:Real}} # The photon frequency of the laser
     ϵ::Union{Real, Vector{<:Real}} # The inverse of the absorption coefficient
     R::Real # The reflectivity of the sample
     δb::Union{Real, Vector{<:Real}} # The ballistic length of electrons
@@ -62,7 +62,7 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Real = 10.0, ϕ::Real = 10.0, hv::Union{Real,Vector{<:Tuple{Real,Real}}}=5.0, Transport::Symbol = :optical,
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Real = 10.0, ϕ::Real = 10.0, hv::Union{Real, Matrix{<:Real}}=5.0, Transport::Symbol = :optical,
                       ϵ::Union{Real,Vector{<:Real}} = 1.0, R::Real = 0.0, δb::Union{Real,Vector{<:Real}} = 1.0)
     
     FWHM = convert_units(FWHM)
@@ -587,7 +587,12 @@ end
     - Evenly spaced energy grid that is suitable for the numerical integration algorithm and of sufficient accuracy/discretisation for accurate dynamics
 """
 function build_egrid(hv)
-    egrid = collect(range(-2*hv,2*hv,step=0.01))
+    if hv isa Matrix
+        freq = findmax(hv[:,1])[1]
+    else
+        freq = hv
+    end
+    egrid = collect(range(-2*freq,2*freq,step=0.01))
     side = 1
     while length(egrid) % 4 != 1
         if side == 1

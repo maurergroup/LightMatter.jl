@@ -270,12 +270,15 @@ end
     # Returns
     - A spline or vector of splines for the desired DOS structure
 """
-function DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::Union{String,Vector{String}}, DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
+function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
+                            DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
                             atomic_layer_tolerance::Real, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     if DOS !== nothing
         return DOS
     else
-        if bulk_DOS isa String
+        if bulk_DOS isa Nothing
+            return get_interpolant([1.0,2.0,3.0],[2.0,4.0,6.0])
+        elseif bulk_DOS isa String
             Vbulk = get_unitcellvolume(bulk_geometry)
             if zDOS == true 
                 DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
