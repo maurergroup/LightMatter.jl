@@ -201,7 +201,7 @@ end
     # Returns
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Union{Real,Vector{<:Real}}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
+function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Real, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
     depthderivative!(Tel, dz, cond)
     cond[1] = 0.0
     cond[end] = 0.0
@@ -228,4 +228,26 @@ function depthderivative!(vec::Vector{<:Real}, dz::Real, Diff::Vector{<:Real})
     end
     Diff[1] = (vec[2]-vec[1])/dz
     Diff[end] = (vec[end]-vec[end-1])/dz
+end
+
+function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Vector{<:Real}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
+    K = κ.*Tel./Tph
+    avg_K = harmonic_average_K(K)
+
+    cond[2:end-1] = (Tel[3:end] .- Tel[1:end-2]) ./(2*dz)
+    cond[1] = 0.0
+    cond[end] = 0.0
+
+    q = avg_K .* cond
+
+    cond[2:end-1] = (q[3:end] .- q[1:end-2]) ./ (2*dz)
+    cond[1] = (q[2]-q[1]) / dz
+    cond[2] = (q[end] - q[end-1]) / dz
+end
+
+function harmonic_average_K(K)
+    new_K = zeros(length(K))
+    new_K[1:end-1] = 2 .* K[2:end] .* K[1:end-1] ./ (K[2:end] .+ K[1:end-1])
+    new_K[end] = 2 * K[end] * K[end-1] ./ (K[end-1] + K[end])
+    return new_K
 end

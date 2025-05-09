@@ -589,17 +589,19 @@ end
 function build_egrid(hv)
     if hv isa Matrix
         freq = findmax(hv[:,1])[1]
+        scal = 1.2
     else
         freq = hv
+        scal = 2
     end
-    egrid = collect(range(-2*freq,2*freq,step=0.01))
+    egrid = collect(range(-scal*freq,scal*freq,step=0.02))
     side = 1
     while length(egrid) % 4 != 1
         if side == 1
-            push!(egrid,egrid[end]+0.01)
+            push!(egrid,egrid[end]+0.02)
             side = -1
         elseif side == -1
-            pushfirst!(egrid,egrid[1]-0.01)
+            pushfirst!(egrid,egrid[1]-0.02)
             side = 1
         end
     end
