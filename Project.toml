@@ -4,6 +4,7 @@ authors = ["Henry Snowden, Reinhard Maurer"]
 version = "1.0.4"
 
 [deps]
+ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 GeneralizedGenerated = "6b9d7cbe-bcb9-11e9-073f-15a7a543e2eb"
@@ -17,6 +18,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+ArrayInterface = "7.18.1"
 DataInterpolations = "8"
 DelimitedFiles = "1"
 GeneralizedGenerated = "0.3"
