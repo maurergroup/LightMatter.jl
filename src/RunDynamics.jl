@@ -37,7 +37,8 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
     simulation_problem!(similar(u0),u0,p,0.0)
     println("Running main dynamics")
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    sol = solve(prob,BS3(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
-    #sol = solve(prob,AutoTsit5(Rosenbrock23(autodiff=false)),abstol=tolerance,reltol=tolerance,saveat=save,dt=max_step)#,dtmax=max_step,dtmin=min_step,callback = callbacks)
+    sol = solve(prob,Rosenbrock23(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
+    #sol = solve(prob,AutoTsit5(Rosenbrock23(autodiff=false)),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
     return sol
 end
+

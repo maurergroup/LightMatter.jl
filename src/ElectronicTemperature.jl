@@ -232,17 +232,17 @@ end
 
 function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Vector{<:Real}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
     K = κ.*Tel./Tph
-    avg_K = harmonic_average_K(K)
 
-    cond[2:end-1] = (Tel[3:end] .- Tel[1:end-2]) ./(2*dz)
-    cond[1] = 0.0
-    cond[end] = 0.0
+    for i in 2:length(K)-1
+        K_plus = 1 / 2 * (K[i+1] + K[i])
+        K_minus = 1 / 2 * (K[i] + K[i-1])
+        cond[i] = (K_plus*(Tel[i+1] - Tel[i]) - K_minus*(Tel[i] - Tel[i-1])) / dz^2
+    end
 
-    q = avg_K .* cond
-
-    cond[2:end-1] = (q[3:end] .- q[1:end-2]) ./ (2*dz)
-    cond[1] = (q[2]-q[1]) / dz
-    cond[2] = (q[end] - q[end-1]) / dz
+    K_plus1 = 1 / 2 * (K[2] + K[1])
+    cond[1] = (K_plus1*(Tel[2] - Tel[1]) ) / dz^2
+    K_plusend = 1 / 2 * (K[end] + K[end-1])
+    cond[end] = -(K_plusend*(Tel[end] - Tel[end-1]) ) / dz^2
 end
 
 function harmonic_average_K(K)
