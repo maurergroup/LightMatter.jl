@@ -70,7 +70,7 @@ end
     # Returns
     - The current heat capacity of the phononic thermal bath
 """
-function nonlinear_phononheatcapacity(Tph::Real, n::Real, θ::Real)
+function nonlinear_phononheatcapacity(Tph, n::Real, θ::Real)
     int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
     prob = IntegralProblem(int, (0.0, θ/Tph))
     return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
@@ -110,7 +110,7 @@ end
     # Returns
     - Value of the change in the phonon internal energy
 """
-function neqelectron_phonontransfer(fneq::Vector{<:Real}, egrid::Vector{<:Real}, τep::Real, DOS::spl)
+function neqelectron_phonontransfer(fneq, egrid::Vector{<:Real}, τep::Real, DOS::spl)
     return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
 end
 """

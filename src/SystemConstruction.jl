@@ -221,7 +221,6 @@ function monometallic_system(sys, sim::Simulation)
     expr_cond = conductivity_expressions(sim)
     loop_body = build_loopbody(sys, sim)
     return quote
-        println(t)
         $expr_cond
         Threads.@threads for i in 1:p.sim.structure.dimension.length
             $loop_body
