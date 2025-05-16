@@ -17,7 +17,7 @@ function get_FermiEnergy(File::String)
     return abs(TotalDOS[Nonzero,1])
 end
 """
-    generate_DOS(File::String, unit_scalar::Real)
+    generate_DOS(File::String, unit_scalar::Number)
     
     Generates a spline of a DOS from a file. Assumes the structure of the DOS is column 1 is Energy in eV
     and column 2 is States in eV⁻¹V⁻¹ (volume of unit cell) 
@@ -29,7 +29,7 @@ end
     # Returns
     - An interpolation object representing the DOS.
 """
-function generate_DOS(File::String, unit_scalar::Real)
+function generate_DOS(File::String, unit_scalar::Number)
     TotalDOS = readdlm(File,comments=true)
     return get_interpolant(TotalDOS[:,1], TotalDOS[:,2] * unit_scalar)
 end
@@ -54,7 +54,7 @@ function get_unitcellvolume(geometry_file::String)
     return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
 """
-    spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Real,dim::Dimension,tolerance::Real)
+    spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Number,dim::Dimension,tolerance::Number)
     
     Creates a spline of a DOS at each z-grid point in the simulation. Reads a folder of atom projected DOS's and the 
     respective geomwtry.in file to determine the height of each DOS and interpolates between them to create the final
@@ -71,7 +71,7 @@ end
     # Returns
     - A vector of splines corresponding to the DOS at each z-height
 """
-function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Real, dim::Dimension, tolerance::Real)
+function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Number, dim::Dimension, tolerance::Number)
     bulkDOS = readdlm(bulk, comments=true) #reads in the bulk DOS
     bulkDOSspl = get_interpolant(bulkDOS[:,1], bulkDOS[:,2] ./ Vbulk) #creates a spline for the bulk DOS
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance) #get a vector of file names and their respective heights
@@ -92,7 +92,7 @@ function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Real
     return zgridDOS
 end
 """
-    get_files_heights_forDOS(folder::String,geometry::String,tolerance::Real)
+    get_files_heights_forDOS(folder::String,geometry::String,tolerance::Number)
     
     Extracts atom from geometry, removes all bar one from each layer defined by tolerance, then connects the atom
     to the corresponding file in the folder of DOS'. Readjusts the heights to set the top layer to 0.0 and the
@@ -106,7 +106,7 @@ end
     # Returns
     - A vector of DOS files and their respective heights
 """
-function get_files_heights_forDOS(folder::String, geometry::String, tolerance::Real)
+function get_files_heights_forDOS(folder::String, geometry::String, tolerance::Number)
     files_from_folder = readdir(folder) # Reads all file names in folder
     dos_files = filter(f -> endswith(f, ".dat"), files_from_folder) #Filters out those that end .dat
     split = splitext.(dos_files) # Splits into matrix of file name ; extension
@@ -160,7 +160,7 @@ function get_slabgeometry(file_path::String)
     return stack(atom_data, dims=1)
 end
 """
-    get_atomiclayers(atoms::Matrix{<:Real},tolerance::Real)
+    get_atomiclayers(atoms::Matrix{<:Number},tolerance::Number)
     
     Seperats the atoms into their layers and selects a single atom from each layer. To remove degeneracy for 
     larger supercell structures.
@@ -172,7 +172,7 @@ end
     # Returns
     - A trimmed matrix of atoms now containing one atom per layer
 """
-function get_atomiclayers(atoms::Matrix{<:Real}, tolerance::Real)
+function get_atomiclayers(atoms::Matrix{<:Number}, tolerance::Number)
     unique_layers=[]
     for i in eachindex(atoms[:,1])
         to_push = true
@@ -189,7 +189,7 @@ function get_atomiclayers(atoms::Matrix{<:Real}, tolerance::Real)
     return stack(unique_layers, dims=1)
 end
 """
-    build_zDOSArray(egrid::Vector{<:Real},folder::String,files::Vector{String},heights::Vector{<:Real})
+    build_zDOSArray(egrid::Vector{<:Number},folder::String,files::Vector{String},heights::Vector{<:Number})
     
     Builds a matrix of the DOS as a function of height and energy for the individual layers. 
 
@@ -202,7 +202,7 @@ end
     # Returns
     - A matrix of states as a function of height and energy
 """
-function build_zDOSArray(egrid::Vector{<:Real}, folder::String, files::Vector{String}, heights::Vector{<:Real})
+function build_zDOSArray(egrid::Vector{<:Number}, folder::String, files::Vector{String}, heights::Vector{<:Number})
     zDOS = Matrix{Float64}(undef, length(heights), length(egrid))
     for i in eachindex(files)
         TotalDOS = readdlm(folder*files[i], comments=true)
@@ -215,7 +215,7 @@ function build_zDOSArray(egrid::Vector{<:Real}, folder::String, files::Vector{St
     return zDOSspl
 end
 """
-    DOSScale!(Temp::Matrix{<:Real},bulk::Vector{<:Real},Energies::Vector{<:Real})
+    DOSScale!(Temp::Matrix{<:Number},bulk::Vector{<:Number},Energies::Vector{<:Number})
     
     Ensures that all DOS are scaled to the same number of particles as the bulk
 
@@ -227,7 +227,7 @@ end
     # Returns
     - Temp with the rescaled DOS'
 """
-function DOSScale!(Temp::Matrix{<:Real}, bulk::Vector{<:Real}, Energies::Vector{<:Real})
+function DOSScale!(Temp::Matrix{<:Number}, bulk::Vector{<:Number}, Energies::Vector{<:Number})
     fd = FermiDirac(0.0,0.0, Energies)
     for i in eachindex(Temp[:,1])
         f(u) = extended_Bode(u*fd.*Temp[i,:], Energies) - extended_Bode(fd.*bulk, Energies)
@@ -239,7 +239,7 @@ function DOSScale!(Temp::Matrix{<:Real}, bulk::Vector{<:Real}, Energies::Vector{
     return Temp
 end
 """
-    get_interpolant(xvals::Vector{<:Real},yvals::Vector{<:Real})
+    get_interpolant(xvals::Vector{<:Number},yvals::Vector{<:Number})
     
     Generates a linear spline of any two vectors with a constant extrapolation applied to the boundaries.
 
@@ -250,10 +250,10 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-@inline get_interpolant(xvals::Vector{<:Real}, yvals::Vector{<:Real}) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
+@inline get_interpolant(xvals::Vector{<:Number}, yvals::Vector{<:Number}) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
 """
     DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
-                       atomic_layer_tolerance::Real, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+                       atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     
     Determines the desired DOS configuration and assembles it accordingly
 
@@ -272,7 +272,7 @@ end
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Real, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+                            atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     if DOS !== nothing
         return DOS
     else

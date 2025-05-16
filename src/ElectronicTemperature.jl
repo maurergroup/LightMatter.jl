@@ -35,7 +35,7 @@ end
     - Expression for the time evolution of a two-temperature model electronic temperature
 """
 function build_electronTTM(sim::Simulation, Source::Expr, ElecPhon::Expr, HeatCapacity::Expr)
-    args = Union{Expr, Symbol, Real}[Source, ElecPhon]
+    args = Union{Expr, Symbol, Number}[Source, ElecPhon]
     if sim.electronictemperature.Conductivity == true
         push!(args, :Tel_cond)
     end
@@ -63,7 +63,7 @@ function electrontemperature_heatcapacity(sim::Simulation)
     end
 end
 """
-    nonlinear_electronheatcapacity(Tel::Real, μ::Real, DOS::spl, egrid::Vector{<:Real})
+    nonlinear_electronheatcapacity(Tel::Number, μ::Number, DOS::spl, egrid::Vector{<:Number})
     
     Calculates non-linear electronic bath heat capacity. A more accurate method than the
     linear form.
@@ -77,7 +77,7 @@ end
     # Returns
     - The current heat capacity of the electronic thermal bath
 """
-function nonlinear_electronheatcapacity(Tel::Real, μ::Real, DOS::spl, egrid::Vector{<:Real})
+function nonlinear_electronheatcapacity(Tel::Number, μ::Number, DOS::spl, egrid::Vector{<:Number})
     return extended_Bode(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid, egrid)
 end
 """
@@ -106,7 +106,7 @@ function electronphonon_coupling(sim::Simulation)
     end
 end
 """
-    nonlinear_electronphononcoupling(λ::Real, ω::Real, DOS::spl, Tel::Real, μ::Real, Tph::Real, egrid::Vector{<:Real})
+    nonlinear_electronphononcoupling(λ::Number, ω::Number, DOS::spl, Tel::Number, μ::Number, Tph::Number, egrid::Vector{<:Number})
     
     Calculates the non-linear electron phonon coupling parameter and subsequent energy flow from the density-of-states
     of the system. More accurate than a constant value. 
@@ -124,7 +124,7 @@ end
     # Returns
     - Energy flow between an electornic and phononic bath with a calculate g parameter
 """
-function nonlinear_electronphononcoupling(λ::Real, ω::Real, DOS::spl, Tel::Real, μ::Real, Tph::Real, egrid::Vector{<:Real})
+function nonlinear_electronphononcoupling(λ::Number, ω::Number, DOS::spl, Tel::Number, μ::Number, Tph::Number, egrid::Vector{<:Number})
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
     g=prefac .* extended_Bode(DOS(egrid).^2 .*-dFDdE(Tel, μ, egrid), egrid)
     return -g * (Tel-Tph)
@@ -169,7 +169,7 @@ function athem_electempenergychange(sim::Simulation)
     return Expr(:call, :+, args...)
 end
 """
-    elec_energychange(egrid::Vector{<:Real}, relax_dis::Vector{<:Real}, DOS::spl)
+    elec_energychange(egrid::Vector{<:Number}, relax_dis::Vector{<:Number}, DOS::spl)
     
     Calculates the energy change of the thermal bath due to non-equilibrium-equilibrium
     electron scattering.
@@ -182,11 +182,11 @@ end
     # Returns
     - The change in the internal energy of the thermal system due to e-e scattering
 """
-function elec_energychange(egrid::Vector{<:Real}, relax_dis::Vector{<:Real}, DOS::spl)
+function elec_energychange(egrid::Vector{<:Number}, relax_dis::Vector{<:Number}, DOS::spl)
     return Lightmatter.get_internalenergy(relax_dis, DOS, egrid)
 end
 """
-    electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Union{Real,Vector{<:Real}}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
+    electrontemperature_conductivity!(Tel::Vector{<:Number}, κ::Union{Number,Vector{<:Number}}, dz::Number, Tph::Vector{<:Number}, cond::Vector{<:Number})
     
     Calculates the change in temperature due to diffusive transport of energy through the system. Uses the boundary conditions of
     setting dTel / dz to 0.0.
@@ -201,7 +201,7 @@ end
     # Returns
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Real, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
+function electrontemperature_conductivity!(Tel::Vector{<:Number}, κ::Number, dz::Number, Tph::Vector{<:Number}, cond::Vector{<:Number})
     depthderivative!(Tel, dz, cond)
     cond[1] = 0.0
     cond[end] = 0.0
@@ -209,7 +209,7 @@ function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Real, dz::Re
     depthderivative!((cond.*K), dz, cond)
 end
 """
-    depthderivative!(vec::Vector{<:Real}, dz::Real, Diff::Vector{<:Real})
+    depthderivative!(vec::Vector{<:Number}, dz::Number, Diff::Vector{<:Number})
     
     Calculates a 2nd order finite difference method of a vector along a grid with spacing dz.
     Uses central difference in the middle and forward(reverse) difference at the top(end) of the vector
@@ -222,7 +222,7 @@ end
     # Returns
     - Updates the diff vector with the finite difference result
 """
-function depthderivative!(vec::Vector{<:Real}, dz::Real, Diff::Vector{<:Real})
+function depthderivative!(vec::Vector{<:Number}, dz::Number, Diff::Vector{<:Number})
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
     end
@@ -230,7 +230,7 @@ function depthderivative!(vec::Vector{<:Real}, dz::Real, Diff::Vector{<:Real})
     Diff[end] = (vec[end]-vec[end-1])/dz
 end
 
-function electrontemperature_conductivity!(Tel::Vector{<:Real}, κ::Vector{<:Real}, dz::Real, Tph::Vector{<:Real}, cond::Vector{<:Real})
+function electrontemperature_conductivity!(Tel::Vector{<:Number}, κ::Vector{<:Number}, dz::Number, Tph::Vector{<:Number}, cond::Vector{<:Number})
     K = κ.*Tel./Tph
 
     for i in 2:length(K)-1

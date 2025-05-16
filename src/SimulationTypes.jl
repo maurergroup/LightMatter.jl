@@ -21,12 +21,12 @@ global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip
         envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
         Transport::Symbol # :optical, :ballistic and :combined are the options for how the laser decays into a slab
 
-        FWHM::Real # The Full-Width Half-Maximum of the laser, for rectnagular half the length
-        ϕ::Real # The unabsorbed fluence of the laser
-        hv::Real # The photon frequency of the laser
-        ϵ::Union{Real,Vector{<:Real}} # The inverse of the absorption coefficient
-        R::Real # The reflectivity of the sample
-        δb::Union{Real,Vector{<:Real}} # The ballistic length of electrons
+        FWHM::Number # The Full-Width Half-Maximum of the laser, for rectnagular half the length
+        ϕ::Number # The unabsorbed fluence of the laser
+        hv::Number # The photon frequency of the laser
+        ϵ::Union{Number,Vector{<:Number}} # The inverse of the absorption coefficient
+        R::Number # The reflectivity of the sample
+        δb::Union{Number,Vector{<:Number}} # The ballistic length of electrons
     end
     
     Struct that contains all laser parameters and any material parameters that affect laser absorption
@@ -35,12 +35,12 @@ global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip
     envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
     Transport::Symbol # :optical, :ballistic and :combined are the options for how the laser decays into a slab
 
-    FWHM::Real # The Full-Width Half-Maximum of the laser, for rectnagular half the length
-    ϕ::Real # The unabsorbed fluence of the laser
-    hv::Union{Real, Matrix{<:Real}} # The photon frequency of the laser
-    ϵ::Union{Real, Vector{<:Real}} # The inverse of the absorption coefficient
-    R::Real # The reflectivity of the sample
-    δb::Union{Real, Vector{<:Real}} # The ballistic length of electrons
+    FWHM::Number # The Full-Width Half-Maximum of the laser, for rectnagular half the length
+    ϕ::Number # The unabsorbed fluence of the laser
+    hv::Union{Number, Matrix{<:Number}} # The photon frequency of the laser
+    ϵ::Union{Number, Vector{<:Number}} # The inverse of the absorption coefficient
+    R::Number # The reflectivity of the sample
+    δb::Union{Number, Vector{<:Number}} # The ballistic length of electrons
 end
 """
     build_laser(;envelope=:Gaussian, FWHM=10.0, ϕ=10.0, hv=5.0, Transport=:optical, ϵ=1.0, R=0.0, δb=1.0)
@@ -62,8 +62,8 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Real = 10.0, ϕ::Real = 10.0, hv::Union{Real, Matrix{<:Real}}=5.0, Transport::Symbol = :optical,
-                      ϵ::Union{Real,Vector{<:Real}} = 1.0, R::Real = 0.0, δb::Union{Real,Vector{<:Real}} = 1.0)
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Number = 10.0, ϕ::Number = 10.0, hv::Union{Number, Matrix{<:Number}}=5.0, Transport::Symbol = :optical,
+                      ϵ::Union{Number,Vector{<:Number}} = 1.0, R::Number = 0.0, δb::Union{Number,Vector{<:Number}} = 1.0)
     
     FWHM = convert_units(FWHM)
     Power = convert_units(ϕ)
@@ -75,21 +75,21 @@ end
 """
     Dimension <: SimulationTypes
         length::Union{Int, Vector{Int}} # The length of the grid, not the depth of the slab
-        grid::AbstractArray{<:Real} # The grid the simulation is solved over
-        spacing::Union{Real, Vector{<:Real}} #The spacing between grid points
-        InterfaceHeight::Union{Real, Vector{<:Real}} # Height sorted list of the interfaces between materials
+        grid::AbstractArray{<:Number} # The grid the simulation is solved over
+        spacing::Union{Number, Vector{<:Number}} #The spacing between grid points
+        InterfaceHeight::Union{Number, Vector{<:Number}} # Height sorted list of the interfaces between materials
     end
 
     Struct that contains all information regarding the spatial grid that the simulation is performed on.
 """
 @kwdef struct Dimension <: SimulationTypes
     length::Union{Int, Vector{Int}} # The length of the grid, not the depth of the slab
-    grid::AbstractArray{<:Real} # The grid the simulation is solved over
-    spacing::Union{Real, Vector{<:Real}} #The spacing between grid points
-    InterfaceHeight::Union{Real, Vector{<:Real}} # Height sorted list of the interfaces between materials
+    grid::AbstractArray{<:Number} # The grid the simulation is solved over
+    spacing::Union{Number, Vector{<:Number}} #The spacing between grid points
+    InterfaceHeight::Union{Number, Vector{<:Number}} # Height sorted list of the interfaces between materials
 end
 """
-    build_Dimension(grid=[0.0]::AbstractArray{<:Real}, cutoff=0.0::Union{Vector{<:Real},Real})
+    build_Dimension(grid=[0.0]::AbstractArray{<:Number}, cutoff=0.0::Union{Vector{<:Number},Number})
 
     Outer constructor function to assemble the Dimension struct. The user provides an evenly spaced grid 
     and sorted list of interface heights for antenna-reactor complexes. The user must ensure the length of 
@@ -103,7 +103,7 @@ end
     # Returns
     - The Dimension struct with the users grid and interface heights
 """
-function build_Dimension(grid::AbstractArray{<:Real}=[0.0], cutoff::Union{Vector{<:Real},Real}=0.0)
+function build_Dimension(grid::AbstractArray{<:Number}=[0.0], cutoff::Union{Vector{<:Number},Number}=0.0)
     L = length(grid)
     grid = convert_units(grid)
     if L > 1
@@ -121,7 +121,7 @@ end
                             # of material parameters needs to become a vector of length=Elemental_System
 
         DOS::Union{spl,Vector{spl},Vector{Vector{spl}}} # The density of states of the simulation
-        egrid::Vector{<:Real} # An energy grid for electronic or phononic distributions to be solved on
+        egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
         dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
     end
@@ -136,7 +136,7 @@ end
                           # of material parameters needs to become a vector of length=Elemental_System
 
     DOS::Union{spl,Vector{spl}, Vector{Vector{spl}}} # The density of states of the simulation
-    egrid::Vector{<:Real} # An energy grid for electronic or phononic distributions to be solved on
+    egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
 end
@@ -144,8 +144,8 @@ end
     build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
                     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
                     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
-                    atomic_layer_tolerance::Union{Real,Vector{Real}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, 
-                    egrid::Union{Vector{<:Real},Nothing} = nothing)
+                    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, 
+                    egrid::Union{Vector{<:Number},Nothing} = nothing)
 
     Outer constructor function to assemble the Structure struct. No unit conversion is performed.
     All DOS files must be in the format |energy (eV), states (eV⁻¹Vᵤ⁻¹)|. Comment lines (#) are ignored
@@ -172,7 +172,7 @@ end
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
-    atomic_layer_tolerance::Union{Real,Vector{Real}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Union{Vector{<:Real},Nothing} = nothing)
+    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Union{Vector{<:Number},Nothing} = nothing)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = egrid isa Nothing ? build_egrid(las.hv) : egrid
@@ -215,10 +215,10 @@ end
         ExcitationMatrixElements::Symbol # Implementation is only match internal energy (:unity)
         Conductive_Velocity::Symbol # Implementation of how gorup velocity is calculated, :constant, :fermigas or :effectiveoneband
         
-        FE::Union{Real,Vector{<:Real}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
-        τ::Union{Real,Vector{<:Real}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
-        τep::Union{Real,Vector{<:Real}} # Constant relaxation time for phonons
-        v_g::Union{Vector{<:Real},Matrix{<:Real}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
+        FE::Union{Number,Vector{<:Number}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
+        τ::Union{Number,Vector{<:Number}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
+        τep::Union{Number,Vector{<:Number}} # Constant relaxation time for phonons
+        v_g::Union{Vector{<:Number},Matrix{<:Number}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
     end
 
     Struct that defines and holds all values for the propagation of athermal electrons
@@ -238,10 +238,10 @@ end
     ExcitationMatrixElements::Symbol # Implementation is only match internal energy (:unity)
     Conductive_Velocity::Symbol # Implementation of how gorup velocity is calculated, :constant, :fermigas or :effectiveoneband
     
-    FE::Union{Real,Vector{<:Real}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
-    τ::Union{Real,Vector{<:Real}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
-    τep::Union{Real,Vector{<:Real}} # Constant relaxation time for phonons
-    v_g::Union{Vector{<:Real},Matrix{<:Real}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
+    FE::Union{Number,Vector{<:Number}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
+    τ::Union{Number,Vector{<:Number}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
+    τep::Union{Number,Vector{<:Number}} # Constant relaxation time for phonons
+    v_g::Union{Vector{<:Number},Matrix{<:Number}} # Group velocity of electrons calculated assuming a Fermi liquid with μ = FE
 end
 """
     build_AthermalElectrons(;structure::Structure, Enabled = false, AthermalElectron_ElectronCoupling = false, 
@@ -300,11 +300,11 @@ end
         ElectronPhononCouplingValue::Symbol = :constant # Whether to use constant (:constant) or variable (:variable)
                                                         # electron phonon coupling
 
-        γ::Union{Real,Vector{<:Real}} = 1.0 # Specific heat capacity of electrons at room temperature for linear heat capacity
-        κ::Union{Real,Vector{<:Real}} = 1.0 # Thermal conductivity of electrons at room temperature
-        λ::Union{Real,Vector{<:Real}} = 1.0 # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
-        ω::Union{Real,Vector{<:Real}} = 1.0 # Second moment of phonon spectral function for non-linear electron-phonon coupling
-        g::Union{Real,Vector{<:Real}} = 1.0 # Constant electron-phonon coupling value 
+        γ::Union{Number,Vector{<:Number}} = 1.0 # Specific heat capacity of electrons at room temperature for linear heat capacity
+        κ::Union{Number,Vector{<:Number}} = 1.0 # Thermal conductivity of electrons at room temperature
+        λ::Union{Number,Vector{<:Number}} = 1.0 # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
+        ω::Union{Number,Vector{<:Number}} = 1.0 # Second moment of phonon spectral function for non-linear electron-phonon coupling
+        g::Union{Number,Vector{<:Number}} = 1.0 # Constant electron-phonon coupling value 
     end
 
     Struct that defines and holds all values for the propagation of an electronic temperature
@@ -323,11 +323,11 @@ end
     ElectronPhononCouplingValue::Symbol # Whether to use constant (:constant) or variable (:variable)
                                         # electron phonon coupling
 
-    γ::Union{Real,Vector{<:Real}} # Specific heat capacity of electrons at room temperature for linear heat capacity
-    κ::Union{Real,Vector{<:Real}} # Thermal conductivity of electrons at room temperature
-    λ::Union{Real,Vector{<:Real}} # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
-    ω::Union{Real,Vector{<:Real}} # Second moment of phonon spectral function for non-linear electron-phonon coupling
-    g::Union{Real,Vector{<:Real}} # Constant electron-phonon coupling value 
+    γ::Union{Number,Vector{<:Number}} # Specific heat capacity of electrons at room temperature for linear heat capacity
+    κ::Union{Number,Vector{<:Number}} # Thermal conductivity of electrons at room temperature
+    λ::Union{Number,Vector{<:Number}} # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
+    ω::Union{Number,Vector{<:Number}} # Second moment of phonon spectral function for non-linear electron-phonon coupling
+    g::Union{Number,Vector{<:Number}} # Constant electron-phonon coupling value 
 end
 """
     build_ElectronicTemperature(; Enabled = false, AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
@@ -386,10 +386,10 @@ end
         PhononicHeatCapacity::Symbol = :constant # Whether to use constant (:constant) or non-linear/Simpson's Rule (:nonlinear) 
                                                  # Phononic Heat Capacity
         
-        θ::Union{Real,Vector{<:Real}} = 1.0 # Debye temperature for non-linear phonon heat capacity
-        n::Union{Real,Vector{<:Real}} = 1.0 # Atomic density for non-linear phonon heat capacity
-        Cph::Union{Real,Vector{<:Real}} = 1.0 # Constant phonon heat capacity
-        κ::Union{Real,Vector{<:Real}} = 1.0 # Constant phonon thermal conductivity
+        θ::Union{Number,Vector{<:Number}} = 1.0 # Debye temperature for non-linear phonon heat capacity
+        n::Union{Number,Vector{<:Number}} = 1.0 # Atomic density for non-linear phonon heat capacity
+        Cph::Union{Number,Vector{<:Number}} = 1.0 # Constant phonon heat capacity
+        κ::Union{Number,Vector{<:Number}} = 1.0 # Constant phonon thermal conductivity
     end
     Struct that defines and holds all values for the propagation of a phononic temperature
     This can be coupled solely to a thermal electronic bath for a Two-Temperature Model simulation or to athermal electrons
@@ -405,10 +405,10 @@ end
     PhononicHeatCapacity::Symbol # Whether to use constant (:constant) or non-linear/Simpson's Rule (:nonlinear) 
                                  # Phononic Heat Capacity
     
-    θ::Union{Real,Vector{<:Real}} # Debye temperature for non-linear phonon heat capacity
-    n::Union{Real,Vector{<:Real}} # Atomic density for non-linear phonon heat capacity
-    Cph::Union{Real,Vector{<:Real}} # Constant phonon heat capacity
-    κ::Union{Real,Vector{<:Real}} # Constant phonon thermal conductivity
+    θ::Union{Number,Vector{<:Number}} # Debye temperature for non-linear phonon heat capacity
+    n::Union{Number,Vector{<:Number}} # Atomic density for non-linear phonon heat capacity
+    Cph::Union{Number,Vector{<:Number}} # Constant phonon heat capacity
+    κ::Union{Number,Vector{<:Number}} # Constant phonon thermal conductivity
 end
 """
     build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoupling = false, Electron_PhononCoupling = false, 

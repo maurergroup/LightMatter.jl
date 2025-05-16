@@ -74,7 +74,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
     return exprs
 end
 """
-    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Real})
+    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
     
     Generates the initial conditions (u0) NamedArrayPartition for the ODE 
 
@@ -85,7 +85,7 @@ end
     # Returns
     - NamedArrayPartition containing the initial conditions of the simulation
 """
-function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Real})
+function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
     temp_u0 = Dict()
     if sim.athermalelectrons.Enabled == true
         merge!(temp_u0, Dict("fneq"=>zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
@@ -119,7 +119,7 @@ function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, 
     return NamedArrayPartition(namtup)
 end
 """
-    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Real})
+    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
     
     Generates the parameters as a NamedTuple for the ODE 
 
@@ -130,7 +130,7 @@ end
     # Returns
     - NamedTuple containing the parameters of the simulation
 """
-function generate_parameters(sim::Simulation, initialtemps::Dict{String, <:Real})
+function generate_parameters(sim::Simulation, initialtemps::Dict{String, <:Number})
     if sim.structure.Elemental_System > 1
         p = (sim=sim,matsim=sim_seperation(sim))
     else

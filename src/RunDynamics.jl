@@ -2,8 +2,8 @@
 # Could add some more key-word arguemnts such as the algorithm used
 ###
 """
-    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Real},
-    tspan::Tuple{Real,Real}, sim::Simulation; 
+    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
+    tspan::Tuple{Number,Number}, sim::Simulation; 
     save, tolerance, max_step, min_step, callbacks)
     
     Generates the problem the dynamics will solve and then solves the coupled system of ODE's.
@@ -25,8 +25,8 @@
     # Returns
     - The solution of the dynamics calculation
 """
-function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Real},
-    tspan::Tuple{Real,Real}, sim::Simulation; 
+function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
+    tspan::Tuple{Number,Number}, sim::Simulation; 
     save=2.0, tolerance=1e-4, max_step=0.1, min_step=0.01, callbacks=CallbackSet())
 
     u0 = generate_initialconditions(sim,initialtemps)
