@@ -12,7 +12,7 @@
     # Returns
     - The value of the chemical potential
 """
-function find_chemicalpotential(no_part, Tel, DOS::spl, egrid::Vector{<:Real})
+function find_chemicalpotential(no_part::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     f(u) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
     return solve(ZeroProblem(f, 0.0), Order5(); atol=1e-3, rtol=1e-3)
 end
@@ -30,7 +30,7 @@ end
     # Returns
     - The number of electrons
 """
-function get_thermalparticles(μ::Real, Tel, DOS::spl, egrid::Vector{<:Real})
+function get_thermalparticles(μ::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end
 """
@@ -46,7 +46,7 @@ end
     # Returns
     - The number of electrons
 """
-function get_noparticles(Dis, DOS::spl, egrid::Vector{<:Real})
+function get_noparticles(Dis::Vector{<:Real}, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(Dis.*DOS(egrid),egrid)
 end
 """
@@ -63,7 +63,7 @@ end
     # Returns
     - The value of dn/dT
 """
-function p_T(μ::Real, Tel, DOS::spl, egrid::Vector{<:Real})
+function p_T(μ::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
@@ -80,7 +80,7 @@ end
     # Returns
     - The value of dn/dμ
 """
-function p_μ(μ::Real, Tel, DOS::spl, egrid::Vector{<:Real})
+function p_μ(μ::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
@@ -96,7 +96,7 @@ end
     # Returns
     - The internal energy of the given distribution
 """
-function get_internalenergy(Dis, DOS::spl, egrid::Vector{<:Real})
+function get_internalenergy(Dis::Vector{<:Real}, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(Dis .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -113,7 +113,7 @@ end
     # Returns
     - The value of dU/dT
 """
-function c_T(μ::Real, Tel, DOS::spl, egrid::Vector{<:Real})
+function c_T(μ::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -130,7 +130,7 @@ end
     # Returns
     - The value of dU/dμ
 """
-function c_μ(μ::Real, Tel, DOS::spl, egrid::Vector{<:Real})
+function c_μ(μ::Real, Tel::Real, DOS::spl, egrid::Vector{<:Real})
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -146,7 +146,7 @@ end
     # Returns
     - The integration value across the range
 """
-function extended_Bode(y, x)
+function extended_Bode(y::Vector{<:Real}, x::Vector{<:Real})
     n = length(x)
     h = x[2]-x[1]  # The spacing between points
     integral = 0.0
