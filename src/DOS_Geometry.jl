@@ -250,7 +250,7 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-@inline get_interpolant(xvals::Vector{<:Number}, yvals::Vector{<:Number}) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
+@inline get_interpolant(xvals, yvals) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
 """
     DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
                        atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})

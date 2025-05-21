@@ -12,9 +12,16 @@
     # Returns
     - The value of the chemical potential
 """
-function find_chemicalpotential(no_part::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
-    f(u) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(ZeroProblem(f, 0.0), Order5(); atol=1e-3, rtol=1e-3)
+#= function find_chemicalpotential(no_part, Tel, DOS, egrid)
+    f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
+    return solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
+end =#
+
+function find_chemicalpotential(no_part, Tel, DOS, egrid)
+    noe = ForwardDiff.value(no_part)
+    temp = ForwardDiff.value(Tel)
+    f(u,p) = noe - get_thermalparticles(u, temp, DOS, egrid)
+    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
 end
 """
     get_thermalparticles(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -30,7 +37,12 @@ end
     # Returns
     - The number of electrons
 """
-function get_thermalparticles(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+function get_thermalparticles(μ, Tel, DOS, egrid)
+    return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+end
+
+function get_thermalparticles(μ::ForwardDiff.Dual, Tel::SparseConnectivityTracer.GradientTracer, DOS, egrid)
+    μ = ForwardDiff.value(μ)
     return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end
 """
@@ -46,7 +58,7 @@ end
     # Returns
     - The number of electrons
 """
-function get_noparticles(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
+function get_noparticles(Dis, DOS, egrid)
     return extended_Bode(Dis.*DOS(egrid),egrid)
 end
 """
@@ -63,7 +75,7 @@ end
     # Returns
     - The value of dn/dT
 """
-function p_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+function p_T(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
@@ -80,7 +92,7 @@ end
     # Returns
     - The value of dn/dμ
 """
-function p_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+function p_μ(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
@@ -96,7 +108,7 @@ end
     # Returns
     - The internal energy of the given distribution
 """
-function get_internalenergy(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
+function get_internalenergy(Dis, DOS, egrid)
     return extended_Bode(Dis .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -113,7 +125,7 @@ end
     # Returns
     - The value of dU/dT
 """
-function c_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+function c_T(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -130,7 +142,7 @@ end
     # Returns
     - The value of dU/dμ
 """
-function c_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+function c_μ(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
@@ -146,7 +158,7 @@ end
     # Returns
     - The integration value across the range
 """
-function extended_Bode(y::Vector{<:Number}, x::Vector{<:Number})
+function extended_Bode(y, x)
     n = length(x)
     h = x[2]-x[1]  # The spacing between points
     integral = 0.0

@@ -54,10 +54,10 @@ end
     - 'FWHM': unit = fs:  Full-Width Half-Maximum of the laser pulse or half the duration of the Rectangular laser ± 0.0
     - 'ϕ': unit = eV/nm²: The fluence of the laser 
     - 'hv': unit = eV: The photon energy of the laser
-    - 'Transport': The method of spatial transport of the laser, :Optical, :Ballistic, :Combined
+    - 'Transport': The method of spatial transport of the laser, :optical, :ballistic, :combined
     - 'ϵ': unit = nm: The penetration depth of the material (1/α), for the :Optical & :Combined transport
     - 'R': unit = unitless:The reflectivity of the sample surface, leave at 0.0 if your provided fluence is the absorbed fluence
-    - 'δb': unit = nm:The ballistic length of electrons, for :Ballistic & :Combined transport
+    - 'δb': unit = nm:The ballistic length of electrons, for :ballistic & :combined transport
 
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units

@@ -137,16 +137,16 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, <:Numbe
         p = (sim=sim,)
     end
     if sim.electronictemperature.Conductivity == true
-        p = (; p..., Tel_cond = zeros(sim.structure.dimension.length))
+        p = (; p..., Tel_cond = Vector{Number}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true
-        p = (; p..., f_cond = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
+        p = (; p..., f_cond = Matrix{Number}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.phononictemperature.Conductivity == true
-        p = (; p..., Tph_cond = zeros(sim.structure.dimension.length))
+        p = (; p..., Tph_cond = Vector{Number}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-        p = (; p..., Δn = zeros(sim.structure.dimension.length))
+        p = (; p..., Δn = Vector{Number}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1

@@ -12,7 +12,7 @@
     # Returns
     - Value or vector of the Fermi-Dirac distribution
 """
-@inline FermiDirac(Tel::Number, μ::Number, E::Union{Vector{<:Number},Number}) = 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
+@inline FermiDirac(Tel, μ, E) = 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
 """
     dFDdE(Tel::Number, μ::Number, E::Union{Vector{<:Number},Number})
     
@@ -26,7 +26,7 @@
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to energy
 """
-@inline function dFDdE(Tel::Number, μ::Number, E::Union{Vector{<:Number},Number})
+@inline function dFDdE(Tel, μ, E)
     return -exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 """
@@ -42,7 +42,7 @@ end
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to temperature
 """
-@inline function dFDdT(Tel::Number, μ::Number, E::Union{Vector{<:Number},Number})
+@inline function dFDdT(Tel, μ, E)
     return (E.-μ) .* exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel^2 * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 """
@@ -58,7 +58,7 @@ end
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to chemical potential
 """
-@inline function dFDdμ(Tel::Number, μ::Number, E::Union{Vector{<:Number},Number})
+@inline function dFDdμ(Tel, μ, E)
     return exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 """

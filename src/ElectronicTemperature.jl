@@ -77,7 +77,7 @@ end
     # Returns
     - The current heat capacity of the electronic thermal bath
 """
-function nonlinear_electronheatcapacity(Tel::Number, μ::Number, DOS::spl, egrid::Vector{<:Number})
+function nonlinear_electronheatcapacity(Tel, μ, DOS, egrid)
     return extended_Bode(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid, egrid)
 end
 """
@@ -124,7 +124,7 @@ end
     # Returns
     - Energy flow between an electornic and phononic bath with a calculate g parameter
 """
-function nonlinear_electronphononcoupling(λ::Number, ω::Number, DOS::spl, Tel::Number, μ::Number, Tph::Number, egrid::Vector{<:Number})
+function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph, egrid)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
     g=prefac .* extended_Bode(DOS(egrid).^2 .*-dFDdE(Tel, μ, egrid), egrid)
     return -g * (Tel-Tph)
@@ -182,7 +182,7 @@ end
     # Returns
     - The change in the internal energy of the thermal system due to e-e scattering
 """
-function elec_energychange(egrid::Vector{<:Number}, relax_dis::Vector{<:Number}, DOS::spl)
+function elec_energychange(egrid, relax_dis, DOS)
     return Lightmatter.get_internalenergy(relax_dis, DOS, egrid)
 end
 """
@@ -201,12 +201,19 @@ end
     # Returns
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
-function electrontemperature_conductivity!(Tel::Vector{<:Number}, κ::Number, dz::Number, Tph::Vector{<:Number}, cond::Vector{<:Number})
-    depthderivative!(Tel, dz, cond)
-    cond[1] = 0.0
-    cond[end] = 0.0
-    K=κ.*Tel./Tph
-    depthderivative!((cond.*K), dz, cond)
+function electrontemperature_conductivity!(Tel, κ, dz, Tph, cond)
+    K = κ.*Tel./Tph
+
+    for i in 2:length(K)-1
+        K_plus = 1 / 2 * (K[i+1] + K[i])
+        K_minus = 1 / 2 * (K[i] + K[i-1])
+        cond[i] = (K_plus*(Tel[i+1] - Tel[i]) - K_minus*(Tel[i] - Tel[i-1])) / dz^2
+    end
+
+    K_plus1 = 1 / 2 * (K[2] + K[1])
+    cond[1] = (K_plus1*(Tel[2] - Tel[1]) ) / dz^2
+    K_plusend = 1 / 2 * (K[end] + K[end-1])
+    cond[end] = -(K_plusend*(Tel[end] - Tel[end-1]) ) / dz^2
 end
 """
     depthderivative!(vec::Vector{<:Number}, dz::Number, Diff::Vector{<:Number})
@@ -222,27 +229,12 @@ end
     # Returns
     - Updates the diff vector with the finite difference result
 """
-function depthderivative!(vec::Vector{<:Number}, dz::Number, Diff::Vector{<:Number})
+function depthderivative!(vec, dz, Diff)
     for i in 2:length(vec)-1
         Diff[i]=(vec[i+1]-vec[i-1])/(2*dz)
     end
     Diff[1] = (vec[2]-vec[1])/dz
     Diff[end] = (vec[end]-vec[end-1])/dz
-end
-
-function electrontemperature_conductivity!(Tel::Vector{<:Number}, κ::Vector{<:Number}, dz::Number, Tph::Vector{<:Number}, cond::Vector{<:Number})
-    K = κ.*Tel./Tph
-
-    for i in 2:length(K)-1
-        K_plus = 1 / 2 * (K[i+1] + K[i])
-        K_minus = 1 / 2 * (K[i] + K[i-1])
-        cond[i] = (K_plus*(Tel[i+1] - Tel[i]) - K_minus*(Tel[i] - Tel[i-1])) / dz^2
-    end
-
-    K_plus1 = 1 / 2 * (K[2] + K[1])
-    cond[1] = (K_plus1*(Tel[2] - Tel[1]) ) / dz^2
-    K_plusend = 1 / 2 * (K[end] + K[end-1])
-    cond[end] = -(K_plusend*(Tel[end] - Tel[end-1]) ) / dz^2
 end
 
 function harmonic_average_K(K)

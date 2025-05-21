@@ -191,7 +191,7 @@ function write_DOS(structure::Structure)
         for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)
         end
-    elseif structure.Elemental_System > 1
+    elseif structure.Elemental_System > 1 && structure.DOS isa Vector
         DOS = zeros(length(structure.DOS), length(egrid))
         for i in eachindex(structure.DOS)
             DOS[i,:] = structure.DOS[i](egrid)

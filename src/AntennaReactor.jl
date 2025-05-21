@@ -187,7 +187,6 @@ function sim_seperation(sim::Simulation)
     tphs   = conditional_split(sim.phononictemperature, sim.phononictemperature.Enabled)
     neqs   = conditional_split(sim.athermalelectrons, sim.athermalelectrons.Enabled)
     structs = split_structure(sim.structure)
-
     new_sim = Vector{SimulationTypes}(undef, sim.structure.Elemental_System) #Build and fill vector of simulation objects
     for i in 1:sim.structure.Elemental_System 
         new_sim[i] = build_Simulation(laser=lasers[i], electronictemperature=tels[i], phononictemperature=tphs[i],
@@ -233,7 +232,7 @@ function split_structure(structure::Structure)
     field_values = Dict(f => getfield(structure, f) for f in fieldnames(typeof(structure))) #Extracts all values from fields of subssytem into dict
     
     if !(:DOS in keys(field_values) && field_values[:DOS] isa Vector)
-        return [structure]  # Return as-is if the specified field is not a vector
+        return fill(structure, structure.Elemental_System)  # Return as-is if the specified field is not a vector
     end
     
     return [

@@ -70,9 +70,16 @@ end
     # Returns
     - The current heat capacity of the phononic thermal bath
 """
-function nonlinear_phononheatcapacity(Tph::Number, n::Number, θ::Number)
+function nonlinear_phononheatcapacity(Tph, n, θ)
     int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
     prob = IntegralProblem(int, (0.0, θ/Tph))
+    return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
+end
+
+function nonlinear_phononheatcapacity(Tph::ForwardDiff.Dual, n, θ)
+    temp = ForwardDiff.value(Tph)
+    int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
+    prob = IntegralProblem(int, (0.0, θ/temp))
     return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
 end
 """
@@ -110,7 +117,7 @@ end
     # Returns
     - Value of the change in the phonon internal energy
 """
-function neqelectron_phonontransfer(fneq::Vector{<:Number}, egrid::Vector{<:Number}, τep::Number, DOS::spl)
+function neqelectron_phonontransfer(fneq, egrid, τep, DOS)
     return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
 end
 """
@@ -127,7 +134,7 @@ end
     # Returns
     - Updates cond with the change in temperature at each z-grid point
 """
-function phonontemperature_conductivity!(Tph::Vector{<:Number}, κ::Union{Number,Vector{<:Number}}, dz::Number, cond::Vector{<:Number})
+function phonontemperature_conductivity!(Tph, κ, dz, cond)
     depthderivative!(Tph, dz, cond)
     cond[1] = 0.0
     cond[end] = 0.0
