@@ -38,9 +38,9 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
     println("Running main dynamics")
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
     if sim.athermalelectrons.Conductivity == false
-        sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
+        sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step, maxiters=maxiters,callback = callbacks)
     else
-        sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step, maxiters=1e5, dtmin=min_step,callback = callbacks)
+        sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step, maxiters=maxiters, dtmin=min_step,callback = callbacks)
     end
     return sol
 end
