@@ -37,7 +37,6 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
     simulation_problem!(similar(u0),u0,p,0.0)
     println("Running main dynamics")
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    #sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
     if sim.athermalelectrons.Conductivity == false
         sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
     else
