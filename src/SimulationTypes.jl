@@ -172,11 +172,10 @@ end
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
-    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Union{Vector{<:Number},Nothing} = nothing)
+    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{<:Number} = collect(-1.0:0.1:1.0))
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
-    egrid = egrid isa Nothing ? build_egrid(las.hv) : egrid
-
+    egrid = build_egrid(egrid)
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension)
 end
 """
@@ -586,22 +585,15 @@ end
     # Returns
     - Evenly spaced energy grid that is suitable for the numerical integration algorithm and of sufficient accuracy/discretisation for accurate dynamics
 """
-function build_egrid(hv)
-    if hv isa Matrix
-        freq = findmax(hv[:,1])[1]
-        scal = 1.2
-    else
-        freq = hv
-        scal = 2
-    end
-    egrid = collect(range(-scal*freq,scal*freq,step=0.02))
+function build_egrid(egrid)
     side = 1
+    dE = egrid[2] - egrid[1]
     while length(egrid) % 4 != 1
         if side == 1
-            push!(egrid,egrid[end]+0.02)
+            push!(egrid,egrid[end]+dE)
             side = -1
         elseif side == -1
-            pushfirst!(egrid,egrid[1]-0.02)
+            pushfirst!(egrid,egrid[1]-dE)
             side = 1
         end
     end

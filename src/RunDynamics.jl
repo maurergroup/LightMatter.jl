@@ -27,7 +27,7 @@
 """
 function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
     tspan::Tuple{Number,Number}, sim::Simulation; 
-    save=2.0, tolerance=1e-4, max_step=0.1, min_step=0.01, callbacks=CallbackSet())
+    save=2.0, tolerance=1e-4, max_step=0.1, min_step=0.01, maxiters=1e5, callbacks=CallbackSet())
 
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
@@ -39,9 +39,9 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
     #sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
     if sim.fneq.Conductivity == false
-        sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
+        sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step, maxiters=1e5, dtmin=min_step,callback = callbacks)
     else
-        sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
+        sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step, maxiters=1e5, dtmin=min_step,callback = callbacks)
     end
     return sol
 end
