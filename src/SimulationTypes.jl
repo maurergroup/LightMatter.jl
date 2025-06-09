@@ -140,6 +140,7 @@ end
                           # of material parameters needs to become a vector of length=Elemental_System
 
     DOS::Union{spl,Vector{spl}, Vector{Vector{spl}}} # The density of states of the simulation
+    BandStructure::Union{Vector{spl},Matrix{spl},Nothing} # The band structure of the simulation
     egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)

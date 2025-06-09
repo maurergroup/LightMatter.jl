@@ -450,8 +450,9 @@ function output_athermalelectronelectronscattering(f, results, sim)
         mk_function((sim,μ,Tel,),(),τ_expr)
         Threads.@threads for i in eachindex(fneq[:,1,1])
             for j in eachindex(tel[1,:])
-            τee = lifetime(sim, μ[i,j], tel[i,j])
-            rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
+                τee = lifetime(sim, μ[i,j], tel[i,j])
+                rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
+            end
         end
         write_dataset(f["Athermal Electrons"], "Athermal Electron-Electron Scattering", rel)
         merge!(results, Dict("e*erelax" => rel))

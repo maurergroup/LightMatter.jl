@@ -77,24 +77,24 @@ end
 function spatial_z_laser(sim::Simulation)
     if sim.laser.Transport == :ballistic
         if sim.structure.dimension.length == 1
-            return :(1 / sim.laser.δb)
+            return :(1 ./ sim.laser.δb)
         else
             l = sim.structure.dimension.grid[end]
-            return :(1 / (sim.laser.δb*(1-exp(-$l/sim.laser.δb))) * exp.(-sim.structure.dimension.grid[i]./sim.laser.δb))
+            return :(1 ./ (sim.laser.δb.*(1 .-exp.(-$l./sim.laser.δb))) .* exp.(-sim.structure.dimension.grid[i]./sim.laser.δb))
         end
     elseif sim.laser.Transport == :optical
         if sim.structure.dimension.length == 1
-            return :(1 / sim.laser.ϵ)
+            return :(1 ./ sim.laser.ϵ)
         else
             l = sim.structure.dimension.grid[end]
-            return :(1/(sim.laser.ϵ * (1-exp(-$l/sim.laser.ϵ))) * exp.(-sim.structure.dimension.grid[i]./sim.laser.ϵ))
+            return :(1 ./(sim.laser.ϵ .* (1 .-exp.(-$l./sim.laser.ϵ))) .* exp.(-sim.structure.dimension.grid[i]./sim.laser.ϵ))
         end
     elseif sim.laser.Transport == :combined
         if sim.structure.dimension.length == 1
-            return :(1 / (sim.laser.δb + sim.laser.ϵ))
+            return :(1 ./ (sim.laser.δb .+ sim.laser.ϵ))
         else
             l = sim.structure.dimension.grid[end]
-            return :(1 / ((sim.laser.δb+sim.laser.ϵ) * (1-exp(-$l/(sim.laser.δb+sim.laser.ϵ)))) * exp.(-sim.structure.dimension.grid[i]./(sim.laser.δb+sim.laser.ϵ)))
+            return :(1 ./ ((sim.laser.δb.+sim.laser.ϵ) * (1 .-exp.(-$l./(sim.laser.δb.+sim.laser.ϵ)))) .* exp.(-sim.structure.dimension.grid[i]./(sim.laser.δb.+sim.laser.ϵ)))
         end
     end
 end
