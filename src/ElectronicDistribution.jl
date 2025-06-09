@@ -119,7 +119,7 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
                 end
             end
         else 
-            return [0.0]
+            return [NaN]
         end
     else
         if Conductivity == true
@@ -137,7 +137,7 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
                 end
             end
         else 
-            return [0.0]
+            return [NaN]
         end
     end
 end

@@ -1,4 +1,53 @@
 """
+    DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
+                       atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+    
+    Determines the desired DOS configuration and assembles it accordingly
+
+    # Arguments
+    - 'bulk_DOS': The bulk DOS file location
+    - 'bulk_geometry': The bulk DOS geometry location
+    - 'DOS_folder': The folder where the atom-projected DOS' are present
+    - 'slab_geometry': The geometry.in file used in the creation of the atom-projected DOS'
+    - 'atomic_layer_tolerance': The minimum height 2 atoms need to be apart to be considered seperate layers (default = 0.1 nm)
+    - 'dim': The Dimension struct which holds the z-grid
+    - 'zDOS': Bool for enabling a spatially dependent DOS
+    ' 'DOS': Allows the user to use their own splined DOS, for other regions of the code it must be the same type as normal DOS
+    
+    # Returns
+    - A spline or vector of splines for the desired DOS structure
+"""
+function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
+                            DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
+                            atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+    if DOS !== nothing
+        return DOS
+    else
+        if bulk_DOS isa Nothing
+            return get_interpolant(fill(NaN, 4), fill(NaN, 4))
+        elseif bulk_DOS isa String
+            Vbulk = get_unitcellvolume(bulk_geometry)
+            if zDOS == true 
+                DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
+            else
+                DOS = generate_DOS(bulk_DOS, 1/Vbulk) 
+            end
+        else
+            Vbulk = zeros(length(bulk_DOS))
+            DOS = Vector{spl}(undef, length(bulk_DOS))
+            for i in eachindex(bulk_DOS)
+                Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
+                if zDOS == true 
+                    DOS[i] = spatial_DOS(DOS_folder[i], slab_geometry[i], bulk_DOS[i], Vbulk[i],dimension, atomic_layer_tolerance)
+                else
+                    DOS[i] = generate_DOS(bulk_DOS[i], 1/Vbulk[i])
+                end
+            end
+        end
+        return DOS
+    end
+end
+"""
     get_FermiEnergy(File::String)
     
     Calculates the Fermi energy defined as the difference between 0.0 and the
@@ -251,52 +300,3 @@ end
     - Spline of yvals vs xvals
 """
 @inline get_interpolant(xvals, yvals) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
-"""
-    DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
-                       atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
-    
-    Determines the desired DOS configuration and assembles it accordingly
-
-    # Arguments
-    - 'bulk_DOS': The bulk DOS file location
-    - 'bulk_geometry': The bulk DOS geometry location
-    - 'DOS_folder': The folder where the atom-projected DOS' are present
-    - 'slab_geometry': The geometry.in file used in the creation of the atom-projected DOS'
-    - 'atomic_layer_tolerance': The minimum height 2 atoms need to be apart to be considered seperate layers (default = 0.1 nm)
-    - 'dim': The Dimension struct which holds the z-grid
-    - 'zDOS': Bool for enabling a spatially dependent DOS
-    ' 'DOS': Allows the user to use their own splined DOS, for other regions of the code it must be the same type as normal DOS
-    
-    # Returns
-    - A spline or vector of splines for the desired DOS structure
-"""
-function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
-                            DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
-    if DOS !== nothing
-        return DOS
-    else
-        if bulk_DOS isa Nothing
-            return get_interpolant([1.0,2.0,3.0],[2.0,4.0,6.0])
-        elseif bulk_DOS isa String
-            Vbulk = get_unitcellvolume(bulk_geometry)
-            if zDOS == true 
-                DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
-            else
-                DOS = generate_DOS(bulk_DOS, 1/Vbulk) 
-            end
-        else
-            Vbulk = zeros(length(bulk_DOS))
-            DOS = Vector{spl}(undef, length(bulk_DOS))
-            for i in eachindex(bulk_DOS)
-                Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
-                if zDOS == true 
-                    DOS[i] = spatial_DOS(DOS_folder[i], slab_geometry[i], bulk_DOS[i], Vbulk[i],dimension, atomic_layer_tolerance)
-                else
-                    DOS[i] = generate_DOS(bulk_DOS[i], 1/Vbulk[i])
-                end
-            end
-        end
-        return DOS
-    end
-end

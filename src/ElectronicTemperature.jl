@@ -122,7 +122,7 @@ end
     - 'egrid': Energy grid the simulation is solved over
 
     # Returns
-    - Energy flow between an electornic and phononic bath with a calculate g parameter
+    - Energy flow between an electronic and phononic bath with a calculate g parameter
 """
 function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph, egrid)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ

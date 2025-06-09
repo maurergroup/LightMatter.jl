@@ -1,6 +1,3 @@
-###
-# Could add some more key-word arguemnts such as the algorithm used
-###
 """
     run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
     tspan::Tuple{Number,Number}, sim::Simulation; 
@@ -15,33 +12,23 @@
     - 'tspan': Tuple of values for the dynamics to run between (the laser is centred on 0.0)
     - 'sim': Simulation settings and parameters
     
-    # Optional Arguments
-    - 'save': The time points the solution is saved at : Defaults to 2.0 fs
-    - 'tolerance': The absolute and relative tolerance value of the dynamics : Defaults to 1e-4
-    - 'max_step': Maximum step size for adaptive integrator : Defaults to 0.1 fs
-    - 'min_step': Minimum step size for adaptive integrator : Defaults to 0.01 fs
-    = 'callbacks': Any user-defined callbacks : Defaults to CallbackSet()
+    # KWARGS
+    - Any key-word arguemnts from DiffEq that work with ODEProblems can be including in a namedtuple here
 
     # Returns
     - The solution of the dynamics calculation
 """
 function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
-    tspan::Tuple{Number,Number}, sim::Simulation; 
-    save=2.0, tolerance=1e-4, max_step=0.1, min_step=0.01, maxiters=1e5, callbacks=CallbackSet())
+    tspan::Tuple{Number,Number}, sim::Simulation, alg=Tsit5(), kwargs...)
 
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
     simulation_expr = simulation_construction(sys,sim)
     simulation_problem! = mk_function((:du,:u,:p,:t),(),simulation_expr)
-    println("Precompiling")
+
     simulation_problem!(similar(u0),u0,p,0.0)
-    println("Running main dynamics")
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    if sim.athermalelectrons.Conductivity == false
-        sol = solve(prob,Tsit5(),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step,dtmin=min_step,callback = callbacks)
-    else
-        sol = solve(prob,Trapezoid(autodiff=false),abstol=tolerance,reltol=tolerance,saveat=save,dtmax=max_step, maxiters=1e5, dtmin=min_step,callback = callbacks)
-    end
+    sol = solve(prob, alg, kwargs...,)
     return sol
 end
 

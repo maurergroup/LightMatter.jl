@@ -15,7 +15,7 @@ global const spl=DataInterpolations.LinearInterpolation
 
     Global named tuple for accessing constant physical values during a Simulation
 """
-global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)),kB = ustrip(uconvert(u"eV/K",Unitful.k)),me = ustrip(uconvert(UnitModule.eVm,Unitful.me)))
+global const Constants = (ħ = ustrip(uconvert(u"eV*fs",Unitful.ħ)), kB = ustrip(uconvert(u"eV/K",Unitful.k)), me = ustrip(Unitful.me * 1.602e5))
 """
     Laser <: SimulationTypes
         envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
@@ -62,19 +62,23 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Number = 10.0, ϕ::Number = 10.0, hv::Union{Number, Matrix{<:Number}}=5.0, Transport::Symbol = :optical,
-                      ϵ::Union{Number,Vector{<:Number}} = 1.0, R::Number = 0.0, δb::Union{Number,Vector{<:Number}} = 1.0)
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Number = NaN, ϕ::Number = NaN, hv::Union{Number, Matrix{<:Number}} = NaN, Transport::Symbol = :optical,
+                      ϵ::Union{Number,Vector{<:Number}} = NaN, R::Number = NaN, δb::Union{Number,Vector{<:Number}} = NaN)
     
-    FWHM = convert_units(FWHM)
-    Power = convert_units(ϕ)
-    hv = convert_units(hv)
-    ϵ = convert_units(ϵ)
-    δb = convert_units(δb)
+    FWHM = uconvert(u"fs", FWHM)
+    Power = uconvert(u"eV/nm^2", ϕ)
+    if hv isa AbstractMatrix
+        hv[:,1] = uconvert(u"eV", hv[:,1])
+    else
+        hv = uconvert(u"eV", hv)
+    end
+    ϵ = uconvert(u"nm", ϵ)
+    δb = uconvert(u"nm", δb)
     return Laser(envelope=envelope, FWHM=FWHM, ϕ=Power, hv=hv, Transport=Transport, ϵ=ϵ, R=R, δb=δb)
 end
 """
     Dimension <: SimulationTypes
-        length::Union{Int, Vector{Int}} # The length of the grid, not the depth of the slab
+        length::Int # The length of the grid, not the depth of the slab
         grid::AbstractArray{<:Number} # The grid the simulation is solved over
         spacing::Union{Number, Vector{<:Number}} #The spacing between grid points
         InterfaceHeight::Union{Number, Vector{<:Number}} # Height sorted list of the interfaces between materials
@@ -83,7 +87,7 @@ end
     Struct that contains all information regarding the spatial grid that the simulation is performed on.
 """
 @kwdef struct Dimension <: SimulationTypes
-    length::Union{Int, Vector{Int}} # The length of the grid, not the depth of the slab
+    length::Int # The length of the grid, not the depth of the slab
     grid::AbstractArray{<:Number} # The grid the simulation is solved over
     spacing::Union{Number, Vector{<:Number}} #The spacing between grid points
     InterfaceHeight::Union{Number, Vector{<:Number}} # Height sorted list of the interfaces between materials
@@ -103,9 +107,9 @@ end
     # Returns
     - The Dimension struct with the users grid and interface heights
 """
-function build_Dimension(grid::AbstractArray{<:Number}=[0.0], cutoff::Union{Vector{<:Number},Number}=0.0)
+function build_Dimension(grid::AbstractArray{<:Number} = [NaN], cutoff::Union{Vector{<:Number},Number} = NaN)
     L = length(grid)
-    grid = convert_units(grid)
+    grid = uconvert(u"nm", grid)
     if L > 1
         spacing = grid[2]-grid[1]
     else
@@ -172,7 +176,7 @@ end
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
-    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{<:Number} = collect(-1.0:0.1:1.0))
+    atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{<:Number} = collect(-10.0:0.01:10.0))
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
@@ -263,7 +267,7 @@ end
     - 'ExcitationMatrixElements': Decides method to calculate excitation matrix elements, only :unity is currently implemented
     - 'FE': unit = eV: The Fermi energy defined as the difference between the bottom of the valence band in the DOS and 0.0
     - 'τ': unit = fs: A material dependent scalar for the :FLT lifetime or the constant value for :constant e-e lifetime
-    - 'τep': unit = fs: The constant lifetime for the athermal electrons due to electorn-phonon coupling
+    - 'τep': unit = fs: The constant lifetime for the athermal electrons due to electron-phonon coupling
     - 'v_g': unit = nm/fs: The group velocity of the ballistic electrons, for the user to define their own group velocity and will overwrite the 
              one calculated by build_group_velocity. Also the value used for a constant velocity.
     - 'Conductive_Velocity': Define the group velocity that build_group_velocity should use, :constant :fermigas, :effectiveoneband
@@ -275,11 +279,14 @@ end
 """
 function build_AthermalElectrons(; Enabled = false, structure::Structure = build_Structure(), AthermalElectron_ElectronCoupling = false, 
     AthermalElectron_PhononCoupling = false, Conductivity = false, ElectronicRelaxation = :FLT, PhononicRelaxation = :constant, 
-    ExcitationMatrixElements = :unity, FE=0.0, τ=1.0, τep = 1000.0, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
+    ExcitationMatrixElements = :unity, FE = NaN, τ = NaN, τep = NaN, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
 
-    τ = convert_units(τ)
-    τep = convert_units(τep)
+    τ = uconvert(u"fs", τ)
+    τep = uconvert(u"fs", τep)
+    FE = uconvert(u"eV", FE)
+
     v_g = build_group_velocity(v_g,FE,Conductivity,Conductive_Velocity,structure)
+
     return AthermalElectrons(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
         ElectronicRelaxation=ElectronicRelaxation, PhononicRelaxation=PhononicRelaxation, 
@@ -352,23 +359,22 @@ end
     - The ElectronicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_ElectronicTemperature(; Enabled = false, structure=build_Structure(), AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
-                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = 1.0, κ = 1.0, λ = 1.0, ω = 1.0, g = 1.0)
+                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = NaN, κ = NaN, λ = NaN, ω = NaN, g = NaN)
 
-    γ = convert_units(γ)
+    γ = uconvert(u"eV/nm^3/K^2", γ)
     if structure.Elemental_System == 1
-        κ = convert_units(κ)
+        κ = uconvert(u"eV/fs/nm/K", κ)
     else
         new_κ = zeros(structure.dimension.length)
-        κ = convert_units(κ)
+        κ = uconvert(u"eV/fs/nm/K", κ)
         for i in eachindex(new_κ)
             X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
             new_κ[i] = κ[X]
         end
         κ = new_κ
     end
-    λ = convert_units(λ)
-    ω = convert_units(ω)
-    g = convert_units(g)
+    ω = uconvert(u"eV^2", ω)
+    g = uconvert(u"eV/fs/nm^3/K", g)
     return ElectronicTemperature(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
                                  Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
                                  ElectronicHeatCapacity=ElectronicHeatCapacity, ElectronPhononCouplingValue=ElectronPhononCouplingValue,
@@ -424,19 +430,19 @@ end
     - 'PhononicHeatCapacity': Method for calculating the phononic heat capacity, :constant or :nonlinear
     - 'θ': unit = K: Debye temperature of the material
     - 'n': unit = atoms/nm³: Number of atoms per nm³
-    - 'Cph': unit = unitless: Constant heat capacity for :constant
-    - 'κ': unit = eV/nm³/K: Constant thermal conductivity of phonons
+    - 'Cph': unit = eV/nm³/K: Constant heat capacity for :constant
+    - 'κ': unit = eV/nm: Constant thermal conductivity of phonons
 
     # Returns
     - The PhononicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoupling = false, Electron_PhononCoupling = false, 
-                                    Conductivity = false, PhononicHeatCapacity = :linear, θ = 1.0, n = 1.0, Cph = 1.0, κ = 1.0)
+                                    Conductivity = false, PhononicHeatCapacity = :linear, θ = NaN, n = NaN, Cph = NaN, κ = NaN)
 
-    θ = convert_units(θ)
-    n = convert_units(n)
-    Cph = convert_units(Cph)
-    κ = convert_units(κ)
+    θ = uconvert(u"K", θ)
+    n = uconvert(u"nm^-3", n)
+    Cph = uconvert(u"eV/nm^3/K", Cph)
+    κ = uconvert(u"eV/nm", κ)
     return PhononicTemperature(Enabled=Enabled, AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, 
                                Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
                                PhononicHeatCapacity=PhononicHeatCapacity, θ=θ, n=n, Cph=Cph, κ=κ)

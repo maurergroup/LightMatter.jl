@@ -1,7 +1,6 @@
 module Lightmatter
 
-using DataInterpolations, DelimitedFiles, Integrals, NonlinearSolve, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful, JLD2, ForwardDiff
-using SparseConnectivityTracer, ADTypes
+using DataInterpolations, DelimitedFiles, Integrals, NonlinearSolve, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful, JLD2
 
 export build_Simulation, run_simulation, post_production, Constants, DensityMatrix, build_DensityMatrix, build_Dimension, FE_initialization
 export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, build_PhononicTemperature, function_builder
@@ -9,24 +8,14 @@ export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure
 export ElectronicDistribution, PhononicDistribution
 
 
-include("UnitManagement.jl")
-using .UnitModule
-"""
-    __init__()
-
-    Initialises custom unit functions
-"""
-function __init__()
-    Unitful.register(UnitModule)
-    Unitful.preferunits(UnitModule.eVm, u"nm", u"fs", u"K")
-end
+Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = a
 
 """
     Lightmatter_units
 
-    A list of the preferred units in the Lightmatter.jl package
+    A list of the units used in Lightmatter.jl: Please convert all units to this 
 """
-global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K",UnitModule.eVm]
+global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K"] 
 
 include("SimulationTypes.jl")
 include("Lasers.jl")
