@@ -17,6 +17,7 @@ Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
 """
 global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K"] 
 
+include("UnitManagement.jl")
 include("SimulationTypes.jl")
 include("Lasers.jl")
 include("ElectronicTemperature.jl")
