@@ -364,10 +364,10 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
                     grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
                     for i in 1:Elemental_System
                         length = length(grids[i])
-                        V_g[i] = fill(convert_units(v_g),length)
+                        V_g[i] = fill(convert_units(u"nm/fs", v_g),length)
                     end
                 else
-                    return convert_units(v_g)
+                    return convert_units(u"nm/fs", v_g)
                 end
             end
         else 

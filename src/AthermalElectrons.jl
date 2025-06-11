@@ -16,13 +16,14 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     ftot = :($feq .+ fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
+    mag_trans = magnetotransport_equations(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
         athemexcite = :(vec(sum($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
     else
         athemexcite = :($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
     end
-    return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
+    return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
 end
 """
     build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Number}, Elecphon::Union{Expr, Number})
@@ -38,8 +39,8 @@ end
     # Returns
     - A broadcasted summation of all interaction terms.
 """
-function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Number}, Elecphon::Union{Expr,Number})
-    args = Union{Expr, Symbol, Number}[athemexcite, Elecelec, Elecphon]
+function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Number}, Elecphon::Union{Expr,Number}, mag_trans::Union{Expr,Number})
+    args = Union{Expr, Symbol, Number}[athemexcite, Elecelec, Elecphon, mag_trans]
     if sim.athermalelectrons.Conductivity == true
         push!(args, :f_cond)
     end

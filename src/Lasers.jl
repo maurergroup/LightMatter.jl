@@ -10,7 +10,7 @@
     - Expression for the power of the laser as a function of time and depth
 """
 function laser_factory(sim::Simulation)
-    temporal = temporal_laser(sim.las)
+    temporal = temporal_laser(sim.laser)
     power = :((1-sim.laser.R) * sim.laser.ϕ)
     spatial = spatial_laser(sim)
     return Expr(:call, :*, temporal, spatial, power)
@@ -34,14 +34,14 @@ end
 function temporal_laser(laser::Laser)
     type = laser.envelope
     if type == :Gaussian
-        return :(sqrt(4*log(2)/pi) / laser.FWHM * exp(-4*log(2)*t^2/laser.FWHM^2))
+        return :(sqrt(4*log(2)/pi) / sim.laser.FWHM * exp(-4*log(2)*t^2/sim.laser.FWHM^2))
     elseif type == :HyperbolicSecant
-        return :(log(1+sqrt(2)) / laser.FWHM * sech(2*log(1+sqrt(2))*(t/laser.FWHM))^2)
+        return :(log(1+sqrt(2)) / sim.laser.FWHM * sech(2*log(1+sqrt(2))*(t/sim.laser.FWHM))^2)
     elseif type == :Lorentzian
-        lorent = :((1+(4/(1+sqrt(2)) * (t/laser.FWHM)^2))^-2)
-        return :(4 * sqrt(sqrt(2)-1) / (pi*laser.FWHM) * $lorent)
+        lorent = :((1+(4/(1+sqrt(2)) * (t/sim.laser.FWHM)^2))^-2)
+        return :(4 * sqrt(sqrt(2)-1) / (pi*sim.laser.FWHM) * $lorent)
     elseif type == :Rectangular
-        return :(-2*laser.FWHM ≤ t ≤ 2*laser.FWHM ? 1/(4*laser.FWHM) : 0.0)
+        return :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? 1/(4*sim.laser.FWHM) : 0.0)
     end
 end
 """
@@ -131,16 +131,16 @@ end
 
 function get_laser_intesity(las::Laser)
     temporal = temporal_laser(las)
-    power = :((1-las.R) * sim.las.ϕ)
-    return Expr(:call, :*, temporal, spatial, power)
+    power = :((1-sim.laser.R) * sim.laser.ϕ)
+    return Expr(:call, :*, temporal, power)
 end
 
 function get_laser_fields(I, n)
     if n isa Matrix || n isa Vector{<:Matrix}
-        E0 = :(sum(sqrt(2 .* $I ./ (n[:,1] .* Constants.c .* Constants.ε0)) .* n[:,2]))
+        E0 = :(sum(sqrt(2 .* $I ./ (sim.laser.n[:,1] .* Constants.c .* Constants.ϵ0)) .* sim.laser.n[:,2]))
     else
-        E0 = :(sqrt(2 .* $I ./ (n .* Constants.c .* Constants.ε0)))
+        E0 = :(sqrt(2 .* $I ./ (sim.laser.n .* Constants.c .* Constants.ϵ0)))
     end
-    B0 = :(E0 ./ Constants.c)
+    B0 = :($E0 ./ Constants.c)
     return Fields(E0, B0)
 end

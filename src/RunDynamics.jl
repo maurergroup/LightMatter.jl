@@ -19,7 +19,7 @@
     - The solution of the dynamics calculation
 """
 function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
-    tspan::Tuple{Number,Number}, sim::Simulation, alg=Tsit5(), kwargs...)
+    tspan::Tuple{Number,Number}, sim::Simulation; alg=Tsit5(), kwargs...)
 
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
@@ -28,7 +28,7 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
 
     simulation_problem!(similar(u0),u0,p,0.0)
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    sol = solve(prob, alg, kwargs...,)
+    sol = solve(prob, alg; kwargs...)
     return sol
 end
 

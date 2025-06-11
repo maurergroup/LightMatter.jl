@@ -63,16 +63,10 @@ end
 end
 
 function magnetotransport_equations(sim)
-    if sim.athermalelectrons.magnetotransport == true
-        dfdk = :(df_dk(fneq, sim))
-
-        E = :(sim.structure.fields.laser.electric + sim.structure.fields.external.electric)
-        B = :(sim.structure.fields.laser.magnetic + sim.structure.fields.external.magnetic)
-
-        X = :(Constants.q * $E / Constants.ħ)
-        Y = :(Constants.q / Constants.ħ / Constants.c *sim.athermalelectrons.v_g * $B)
-
-        return :($dfdk.*$X .+ $dfdk.*$Y)
+    if sim.athermalelectrons.MagnetoTransport == true
+        E = :($(sim.structure.fields.laser.electric) + $(sim.structure.fields.external.electric))
+        B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
+        return :(Lightmatter.magnetotransport(fneq, sim, $E, $B))
     else 
         return :(0.0)
     end
@@ -81,5 +75,19 @@ end
 function df_dk(f, sim)
     k = sim.structure.bandstructure[2](sim.structure.egrid)
     fspl = DataInterpolations.AkimaInterpolation(f, k,extrapolation = ExtrapolationType.Constant)
-    return DataInterpolations.derivative(fspl, k)
+    return DataInterpolations.derivative.(Ref(fspl), k)
+end
+
+function magnetotransport(f, sim, E, B)
+    tmp = zeros(length(sim.structure.egrid))
+    h_2_e = findmin(abs.(sim.structure.egrid))[2]
+    dfdk = Lightmatter.df_dk(f, sim)
+
+    X_e = Constants.q * E / Constants.ħ
+    X_h = -Constants.q * E / Constants.ħ
+    Y_e= Constants.q / Constants.ħ / Constants.c *sim.athermalelectrons.v_g[h_2_e+1:end] * B
+    Y_h= -Constants.q / Constants.ħ / Constants.c *sim.athermalelectrons.v_g[1:h_2_e] * B
+    tmp[1:h_2_e] = -1*(dfdk[1:h_2_e].*X_h .+ dfdk[1:h_2_e].*Y_h)
+    tmp[h_2_e+1:end] = -1*(dfdk[h_2_e+1:end].*X_e .+ dfdk[h_2_e+1:end].*Y_e)
+    return tmp
 end

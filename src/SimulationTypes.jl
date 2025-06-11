@@ -65,7 +65,7 @@ end
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
 function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Number = NaN, ϕ::Number = NaN, hv::Union{Number, Matrix{<:Number}} = NaN, Transport::Symbol = :optical,
-                      ϵ::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} = NaN, R::Number = NaN, δb::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} = NaN,
+                      ϵ::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} = NaN, R::Number = 0.0, δb::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} = NaN,
                       n::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} = NaN)
     
     FWHM = convert_units(u"fs", FWHM)
@@ -129,8 +129,8 @@ end
     Struct that contains all information regarding electromagnetic fields in the simulation.
 """
 struct Fields <: SimulationTypes
-    electric::Expr
-    magnetic::Expr
+    electric::Union{Expr,Number}
+    magnetic::Union{Expr,Number}
 end
 """
     TotalFields <: SimulationTypes
@@ -167,7 +167,8 @@ end
                           # of material parameters needs to become a vector of length=Elemental_System
 
     DOS::Union{spl, Vector{spl}} # The density of states of the simulation
-    bandstructure::Union{Vector{AkimaInterpolation}, Vector{Vector{AkimaInterpolation}},Nothing} # The band structure of the simulation
+    bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} # The band structure of the simulation
+    #bandstructure::Union{Vector{DataInterpolations.AkimaInterpolation}, Vector{Vector{AkimaInterpolation}},Nothing} # The band structure of the simulation 
     egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
@@ -207,13 +208,13 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Number,Vector{Number}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{<:Number} = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(electric=:(0.0), magnetic=:(0.0)), bandstructure::Union{spl, Nothing, Vector{spl}} = nothing, FE=0.0)
+    ext_fields = Fields(:(0.0), :(0.0)), bandstructure::Union{spl, Nothing, Vector{spl}} = nothing, FE=0.0)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
     las_field = calculate_laser_fields(las)
     bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
-    return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = TotalFields(laser=las_field, external=ext_fields),
+    return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = TotalFields(las_field, ext_fields),
                     bandstructure = bandstructure)
 end
 """
@@ -273,7 +274,8 @@ end
     ElectronicRelaxation::Symbol # Implementations are Fermi Liquid Theory (:FLT) or constant (:constant)
     PhononicRelaxation::Symbol # Implementations are constant (:constant) or quasiparticle scattering (:quasi)
     ExcitationMatrixElements::Symbol # Implementation is only match internal energy (:unity)
-    Conductive_Velocity::Symbol # Implementation of how gorup velocity is calculated, :constant, :fermigas or :effectiveoneband
+    Conductive_Velocity::Symbol # Implementation of how group velocity is calculated, :constant, :fermigas or :effectiveoneband
+    MagnetoTransport::Bool # Whether to add magnetotransport to the problem 
     
     FE::Union{Number,Vector{<:Number}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
     τ::Union{Number,Vector{<:Number}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
@@ -313,7 +315,8 @@ end
 """
 function build_AthermalElectrons(; Enabled = false, structure::Structure = build_Structure(), AthermalElectron_ElectronCoupling = false, 
     AthermalElectron_PhononCoupling = false, Conductivity = false, ElectronicRelaxation = :FLT, PhononicRelaxation = :constant, 
-    ExcitationMatrixElements = :unity, FE = NaN, τ = NaN, τep = NaN, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
+    ExcitationMatrixElements = :unity, FE = NaN, τ = NaN, τep = NaN, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false,
+    MagnetoTransport = false)
 
     τ = convert_units(u"fs", τ)
     τep = convert_units(u"fs", τep)
@@ -325,7 +328,7 @@ function build_AthermalElectrons(; Enabled = false, structure::Structure = build
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
         ElectronicRelaxation=ElectronicRelaxation, PhononicRelaxation=PhononicRelaxation, 
         ExcitationMatrixElements=ExcitationMatrixElements, FE=FE, τ=τ, τep=τep, v_g=v_g,
-        Conductive_Velocity=Conductive_Velocity,EmbeddedAthEM=EmbeddedAthEM)
+        Conductive_Velocity=Conductive_Velocity,EmbeddedAthEM=EmbeddedAthEM, MagnetoTransport = MagnetoTransport)
 end
 """
     ElectronicTemperature <: SimulationTypes
