@@ -17,7 +17,11 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
     M = athemexcitation_matrixelements(sim)
-    athemexcite = :($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+    if sim.laser.hv isa Matrix
+        athemexcite = :(vec(sum($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
+    else
+        athemexcite = :($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+    end
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
 end
 """
@@ -75,7 +79,7 @@ function athemexcitation(ftot, egrid, DOS, hv::Matrix{<:Number}, M)
         Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
         Δneqs[i,:] .= Δfneqtot .* hv[i,2] ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
     end
-    return vec(sum(Δneqs, dims=1))  # Returns the sum of the different frequency changes
+    return Δneqs # Returns the sum of the different frequency changes
 end
 """
     athem_holegeneration(egrid::Vector{<:Number},DOS::spl,ftotspl::spl,hv::Number,M::Union{Number,Vector{<:Number}})

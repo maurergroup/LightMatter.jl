@@ -336,25 +336,20 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
                     return get_fermigas_velocity(Ref(structure.egrid),FE)
                 end
             elseif conductive_velocity == :effectiveoneband
-                if structure.Elemental_System != 1
-                    if structure.Spatial_DOS == true
-                        for i in 1:structure.dimension.length
-                            v_g[i] = effective_one_band_velocity(structure.DOS[i],structure.egrid,FE[i])
-                        end
-                    else
-                        v_g = zeros(structure.dimension.length,length(structure.egrid))
-                        Threads.@threads for i in 1:size(v_g,1)
-                            j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
-                            v_g[i,:] .= effective_one_band_velocity(structure.DOS[j],structure.egrid,FE[j])
-                        end
-                        return v_g
+                if structure.Spatial_DOS == true
+                    v_g = zeros(structure.dimension.length,length(structure.egrid))
+                    for i in 1:structure.dimension.length
+                        v_g[i,:] = effective_one_band_velocity(structure.bandstructure[i][1], structure.DOS[i],structure.egrid,FE[i])
                     end
+                elseif structure.Elemental_System != 1
+                    v_g = zeros(structure.dimension.length,length(structure.egrid))
+                    Threads.@threads for i in eachindex(v_g[:,1])
+                        j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
+                        v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j],structure.egrid,FE[j])
+                    end
+                    return v_g
                 else
-                    if structure.Spatial_DOS == true
-                        v_g = effective_one_band_velocity(structure.DOS[end],structure.egrid,FE)
-                    else
-                        v_g = effective_one_band_velocity(structure.DOS,structure.egrid,FE)
-                    end
+                    v_g = effective_one_band_velocity(structure.bandstructure[1], structure.DOS,structure.egrid,FE)
                 end
             end
         else 
@@ -428,20 +423,18 @@ end
     - The effective one band model group velocity as a vector or vector of vectors depending on the structure
     of the system
 """
-function effective_one_band_velocity(DOS::spl, egrid::Vector{<:Number}, FE::Number)
+function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl, egrid::Vector{<:Number}, FE::Number)
     k_E = effective_onebandmodel(DOS,egrid,FE)
     v_g = similar(k_E)
     if eltype(v_g) <: AbstractVector
         for j in eachindex(v_g)
-            E_k = DataInterpolations.AkimaInterpolation(egrid,k_E,extrapolation = ExtrapolationType.Constant)
-            dE_dk = DataInterpolations.derivative.(Ref(E_k),k_E)
+            dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
             kE_spl = Lightmatter.get_interpolant(egrid,k_E)
             dEdk_spl = Lightmatter.get_interpolant(k_E,dE_dk)
             v_g[j] = dEdk_spl(kE_spl(egrid))./ Constants.ħ
         end
     else
-        E_k = DataInterpolations.AkimaInterpolation(egrid,k_E,extrapolation = ExtrapolationType.Constant)
-        dE_dk = DataInterpolations.derivative.(Ref(E_k),k_E)
+        dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
         kE_spl = Lightmatter.get_interpolant(egrid,k_E)
         dEdk_spl = Lightmatter.get_interpolant(k_E,dE_dk)
         v_g = dEdk_spl(kE_spl(egrid))./ Constants.ħ
@@ -462,30 +455,36 @@ end
     # Returns
     - The effective one band model dispersion relation
 """
-function effective_onebandmodel(DOS::spl, egrid::Vector{<:Number}, FE::Number)
-    if DOS isa Vector{spl}
-        k_E=fill(zeros(egrid),length(DOS))
-    else
-        k_E = zeros(length(egrid))
-    end
+function effective_onebandmodel(DOS, egrid::Vector{<:Number}, FE::Number)
+    k_E = zeros(length(egrid))
     
     factor = 3π^2
     int(u,p) = DOS(u)
 
-    if DOS isa Vector{spl}
-        for v in eachindex(k_E)
-            for (i,E) in enumerate(egrid)
-                prob = IntegralProblem(int, -FE, E)
-                sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-8, reltol=1e-8)
-                k_E[v][i] = cbrt(factor*sol.u)
-            end
-        end
-    else 
-        for (i,E) in enumerate(egrid)
-            prob=IntegralProblem(int, -FE, E)
-            sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-8, reltol=1e-8)
-            k_E[i] = cbrt(factor*sol.u)
-        end
+    for (i,E) in enumerate(egrid)
+        prob=IntegralProblem(int, -FE, E)
+        sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-8, reltol=1e-8)
+        k_E[i] = cbrt(factor*sol.u)
     end
     return k_E
+end
+
+function bandstructure_initialization(bandstructure, DOS, egrid, FE)
+    if bandstructure isa Nothing
+        if DOS isa AbstractArray
+            E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
+            for i in eachindex(DOS)
+                temp_k = effective_onebandmodel(DOS[i], egrid, FE)
+                E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
+                          DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
+            end
+            return k_E
+        else
+            temp_k = effective_onebandmodel(DOS, egrid, FE)
+            return [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
+                    DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
+        end
+    else
+        return bandstructure
+    end
 end

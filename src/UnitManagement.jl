@@ -19,9 +19,9 @@ end
     # Returns
     - The Quantity converted into Lightmatter.jl's preferred units, or the Number left as is
 """
-function convert_units(value::Union{Quantity, AbstractArray{<:Quantity}, Number, AbstractArray{<:Number}})
+function convert_units(unit::Unitful.FreeUnits, value::Union{Quantity, AbstractArray{<:Quantity}, Number, AbstractArray{<:Number}})
     if value isa Quantity || first(value) isa Quantity
-        val = upreferred.(value)
+        val = uconvert.(unit, value)
         return Float64.(ustrip(val))
     else
         return value

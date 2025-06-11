@@ -10,13 +10,13 @@
     - Expression for the power of the laser as a function of time and depth
 """
 function laser_factory(sim::Simulation)
-    temporal = temporal_laser(sim)
+    temporal = temporal_laser(sim.las)
     power = :((1-sim.laser.R) * sim.laser.ϕ)
     spatial = spatial_laser(sim)
     return Expr(:call, :*, temporal, spatial, power)
 end
 """
-    temporal_laser(sim::Simulation)
+    temporal_laser(las::Laser)
     
     Assembles the expression for the user desired temporal shape of the laser
     Currently implemented:
@@ -26,22 +26,22 @@ end
     - :Rectangular : Constant illumination style method. The laser is on for 2*FWHM at either side of 0.0 fs
 
     # Arguments
-    - 'sim': Simulation settings and parameters
+    - 'las': Settings and parameters of the laser
 
     # Returns
     - Expression for the temporal shape of the laser
 """
-function temporal_laser(sim::Simulation)
-    type = sim.laser.envelope
+function temporal_laser(laser::Laser)
+    type = laser.envelope
     if type == :Gaussian
-        return :(sqrt(4*log(2)/pi) / sim.laser.FWHM * exp(-4*log(2)*t^2/sim.laser.FWHM^2))
+        return :(sqrt(4*log(2)/pi) / laser.FWHM * exp(-4*log(2)*t^2/laser.FWHM^2))
     elseif type == :HyperbolicSecant
-        return :(log(1+sqrt(2)) / sim.laser.FWHM * sech(2*log(1+sqrt(2))*(t/sim.laser.FWHM))^2)
+        return :(log(1+sqrt(2)) / laser.FWHM * sech(2*log(1+sqrt(2))*(t/laser.FWHM))^2)
     elseif type == :Lorentzian
-        lorent = :((1+(4/(1+sqrt(2)) * (t/sim.laser.FWHM)^2))^-2)
-        return :(4 * sqrt(sqrt(2)-1) / (pi*sim.laser.FWHM) * $lorent)
+        lorent = :((1+(4/(1+sqrt(2)) * (t/laser.FWHM)^2))^-2)
+        return :(4 * sqrt(sqrt(2)-1) / (pi*laser.FWHM) * $lorent)
     elseif type == :Rectangular
-        return :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? 1/(4*sim.laser.FWHM) : 0.0)
+        return :(-2*laser.FWHM ≤ t ≤ 2*laser.FWHM ? 1/(4*laser.FWHM) : 0.0)
     end
 end
 """
@@ -122,4 +122,25 @@ function spatial_xy_laser(sim::Simulation)
     else
         return 1
     end
+end
+
+function calculate_laser_fields(las::Laser)
+    I = get_laser_intesity(las)
+    return get_laser_fields(I, las.n)
+end
+
+function get_laser_intesity(las::Laser)
+    temporal = temporal_laser(las)
+    power = :((1-las.R) * sim.las.ϕ)
+    return Expr(:call, :*, temporal, spatial, power)
+end
+
+function get_laser_fields(I, n)
+    if n isa Matrix || n isa Vector{<:Matrix}
+        E0 = :(sum(sqrt(2 .* $I ./ (n[:,1] .* Constants.c .* Constants.ε0)) .* n[:,2]))
+    else
+        E0 = :(sqrt(2 .* $I ./ (n .* Constants.c .* Constants.ε0)))
+    end
+    B0 = :(E0 ./ Constants.c)
+    return Fields(E0, B0)
 end

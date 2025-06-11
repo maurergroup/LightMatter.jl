@@ -8,7 +8,7 @@ export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure
 export ElectronicDistribution, PhononicDistribution
 
 
-Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = a
+Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
 
 """
     Lightmatter_units
