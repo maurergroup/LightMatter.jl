@@ -478,7 +478,7 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                 E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
                           DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
             end
-            return k_E
+            return E_k
         else
             temp_k = effective_onebandmodel(DOS, egrid, FE)
             return [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
