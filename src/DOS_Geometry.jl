@@ -474,7 +474,12 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
         if DOS isa AbstractArray
             E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
             for i in eachindex(DOS)
-                temp_k = effective_onebandmodel(DOS[i], egrid, FE)
+                if length(DOS) == length(FE)
+                    fe = FE[i]
+                else
+                    fe = FE
+                end
+                temp_k = effective_onebandmodel(DOS[i], egrid, fe)
                 E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
                           DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
             end
