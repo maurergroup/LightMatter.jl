@@ -28,7 +28,7 @@ function post_production(sol, file_name::String, initial_temps::Dict{String,<:Nu
 
     results = seperate_results(sol,initial_temps,sim)
     fid["Time Span"] = results["times"]
-    write_dynamicalvariables(f, results)
+    write_dynamicalvariables(fid, results)
 
     selected_output_functions(fid, results, sim, output)
 
@@ -564,11 +564,13 @@ function write_dataset(file,dataset,data)
 end
 
 function get_DOS(DOS, sim, i)
-    if length(DOS) == sim.structure.dimension.length
-        return DOS[i]
-    elseif DOS isa AbstractArray
-        X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return DOS[X]
+    if DOS isa AbstractArray
+        if length(DOS) == sim.structure.dimension.length
+            return DOS[i]
+        else 
+            X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
+            return DOS[X]
+        end
     else
         return DOS
     end
