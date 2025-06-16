@@ -125,22 +125,24 @@ function spatial_xy_laser(sim::Simulation)
 end
 
 function calculate_laser_fields(las::Laser)
-    I = get_laser_intesity(las)
-    return get_laser_fields(I, las.n)
+    return get_laser_fields(las)
 end
 
-function get_laser_intesity(las::Laser)
-    temporal = temporal_laser(las)
-    power = :((1-sim.laser.R) * sim.laser.ϕ)
-    return Expr(:call, :*, temporal, power)
-end
-
-function get_laser_fields(I, n)
-    if n isa Matrix || n isa Vector{<:Matrix}
-        E0 = :(sum(sqrt(2 .* $I ./ (sim.laser.n[:,1] .* Constants.c .* Constants.ϵ0)) .* sim.laser.n[:,2]))
+function get_laser_fields(las)
+    if las.hv isa Matrix
+        power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
     else
-        E0 = :(sqrt(2 .* $I ./ (sim.laser.n .* Constants.c .* Constants.ϵ0)))
+        power = :(sim.laser.hv)
     end
-    B0 = :($E0 ./ Constants.c)
-    return Fields(E0, B0)
+    if las.envelope == :Rectangular
+        E_0 = :(sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)))
+    end
+
+    if las.hv isa Matrix
+        E = :(sum($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t)))
+    else
+        E = :($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t))
+    end
+    B = :($E ./ Constants.c)
+    return Fields(E, B)
 end

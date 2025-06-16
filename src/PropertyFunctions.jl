@@ -21,7 +21,7 @@ function find_chemicalpotential(no_part, Tel, DOS, egrid)
     #noe = ForwardDiff.value(no_part)
     temp = ForwardDiff.value(Tel)
     f(u,p) = no_part - get_thermalparticles(u, temp, DOS, egrid)
-    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
+    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-12, reltol=1e-12).u
 end
 """
     get_thermalparticles(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})

@@ -166,6 +166,9 @@ function athem_electempenergychange(sim::Simulation)
     if sim.electronictemperature.Conductivity == true
         push!(args, :(Tel_cond))
     end
+    if sim.athermalelectrons.MagnetoTransport == true
+        push!(args, :(-1*Lightmatter.get_internalenergy(Δf_mt, sim.structure.DOS, sim.structure.egrid)))
+    end
     return Expr(:call, :+, args...)
 end
 """

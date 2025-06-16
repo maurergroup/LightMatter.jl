@@ -63,6 +63,9 @@ function generate_expressions(sim::Simulation, laser::Expr)
     if sim.phononictemperature.Enabled == true
         merge!(exprs,Dict("Tph" => Lightmatter.phonontemperature_factory(sim)))
     end
+    if sim.athermalelectrons.MagnetoTransport == true
+        merge!(exprs,Dict("magneto" => Lightmatter.magnetotransport_equations(sim)))
+    end
     if sim.athermalelectrons.Enabled == true
         merge!(exprs,Dict("fneq" => Lightmatter.athemdistribution_factory(sim, laser)))
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
@@ -288,9 +291,15 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,embedding)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
+            push!(exprs,:(du.noe[i] = 0.0))
             push!(exprs,:(relax_dis = $(sys["relax"])))
-            push!(exprs,:(du.noe[i,:] .= $(sys["noe"])))
+            if sim.athermalelectrons.MagnetoTransport == true
+                push!(exprs,:(Δf_mt = $(sys["magneto"])))
+                push!(exprs,:(du.noe[i] -= Lightmatter.get_noparticles(Δf_mt, sim.structure.DOS, sim.structure.egrid)))
+            end
+            push!(exprs,:(du.noe[i] += $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
+
         end
 
         if sim.athermalelectrons.Enabled == true

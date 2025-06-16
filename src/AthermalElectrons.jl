@@ -16,7 +16,7 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     ftot = :($feq .+ fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-    mag_trans = magnetotransport_equations(sim)
+    mag_trans = athem_magneotransport(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
         athemexcite = :(vec(sum($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
@@ -39,7 +39,7 @@ end
     # Returns
     - A broadcasted summation of all interaction terms.
 """
-function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Number}, Elecphon::Union{Expr,Number}, mag_trans::Union{Expr,Number})
+function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Number}, Elecphon::Union{Expr,Number}, mag_trans::Union{Symbol,Number})
     args = Union{Expr, Symbol, Number}[athemexcite, Elecelec, Elecphon, mag_trans]
     if sim.athermalelectrons.Conductivity == true
         push!(args, :f_cond)
@@ -80,7 +80,7 @@ function athemexcitation(ftot, egrid, DOS, hv::Matrix{<:Number}, M)
         Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
         Δneqs[i,:] .= Δfneqtot .* hv[i,2] ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
     end
-    return Δneqs # Returns the sum of the different frequency changes
+    return Δneqs # Returns the different frequency changes
 end
 """
     athem_holegeneration(egrid::Vector{<:Number},DOS::spl,ftotspl::spl,hv::Number,M::Union{Number,Vector{<:Number}})
@@ -393,5 +393,13 @@ function FE_initalization(bulk_DOS::Union{String, Vector{String}})
             FE[i] = get_FermiEnergy(bulk_DOS[i])
         end
         return FE
+    end
+end
+
+function athem_magneotransport(sim)
+    if sim.athermalelectrons.MagnetoTransport == true
+        return :(Δf_mt)
+    else
+        return :(0.0)
     end
 end

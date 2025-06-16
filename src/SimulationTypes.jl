@@ -4,19 +4,7 @@
     Parent type of all subtypes in Lightmatter.jl
 """
 abstract type SimulationTypes end
-"""
-    spl=DataInterpolations.LinearInterpolation
 
-    A convenience type definition to make type specificity easier throughout the code
-"""
-global const spl=DataInterpolations.LinearInterpolation
-"""
-    Constants = (ħ = 0.6582 eVfs, kB = 8.617e-5 eV/K, me = 5.686 eVm)
-
-    Global named tuple for accessing constant physical values during a Simulation
-"""
-global const Constants = (ħ = ustrip(convert_units(u"eV*fs",Unitful.ħ)), kB = ustrip(convert_units(u"eV/K",Unitful.k)), me = ustrip(Unitful.me * 6.2415e30), c = ustrip(convert_units(u"nm/fs",Unitful.c0)),
-                          ϵ0 = 8.854e-12 * 1e15^4 / 6.2415e30 / 1e9^3, q=ustrip(-Unitful.q)*1e15)
 """
     Laser <: SimulationTypes
         envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular

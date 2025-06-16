@@ -5,7 +5,7 @@ using DataInterpolations, DelimitedFiles, Integrals, NonlinearSolve, RecursiveAr
 export build_Simulation, run_simulation, post_production, Constants, DensityMatrix, build_DensityMatrix, build_Dimension, FE_initialization
 export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, build_PhononicTemperature, function_builder
 export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure, build_Structure, get_FermiEnergy
-export ElectronicDistribution, PhononicDistribution
+export ElectronicDistribution, PhononicDistribution, BaseUnits
 
 
 Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
@@ -16,6 +16,13 @@ Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
     A list of the units used in Lightmatter.jl: Please convert all units to this 
 """
 global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K"] 
+
+"""
+    spl=DataInterpolations.LinearInterpolation
+
+    A convenience type definition to make type specificity easier throughout the code
+"""
+global const spl=DataInterpolations.LinearInterpolation
 
 include("UnitManagement.jl")
 include("SimulationTypes.jl")
