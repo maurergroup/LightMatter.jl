@@ -15,8 +15,8 @@ global const spl=DataInterpolations.LinearInterpolation
 
     Global named tuple for accessing constant physical values during a Simulation
 """
-global const Constants = (ħ = ustrip(convert_units(u"eV*fs",Unitful.ħ)), kB = ustrip(convert_units(u"eV/K",Unitful.k)), me = ustrip(Unitful.me * 1.602e5), c = ustrip(convert_units(u"nm/fs",Unitful.c0)),
-                          ϵ0 = ustrip(convert_units(u"c^2/eV/nm", 8.854e-12u"c^2/J/m")), q=ustrip(-Unitful.q))
+global const Constants = (ħ = ustrip(convert_units(u"eV*fs",Unitful.ħ)), kB = ustrip(convert_units(u"eV/K",Unitful.k)), me = ustrip(Unitful.me * 6.2415e30), c = ustrip(convert_units(u"nm/fs",Unitful.c0)),
+                          ϵ0 = 8.854e-12 * 1e15^4 / 6.2415e30 / 1e9^3, q=ustrip(-Unitful.q)*1e15)
 """
     Laser <: SimulationTypes
         envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
@@ -155,6 +155,8 @@ end
         egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
         dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
+         bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} 
+                        # The band structure of the simulation both in terms of k->E and E-> k
     end
 
     Struct that contains any spatial information including the DOS, the spatial grid to solve the simulation on and
@@ -168,7 +170,6 @@ end
 
     DOS::Union{spl, Vector{spl}} # The density of states of the simulation
     bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} # The band structure of the simulation
-    #bandstructure::Union{Vector{DataInterpolations.AkimaInterpolation}, Vector{Vector{AkimaInterpolation}},Nothing} # The band structure of the simulation 
     egrid::Vector{<:Number} # An energy grid for electronic or phononic distributions to be solved on
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
