@@ -19,9 +19,9 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     mag_trans = athem_magneotransport(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
-        athemexcite = :(vec(sum($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
+        athemexcite = :(vec(sum($laser_expr .* Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
     else
-        athemexcite = :($laser_expr * Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+        athemexcite = :($laser_expr .* Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
     end
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
 end
