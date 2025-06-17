@@ -26,11 +26,11 @@ abstract type SimulationTypes end
 
     FWHM::Number # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Number # The unabsorbed fluence of the laser
-    n::Union{Number, Vector{<:Number}, Matrix{<:Number}, Vector{<:Matrix{Number}}}# The real part of the refractive index of the material
+    n::Union{Number, Vector{<:Number}, Matrix{<:Number}, Vector{<:Matrix{<:Number}}}# The real part of the refractive index of the material
     hv::Union{Number, Matrix{<:Number}} # The photon frequency of the laser
-    ϵ::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} # The inverse of the absorption coefficient
+    ϵ::Union{Number, Vector{<:Number}, Vector{<:Vector{<:Number}}} # The inverse of the absorption coefficient
     R::Number # The reflectivity of the sample
-    δb::Union{Number, Vector{<:Number}, Vector{<:Vector{Number}}} # The ballistic length of electrons
+    δb::Union{Number, Vector{<:Number}, Vector{<:Vector{<:Number}}} # The ballistic length of electrons
 end
 """
     build_laser(;envelope=:Gaussian, FWHM=10.0, ϕ=10.0, hv=5.0, Transport=:optical, ϵ=1.0, R=0.0, δb=1.0)

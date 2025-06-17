@@ -136,6 +136,8 @@ function get_laser_fields(las)
     end
     if las.envelope == :Rectangular
         E_0 = :(sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)))
+    elseif las.envelope == :Gaussian
+        E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.las.FWHM^2))
     end
 
     if las.hv isa Matrix
