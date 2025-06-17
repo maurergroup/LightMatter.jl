@@ -74,7 +74,7 @@ function df_dk(f, sim)
 end
 
 function magnetotransport_1d(f, sim, B)
-
+    tmp = zeros(length(sim.structure.egrid))
     h_2_e = findmin(abs.(sim.structure.egrid))[2]
     dfdk = Lightmatter.df_dk(f, sim)
     Y_e= Constants.q / Constants.ħ / Constants.c * sim.athermalelectrons.v_g[h_2_e+1:end] * B
