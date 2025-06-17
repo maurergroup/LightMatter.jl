@@ -64,7 +64,7 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d(fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), n, sim, $B))
+    return :(Lightmatter.magnetotransport_1d(fneq, sim, $B))
 end
 
 function df_dk(f, sim)
@@ -73,14 +73,9 @@ function df_dk(f, sim)
     return DataInterpolations.derivative.(Ref(fspl), k)
 end
 
-function magnetotransport_1d(f, n, sim, B)
-    tmp = zeros(length(sim.structure.egrid))
-    h_2_e = findmin(abs.(sim.structure.egrid))[2]
+function magnetotransport_1d(f, sim, B)
 
-    goal = Lightmatter.get_internalenergy(f, sim.structure.DOS, sim.structure.egrid)
-    f_0 = Lightmatter.find_relaxeddistribution(sim.structure.egrid, goal, n, sim.structure.DOS)
-    g_k = f.- f_0
-    dfdk = Lightmatter.df_dk(g_k, sim)
+    dfdk = Lightmatter.df_dk(f, sim)
     Y_e= Constants.q / Constants.ħ / Constants.c * sim.athermalelectrons.v_g[h_2_e+1:end] * B
     Y_h= -Constants.q / Constants.ħ / Constants.c * sim.athermalelectrons.v_g[1:h_2_e] * B
 

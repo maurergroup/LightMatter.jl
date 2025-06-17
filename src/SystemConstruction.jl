@@ -71,7 +71,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => Lightmatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim::Simulation)
-            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, $τee))))
+            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n+Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid), $τee))))
         end
     end
     return exprs
