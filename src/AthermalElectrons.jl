@@ -302,6 +302,12 @@ function athem_thermalelectronparticlechange(sim::Simulation)
     if sim.athermalelectrons.Conductivity == true
         push!(args, :n_cond)
     end
+    if sim.athermalelectrons.AthermalElectron_PhononCoupling == true
+        push!(args, :(Lightmatter.get_noparticles(fneq./τep,DOS,egrid)))
+    end
+    if sim.athermalelectrons.MagnetoTransport == true
+        push!(args, :(Lightmatter.get_noparticles(Δf_mt,DOS,egrid)))
+    end
     return Expr(:call, :+, args...)
 end
 """

@@ -82,5 +82,5 @@ function magnetotransport_1d(f, sim, B)
 
     tmp[1:h_2_e] = dfdk[1:h_2_e].*Y_h
     tmp[h_2_e+1:end] = dfdk[h_2_e+1:end].*Y_e
-    return tmp * -1
+    return tmp
 end
