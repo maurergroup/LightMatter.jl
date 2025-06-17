@@ -303,7 +303,8 @@ function athem_thermalelectronparticlechange(sim::Simulation)
         push!(args, :n_cond)
     end
     if sim.athermalelectrons.AthermalElectron_PhononCoupling == true
-        push!(args, :(Lightmatter.get_noparticles(fneq./τep,DOS,egrid)))
+        τep = phonon_relaxationtime(sim)
+        push!(args, :(Lightmatter.get_noparticles(fneq./$τep,DOS,egrid)))
     end
     if sim.athermalelectrons.MagnetoTransport == true
         push!(args, :(Lightmatter.get_noparticles(Δf_mt,DOS,egrid)))
