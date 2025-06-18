@@ -64,7 +64,7 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    tot_n = :(n + Lightmatter.get_noparticles(fneq, sim.structure.DOS, sim.structure.egrid))
+    tot_n = :(n + Lightmatter.get_noparticles(fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim.structure.DOS, sim.structure.egrid))
     return :(Lightmatter.magnetotransport_1d(fneq, $tot_n, sim, $B))
 end
 
