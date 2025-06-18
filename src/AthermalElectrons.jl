@@ -214,7 +214,7 @@ end
 """
 function find_relaxeddistribution(egrid, goal, n, DOS)
     f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-4, reltol=1e-4).u
+    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-3, reltol=1e-3).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
 end
