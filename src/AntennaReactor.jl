@@ -78,7 +78,7 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
     return Expr(:block, exprs...)
 end
 """
-    mat_picker(height::Number, cutoffs::Union{Number,Vector{<:Number}})
+    mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
 
     Selects an index based on material interface height and given cutoffs.
 
@@ -89,7 +89,7 @@ end
     # Returns
     - The index of the region in which `height` lies.
 """
-function mat_picker(height::Number, cutoffs::Union{Number,Vector{<:Number}})
+function mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
     subindex = 1
     for i in eachindex(cutoffs) 
         if height < cutoffs[i]
@@ -201,7 +201,7 @@ end
 
     # Arguments
     - `data`: A subsystem of the simulation e.g. neq electrons or Tel
-    - `number`: Number of subdivisions (usually the number of elements).
+    - `number`: Float64 of subdivisions (usually the number of elements).
 
     # Returns
     - A vector of the subsystem with scalar data extracted from the original vector fields.
@@ -242,20 +242,20 @@ function split_structure(structure::Structure)
     ] # Creates a vector of the Structure struct with the DOS split into their seperate materials
 end
 """
-    split_grid(grid::Vector{<:Number}, cutoffs::Union{Number, Vector{Number}})
+    split_grid(grid::Vector{Float64}, cutoffs::Union{Float64, Vector{Float64}})
 
     Splits a numerical grid into regions that connect to each material
 
     # Arguments
-    - `grid`: A vector of Number numbers representing the full z-grid
+    - `grid`: A vector of Float64 numbers representing the full z-grid
     - `cutoffs`: A single value or vector of values defining the interfaces between each material 
 
     # Returns
     - A vector of sub-vectors representing segments of the original z-grid.
 """
-function split_grid(grid::Vector{<:Number}, cutoffs::Union{Number,Vector{Number}})
+function split_grid(grid::Vector{Float64}, cutoffs::Union{Float64,Vector{Float64}})
     cutoffs = isa(cutoffs, Vector) ? cutoffs : [cutoffs]
-    sections = Vector{Vector{<:Number}}()
+    sections = Vector{Vector{Float64}}()
     start_idx = 1
     for cutoff in cutoffs
         end_idx = findfirst(x -> x > cutoff, grid)

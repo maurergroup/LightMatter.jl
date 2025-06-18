@@ -1,10 +1,10 @@
 """
-    find_chemicalpotential(no_part::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    find_chemicalpotential(no_part::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Determines the chemical potential at the current temperature
 
     # Arguments
-    - 'no_part': Number of particles in the thermal electronic system
+    - 'no_part': Float64 of particles in the thermal electronic system
     - 'Tel': Temperature of the electronic bath
     - 'DOS': Density-of-states of the system
     - 'egrid': Energy grid the simulation is solved over
@@ -17,14 +17,14 @@
     return solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
 end =#
 
-function find_chemicalpotential(no_part, Tel, DOS, egrid)
+function find_chemicalpotential(no_part, Tel, DOS, egrid)::Float64
     #noe = ForwardDiff.value(no_part)
     temp = ForwardDiff.value(Tel)
     f(u,p) = no_part - get_thermalparticles(u, temp, DOS, egrid)
     return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
 end
 """
-    get_thermalparticles(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Calculates number of electrons assuming a Fermi Dirac distribution
 
@@ -46,7 +46,7 @@ end
     return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end =#
 """
-    get_noparticles(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
+    get_noparticles(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
     
     Calculates number of electrons in the given distribution
 
@@ -62,7 +62,7 @@ function get_noparticles(Dis, DOS, egrid)
     return extended_Bode(Dis.*DOS(egrid),egrid)
 end
 """
-    p_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    p_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Calculates the change in the number of particles of a Fermi Dirac distribution with respect to temperature
 
@@ -79,7 +79,7 @@ function p_T(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
-    p_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    p_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Calculates the change in the number of particles of a Fermi Dirac distribution with respect to chemical potential
 
@@ -96,7 +96,7 @@ function p_μ(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
-    get_internalenergy(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
+    get_internalenergy(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
     
     Calculates the internal energy of the given electronic distribution
 
@@ -112,7 +112,7 @@ function get_internalenergy(Dis, DOS, egrid)
     return extended_Bode(Dis .* DOS(egrid) .* egrid, egrid)
 end
 """
-    c_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    c_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Calculates the change in internal energy of a Fermi Dirac distribution with respect to temperature
 
@@ -129,7 +129,7 @@ function c_T(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
-    c_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
+    c_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
     Calculates the change in internal energy of a Fermi Dirac distribution with respect to chemical potential
 
@@ -146,7 +146,7 @@ function c_μ(μ, Tel, DOS, egrid)
     return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
-    extended_Bode(y::Vector{<:Number}, x::Vector{<:Number})
+    extended_Bode(y::Vector{Float64}, x::Vector{Float64})
     
     Performs numerical integration on a grid using the higher order Bode's method.
     Will integrate from end to end of the x vector

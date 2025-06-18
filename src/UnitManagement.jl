@@ -8,18 +8,18 @@ using Unitful
 
 end
 """
-    convert_units(value::Union{Quantity, AbstractArray{<:Quantity}, Number, AbstractArray{<:Number}})
+    convert_units(value::Union{Quantity, AbstractArray{<:Quantity}, Float64, AbstractArray{Float64}})
 
     Converts any user-given parameters that they have attached units to, to the correct units for Lightmatter.jl
     All values without Unitful.jl units attached are assumed to be in the correct units given by Lightmatter_units
 
     # Arguments
-    - 'value': The value(array of values) of the parameter, either as a Unitful.jl Quantity or a Number
+    - 'value': The value(array of values) of the parameter, either as a Unitful.jl Quantity or a Float64
 
     # Returns
-    - The Quantity converted into Lightmatter.jl's preferred units, or the Number left as is
+    - The Quantity converted into Lightmatter.jl's preferred units, or the Float64 left as is
 """
-function convert_units(unit::Unitful.FreeUnits, value::Union{Quantity, AbstractArray{<:Quantity}, Number, AbstractArray{<:Number}})
+function convert_units(unit::Unitful.FreeUnits, value::Union{Quantity, AbstractArray{<:Quantity}, Float64, AbstractArray{Float64}})
     if value isa Quantity || first(value) isa Quantity
         val = uconvert.(unit, value)
         return Float64.(ustrip(val))

@@ -4,7 +4,7 @@
 # This generally needs a good tidying
 ###
 """
-    post_production(sol,file_name::String,initial_temps::Dict{String,<:Number},output::Symbol,sim::Simulation)
+    post_production(sol,file_name::String,initial_temps::Dict{String,Float64},output::Symbol,sim::Simulation)
     
     Handles processing, saving the simulation after it has completed. Uses HDF5 file format
     Currently the only output setting supported is :minimum which only saves the parameters, chemical potential and
@@ -20,7 +20,7 @@
     # Returns
     - Nothing is returned but a file is created
 """
-function post_production(sol, file_name::String, initial_temps::Dict{String,<:Number}, output::Vector{Symbol}, sim::Simulation)
+function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, output::Vector{Symbol}, sim::Simulation)
     temp_name = "temp_"*file_name[1:end-5]*".jld2" 
     @save temp_name sol
     fid = create_datafile_and_structure(file_name)
@@ -189,7 +189,7 @@ function write_DOS(structure::Structure)
     return Dict("DOS" => DOS)
 end
 """
-    seperate_results(sol, initial_temps::Dict{String,<:Number}, sim::Simulation)
+    seperate_results(sol, initial_temps::Dict{String,Float64}, sim::Simulation)
     
     Seperates the results held inside of the solution object
     Also fills all unpropagated subsystems with parameter/temp information where neccessary
@@ -202,7 +202,7 @@ end
     # Returns
     - Dictionary of values of each of the seperated systems 
 """
-function seperate_results(sol, initial_temps::Dict{String,<:Number}, sim::Simulation)
+function seperate_results(sol, initial_temps::Dict{String,Float64}, sim::Simulation)
     fields = propertynames(sol[1])
     vals = generate_valuedict(sol, sim, fields)
     populate_value_dict!(sol, fields, vals)
@@ -224,7 +224,7 @@ end
     - Dictionary of values of each of the propgated subsystems 
 """
 function generate_valuedict(sol, sim::Simulation, fields)
-    vals = Dict{String,Union{Number,AbstractArray}}()
+    vals = Dict{String,Union{Float64,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
             merge!(vals,Dict(String(i) => zeros(length(sol.t), sim.structure.dimension.length)))
@@ -235,7 +235,7 @@ function generate_valuedict(sol, sim::Simulation, fields)
     return vals
 end
 """
-    populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{<:Number}})
+    populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{Float64}})
     
     Populates the subsystem dictionary with the reuslting vlaues from the simulation
 
@@ -257,7 +257,7 @@ function populate_value_dict!(sol, fields, vals)
     return vals
 end
 """
-    populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Number}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{<:Number}})
+    populate_unpropagatedvalues!(sol, initial_temps::Dict{String,Float64}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{Float64}})
     
     Adds placeholder information to any unpropagated fields
 
@@ -271,7 +271,7 @@ end
     # Returns
     - vals dictionary with the added unpropagated subsystems
 """
-function populate_unpropagatedvalues!(initial_temps::Dict{String,<:Number}, fields, sim::Simulation, vals)
+function populate_unpropagatedvalues!(initial_temps::Dict{String,Float64}, fields, sim::Simulation, vals)
     if :Tel ∉ fields
         merge!(vals, Dict("Tel" => fill(initial_temps["Tel"], sim.structure.dimension.length)'))
     end
@@ -322,7 +322,7 @@ function write_dynamicalvariables(f, results)
         elseif name == "fneq"
             write_dataset(f["Athermal Electrons"],"Non-Equilibrium Distribution",result)
         elseif name =="noe"
-            write_dataset(f,"Particle Number",result)
+            write_dataset(f,"Particle Float64",result)
         end
     end
 end

@@ -28,8 +28,8 @@ end
     # Returns
     - Expression for the time evolution of a phnonic thermal bath
 """
-function build_phonontemperature(sim::Simulation, Source::Union{Expr,Number}, ElecPhon::Expr, HeatCapacity::Expr)
-    args = Union{Expr,Symbol,Number}[Source,ElecPhon]
+function build_phonontemperature(sim::Simulation, Source::Union{Expr,Float64}, ElecPhon::Expr, HeatCapacity::Expr)
+    args = Union{Expr,Symbol,Float64}[Source,ElecPhon]
     if sim.phononictemperature.Conductivity == true
         push!(args,:Tph_cond)
     end
@@ -57,14 +57,14 @@ function phonontemperature_heatcapacity(sim::Simulation)
     end
 end
 """
-    nonlinear_phononheatcapacity(Tph::Number, n::Number, θ::Number)
+    nonlinear_phononheatcapacity(Tph::Float64, n::Float64, θ::Float64)
     
     Calculates non-linear phononic bath heat capacity. A more accurate method than the
     constant form.
 
     # Arguments
     - 'Tph': Temperature of the phononic bath
-    - 'n': Number of atoms per nm³
+    - 'n': Float64 of atoms per nm³
     - 'θ': Debye temperature of the system
 
     # Returns
@@ -104,7 +104,7 @@ function phonontemperature_source(sim::Simulation)
     end
 end
 """
-    neqelectron_phonontransfer(fneq::Vector{<:Number}, egrid::Vector{<:Number}, τep::Number, DOS::spl)
+    neqelectron_phonontransfer(fneq::Vector{Float64}, egrid::Vector{Float64}, τep::Float64, DOS::spl)
     
     Calculates energy input into the phonon bath due to non-equilibrium electron-phonon scattering
 
@@ -121,7 +121,7 @@ function neqelectron_phonontransfer(fneq, egrid, τep, DOS)
     return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
 end
 """
-    phonontemperature_conductivity!(Tph::Vector{<:Number}, κ::Union{Number,Vector{<:Number}}, dz::Number, cond::Vector{<:Number})
+    phonontemperature_conductivity!(Tph::Vector{Float64}, κ::Union{Float64,Vector{Float64}}, dz::Float64, cond::Vector{Float64})
     
     Calculates thermal phonon conductivity due to diffusive transport
 

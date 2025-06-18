@@ -1,6 +1,6 @@
 """
     DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
-                       atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+                       atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     
     Determines the desired DOS configuration and assembles it accordingly
 
@@ -19,7 +19,7 @@
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Number, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     if DOS !== nothing
         return DOS
     else
@@ -66,7 +66,7 @@ function get_FermiEnergy(File::String)
     return abs(TotalDOS[Nonzero,1])
 end
 """
-    generate_DOS(File::String, unit_scalar::Number)
+    generate_DOS(File::String, unit_scalar::Float64)
     
     Generates a spline of a DOS from a file. Assumes the structure of the DOS is column 1 is Energy in eV
     and column 2 is States in eV⁻¹V⁻¹ (volume of unit cell) 
@@ -78,7 +78,7 @@ end
     # Returns
     - An interpolation object representing the DOS.
 """
-function generate_DOS(File::String, unit_scalar::Number)
+function generate_DOS(File::String, unit_scalar::Float64)
     TotalDOS = readdlm(File,comments=true)
     return get_interpolant(TotalDOS[:,1], TotalDOS[:,2] * unit_scalar)
 end
@@ -103,7 +103,7 @@ function get_unitcellvolume(geometry_file::String)
     return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
 """
-    spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Number,dim::Dimension,tolerance::Number)
+    spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Float64,dim::Dimension,tolerance::Float64)
     
     Creates a spline of a DOS at each z-grid point in the simulation. Reads a folder of atom projected DOS's and the 
     respective geomwtry.in file to determine the height of each DOS and interpolates between them to create the final
@@ -120,7 +120,7 @@ end
     # Returns
     - A vector of splines corresponding to the DOS at each z-height
 """
-function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Number, dim::Dimension, tolerance::Number)
+function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Float64, dim::Dimension, tolerance::Float64)
     bulkDOS = readdlm(bulk, comments=true) #reads in the bulk DOS
     bulkDOSspl = get_interpolant(bulkDOS[:,1], bulkDOS[:,2] ./ Vbulk) #creates a spline for the bulk DOS
     files,heights = get_files_heights_forDOS(folder,geometry,tolerance) #get a vector of file names and their respective heights
@@ -141,7 +141,7 @@ function spatial_DOS(folder::String, geometry::String, bulk::String, Vbulk::Numb
     return zgridDOS
 end
 """
-    get_files_heights_forDOS(folder::String,geometry::String,tolerance::Number)
+    get_files_heights_forDOS(folder::String,geometry::String,tolerance::Float64)
     
     Extracts atom from geometry, removes all bar one from each layer defined by tolerance, then connects the atom
     to the corresponding file in the folder of DOS'. Readjusts the heights to set the top layer to 0.0 and the
@@ -155,7 +155,7 @@ end
     # Returns
     - A vector of DOS files and their respective heights
 """
-function get_files_heights_forDOS(folder::String, geometry::String, tolerance::Number)
+function get_files_heights_forDOS(folder::String, geometry::String, tolerance::Float64)
     files_from_folder = readdir(folder) # Reads all file names in folder
     dos_files = filter(f -> endswith(f, ".dat"), files_from_folder) #Filters out those that end .dat
     split = splitext.(dos_files) # Splits into matrix of file name ; extension
@@ -209,7 +209,7 @@ function get_slabgeometry(file_path::String)
     return stack(atom_data, dims=1)
 end
 """
-    get_atomiclayers(atoms::Matrix{<:Number},tolerance::Number)
+    get_atomiclayers(atoms::Matrix{Float64},tolerance::Float64)
     
     Seperats the atoms into their layers and selects a single atom from each layer. To remove degeneracy for 
     larger supercell structures.
@@ -221,7 +221,7 @@ end
     # Returns
     - A trimmed matrix of atoms now containing one atom per layer
 """
-function get_atomiclayers(atoms::Matrix{<:Number}, tolerance::Number)
+function get_atomiclayers(atoms::Matrix{Float64}, tolerance::Float64)
     unique_layers=[]
     for i in eachindex(atoms[:,1])
         to_push = true
@@ -238,7 +238,7 @@ function get_atomiclayers(atoms::Matrix{<:Number}, tolerance::Number)
     return stack(unique_layers, dims=1)
 end
 """
-    build_zDOSArray(egrid::Vector{<:Number},folder::String,files::Vector{String},heights::Vector{<:Number})
+    build_zDOSArray(egrid::Vector{Float64},folder::String,files::Vector{String},heights::Vector{Float64})
     
     Builds a matrix of the DOS as a function of height and energy for the individual layers. 
 
@@ -251,7 +251,7 @@ end
     # Returns
     - A matrix of states as a function of height and energy
 """
-function build_zDOSArray(egrid::Vector{<:Number}, folder::String, files::Vector{String}, heights::Vector{<:Number})
+function build_zDOSArray(egrid::Vector{Float64}, folder::String, files::Vector{String}, heights::Vector{Float64})
     zDOS = Matrix{Float64}(undef, length(heights), length(egrid))
     for i in eachindex(files)
         TotalDOS = readdlm(folder*files[i], comments=true)
@@ -264,7 +264,7 @@ function build_zDOSArray(egrid::Vector{<:Number}, folder::String, files::Vector{
     return zDOSspl
 end
 """
-    DOSScale!(Temp::Matrix{<:Number},bulk::Vector{<:Number},Energies::Vector{<:Number})
+    DOSScale!(Temp::Matrix{Float64},bulk::Vector{Float64},Energies::Vector{Float64})
     
     Ensures that all DOS are scaled to the same number of particles as the bulk
 
@@ -276,7 +276,7 @@ end
     # Returns
     - Temp with the rescaled DOS'
 """
-function DOSScale!(Temp::Matrix{<:Number}, bulk::Vector{<:Number}, Energies::Vector{<:Number})
+function DOSScale!(Temp::Matrix{Float64}, bulk::Vector{Float64}, Energies::Vector{Float64})
     fd = FermiDirac(0.0,0.0, Energies)
     for i in eachindex(Temp[:,1])
         f(u) = extended_Bode(u*fd.*Temp[i,:], Energies) - extended_Bode(fd.*bulk, Energies)
@@ -288,7 +288,7 @@ function DOSScale!(Temp::Matrix{<:Number}, bulk::Vector{<:Number}, Energies::Vec
     return Temp
 end
 """
-    get_interpolant(xvals::Vector{<:Number},yvals::Vector{<:Number})
+    get_interpolant(xvals::Vector{Float64},yvals::Vector{Float64})
     
     Generates a linear spline of any two vectors with a constant extrapolation applied to the boundaries.
 
@@ -301,7 +301,7 @@ end
 """
 @inline get_interpolant(xvals, yvals) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
 """
-    build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Number,Vector{<:Number}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
+    build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     
     Creates a vector or array of vectors (spatial DOS) for the group veolcity for ballistic electron transport. Users can also provide a constant value in the form
     of v_g, they must also set conductive_veolcity to constant.
@@ -320,13 +320,13 @@ end
     # Returns
     - The group velocity vector or array of vectors as requested by the user for ballistic electron transport
 """
-function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Number,Vector{<:Number}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
+function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     if isnothing(v_g)
         if Conductivity == true
             if conductive_velocity == :fermigas
                 if structure.Elemental_System > 1
                     elements = structure.Elemental_System
-                    v_g = Vector{Vector{<:Number}}(undef,elements)
+                    v_g = Vector{Vector{Float64}}(undef,elements)
                     grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
                     for i in 1:Elemental_System
                         length = length(grids[i])
@@ -360,7 +360,7 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
             if conductive_velocity == :constant
                 if structure.Elemental_System > 1
                     elements = structure.Elemental_System
-                    V_g = Vector{Vector{<:Number}}(undef,elements)
+                    V_g = Vector{Vector{Float64}}(undef,elements)
                     grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
                     for i in 1:Elemental_System
                         length = length(grids[i])
@@ -376,7 +376,7 @@ function build_group_velocity(v_g::Union{Vector{<:Number},Nothing}, FE::Union{Nu
     end
 end
 """
-    get_fermigas_velocity(egrid::Vector{<:Number}, EF::Number)
+    get_fermigas_velocity(egrid::Vector{Float64}, EF::Float64)
     
     The analytical free electron gas group velocity, requested by conductive_velocity = :fermigas
 
@@ -387,7 +387,7 @@ end
     # Returns
     - The free electron gas group velocity
 """
-function get_fermigas_velocity(egrid::Vector{<:Number}, EF::Number)
+function get_fermigas_velocity(egrid::Vector{Float64}, EF::Float64)
     return sqrt.(2 * (egrid.+EF) ./ Constants.me)
 end
 """
@@ -402,14 +402,14 @@ end
     # Returns
     - The free electron gas denisty-of-states
 """
-function get_fermigas_dos(egrid::Vector{<:Number}, EF::Number)
+function get_fermigas_dos(egrid::Vector{Float64}, EF::Float64)
     comp1 = 1/(3*π^2)
     comp2 = (2*Constants.me/Constants.ħ^2)^(3/2)
     comp3 = (egrid.+FE).^0.5
     return comp1 .* comp2 .* comp3
 end
 """
-    effective_one_band_velocity(DOS::spl, egrid::Vector{<:Number}, FE::Number)
+    effective_one_band_velocity(DOS::spl, egrid::Vector{Float64}, FE::Float64)
     
     Calculates the group velocity from the effective one band model.
     For more details see Mueller & Rethfeld, Phys. Rev. B 87, 035139.
@@ -423,7 +423,7 @@ end
     - The effective one band model group velocity as a vector or vector of vectors depending on the structure
     of the system
 """
-function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl, egrid::Vector{<:Number}, FE::Number)
+function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl, egrid::Vector{Float64}, FE::Float64)
     k_E = effective_onebandmodel(DOS,egrid,FE)
     v_g = similar(k_E)
     if eltype(v_g) <: AbstractVector
@@ -442,7 +442,7 @@ function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl
     return v_g
 end
 """
-    effective_onebandmodel(DOS::spl, egrid::Vector{<:Number}, FE::Number)
+    effective_onebandmodel(DOS::spl, egrid::Vector{Float64}, FE::Float64)
     
     Calculates the dispersion relation within the effective one band model.
     For more details see Mueller & Rethfeld, Phys. Rev. B 87, 035139.
@@ -455,7 +455,7 @@ end
     # Returns
     - The effective one band model dispersion relation
 """
-function effective_onebandmodel(DOS, egrid::Vector{<:Number}, FE::Number)
+function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     k_E = zeros(length(egrid))
     
     factor = 3π^2

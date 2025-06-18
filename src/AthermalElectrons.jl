@@ -26,7 +26,7 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
 end
 """
-    build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Number}, Elecphon::Union{Expr, Number})
+    build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Float64}, Elecphon::Union{Expr, Float64})
 
     Combines excitation and scattering contributions into a single broadcasted sum expression in the AthEM model
 
@@ -39,15 +39,15 @@ end
     # Returns
     - A broadcasted summation of all interaction terms.
 """
-function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Number}, Elecphon::Union{Expr,Number}, mag_trans::Union{Symbol,Number})
-    args = Union{Expr, Symbol, Number}[athemexcite, Elecelec, Elecphon, mag_trans]
+function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Float64}, Elecphon::Union{Expr,Float64}, mag_trans::Union{Symbol,Float64})
+    args = Union{Expr, Symbol, Float64}[athemexcite, Elecelec, Elecphon, mag_trans]
     if sim.athermalelectrons.Conductivity == true
         push!(args, :f_cond)
     end
     return Expr(:call, :(.+), (args)...)
 end
 """
-    athemexcitation(ftot::Vector{<:Number}, egrid::Vector{<:Number}, DOS::spl, hv::Number, M::Union{Number,Vector{<:Number}})
+    athemexcitation(ftot::Vector{Float64}, egrid::Vector{Float64}, DOS::spl, hv::Float64, M::Union{Float64,Vector{Float64}})
 
     Computes the net non-equilibrium excitation using Fermi's Golden Rule.
 
@@ -61,7 +61,7 @@ end
     # Returns
     - Normalized excitation change in the distribution.
 """
-function athemexcitation(ftot, egrid, DOS, hv::Number, M)
+function athemexcitation(ftot, egrid, DOS, hv::Float64, M)
     ftotspl = get_interpolant(egrid, ftot)
     Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv, M)
     Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv, M)
@@ -70,7 +70,7 @@ function athemexcitation(ftot, egrid, DOS, hv::Number, M)
     return Δfneqtot ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
 end
 
-function athemexcitation(ftot, egrid, DOS, hv::Matrix{<:Number}, M)
+function athemexcitation(ftot, egrid, DOS, hv::Matrix{Float64}, M)
     Δneqs = zeros(size(hv,1),length(egrid))
     for i in 1:size(hv,1)
         ftotspl = get_interpolant(egrid, ftot)
@@ -83,7 +83,7 @@ function athemexcitation(ftot, egrid, DOS, hv::Matrix{<:Number}, M)
     return Δneqs # Returns the different frequency changes
 end
 """
-    athem_holegeneration(egrid::Vector{<:Number},DOS::spl,ftotspl::spl,hv::Number,M::Union{Number,Vector{<:Number}})
+    athem_holegeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
 
     Computes the shape of the distribution change due to hole generation.
 
@@ -101,7 +101,7 @@ function athem_holegeneration(egrid, DOS, ftotspl, hv, M)
     return (2*pi/Constants.ħ) .* M .* DOS(egrid.+hv) .* ftotspl(egrid) .* (1 .- ftotspl(egrid.+hv))
 end
 """
-    athem_electrongeneration(egrid::Vector{<:Number},DOS::spl,ftotspl::spl,hv::Number,M::Union{Number,Vector{<:Number}})
+    athem_electrongeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
 
     Computes the shape of the distribution change due to electron generation.
 
@@ -155,7 +155,7 @@ function athem_electronelectroninteraction(sim::Simulation)
     end
 end
 """
-    athem_electronelectronscattering(Tel::Number,μ::Number,sim::Simulation,fneq::Vector{<:Number},DOS::spl,n::Number,τee::Union{Number,Vector{<:Number}})
+    athem_electronelectronscattering(Tel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
 
     Calculates the electron-electron scattering contribution using a modified relaxation time approximation.
 
@@ -199,14 +199,14 @@ function electron_relaxationtime(sim::Simulation)
     end
 end       
 """
-    find_relaxeddistribution(egrid::Vector{<:Number},goal::Number,n::Number,DOS::spl,kB::Number)
+    find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64)
     
     Solves for a Fermi distribution with the same internal energy as a given target.
 
     # Arguments
     - 'egrid': Energy grid distributions are solved on
     - 'goal': The internal energy of the total electronic system
-    - 'n': Number of electrons in the thermal system
+    - 'n': Float64 of electrons in the thermal system
     - 'DOS': Spline of the density-of-states
 
     # Returns
@@ -214,9 +214,16 @@ end
 """
 function find_relaxeddistribution(egrid, goal, n, DOS)
     f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
+    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
+end
+
+function find_relaxeddistribution(out, egrid, goal, n, DOS)
+    f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
+    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
+    μ = find_chemicalpotential(n, Temp, DOS, egrid)
+    @. out = FermiDirac(Temp, μ, egrid)
 end
 
 #= function find_relaxeddistribution(egrid, goal::ForwardDiff.Dual, noe::ForwardDiff.Dual, DOS)
@@ -228,13 +235,13 @@ end
     return FermiDirac(Temp, μ, egrid)
 end =#
 """
-    find_temperatureandμ(Tel::Number,n::Number,DOS::spl,egrid::Vector{<:Number})
+    find_temperatureandμ(Tel::Float64,n::Float64,DOS::spl,egrid::Vector{Float64})
 
     Given a temperature guess, computes chemical potential and internal energy.
 
     # Arguments
     - 'Tel': Guessed electronic temperature to match the goal
-    - 'n': Number of electrons in the thermal system
+    - 'n': Float64 of electrons in the thermal system
     - 'egrid': Energy grid distributions are solved on
     - 'DOS': Spline of the density-of-states
 
@@ -312,7 +319,7 @@ function athem_thermalelectronparticlechange(sim::Simulation)
     return Expr(:call, :+, args...)
 end
 """
-    electron_distribution_transport!(v_g::Vector{<:Number},f::AbstractArray{<:Number},Δf::AbstractArray{<:Number},dz::Number)
+    electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)
 
     Computes ballistic transport of an electronic distribution using second-order finite differences via a kinetic like model.
     Uses forward(reverse) difference for the boundaries. 
@@ -326,37 +333,38 @@ end
     # Returns
     - In-place change to Δf
 """
-function electron_distribution_transport!(v_g::Vector{<:Number}, f, Δf, dz)
-    for i in 2:size(f, 1)-1
-        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g
+function electron_distribution_transport!(v_g::Vector{Float64}, f::Matrix{Float64}, Δf::Matrix{Float64}, dz::Real)
+    @views @inbounds for i in 2:size(f, 1)-1
+        @. Δf[i, :] = ((f[i-1, :] - 2 * f[i, :] + f[i+1, :]) / dz) * v_g
     end
-    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g
-    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g
+
+    @views @. Δf[1, :] = (-(f[1, :] - f[2, :]) / dz) * v_g
+    @views @. Δf[end, :] = ((f[end-1, :] - f[end, :]) / dz) * v_g
 end
 
-function electron_distribution_transport!(v_g::Matrix{<:Number}, f, Δf, dz)
-    for i in 2:size(f, 1)-1
-        Δf[i,:] = (f[i-1,:] .- 2*f[i,:] .+ f[i+1,:]) ./ dz .* v_g[i,:]
+function electron_distribution_transport!(v_g::Matrix{Float64}, f, Δf, dz)
+    @views @inbounds for i in 2:size(f, 1)-1
+        @. Δf[i,:] = (f[i-1,:] - 2*f[i,:] + f[i+1,:]) / dz * v_g[i,:]
     end
-    Δf[1,:] = -(f[1,:] .- f[2,:]) ./ dz .*v_g[1,:]
-    Δf[end,:] = (f[end-1,:] .- f[end,:]) ./ dz .* v_g[end,:]
+    @views @. Δf[1,:] = -(f[1,:] - f[2,:]) ./ dz *v_g[1,:]
+    @views @. Δf[end,:] = (f[end-1,:] - f[end,:]) / dz * v_g[end,:]
 end
 """
-    thermal_particle_transport(v_g::Vector{<:Number},egrid::Vector{<:Number},n::Vector{<:Number},Δn::Vector{<:Number},dz::Number)
+    thermal_particle_transport(v_g::Vector{Float64},egrid::Vector{Float64},n::Vector{Float64},Δn::Vector{Float64},dz::Float64)
 
     Calculates transport correction for thermal particle distribution using the Fermi velocity.
 
     # Arguments
     - `v_g`: Group velocity vector or vector of vectors(spatially-resolved DOS)
     - `egrid`: Energy grid.
-    - `n`: Number of particles in thermal system
+    - `n`: Float64 of particles in thermal system
     - `Δn`: Output array.
     - `dz`: Spatial resolution.
 
     # Returns
     - Updated transport correction array.
 """
-function thermal_particle_transport!(v_g::Vector{<:Number}, egrid, n, Δn, dz)
+function thermal_particle_transport!(v_g::Vector{Float64}, egrid, n, Δn, dz)
     idx_0 = findmin(abs.(egrid.-0.0))[2]
     v_F = v_g[idx_0]
     for i in 2:length(Δn) -1
@@ -366,7 +374,7 @@ function thermal_particle_transport!(v_g::Vector{<:Number}, egrid, n, Δn, dz)
     Δn[end] = (n[end-1] - n[end]) / dz * v_F
 end
 
-function thermal_particle_transport!(v_g::Matrix{<:Number}, egrid, n, Δn, dz)
+function thermal_particle_transport!(v_g::Matrix{Float64}, egrid, n, Δn, dz)
     idx_0 = findmin(abs.(egrid.-0.0))[2]
     for i in 2:length(Δn) -1
         v_F = v_g[i,idx_0]
