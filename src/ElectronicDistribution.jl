@@ -93,10 +93,10 @@ function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, n::Fl
     factor = Constants.q / (Constants.ħ * Constants.c) * B
 
     @inbounds @simd for i in 1:h_2_e
-        Δf_mt[i] = -factor * v_g[i] * dfdk[i]
+        Δf_mt[i] = -factor * v_g[i] * dfdk[i] * -1
     end
     @inbounds @simd for i in (h_2_e + 1):length(Δf_mt)
-        Δf_mt[i] = factor * v_g[i] * dfdk[i]
+        Δf_mt[i] = factor * v_g[i] * dfdk[i] * -1
     end
 end
 
