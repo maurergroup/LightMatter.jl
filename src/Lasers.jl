@@ -135,7 +135,7 @@ function get_laser_fields(las)
         power = :(sim.laser.hv)
     end
     if las.envelope == :Rectangular
-        E_0 = :(sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)))
+        E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
     elseif las.envelope == :Gaussian
         E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.las.FWHM^2))
     end
