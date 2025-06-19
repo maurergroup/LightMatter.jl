@@ -64,7 +64,7 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), tot_n, sim, DOS, $B, g_k, tmp))
+    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq, tot_n, sim, DOS, $B, g_k, tmp))#.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
 end
 
 function df_dk!(dfdk::Vector{Float64}, g_k::Vector{Float64}, sim::Simulation)
@@ -81,13 +81,13 @@ end
 function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, n::Float64, sim::Simulation, DOS::spl, B::Float64, g_k::Vector{Float64}, dfdk::Vector{Float64})
     h_2_e = get_h2e(sim)
 
-    goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
+    #= goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
     find_relaxeddistribution(g_k, sim.structure.egrid, goal, n, DOS)
     @inbounds @simd for i in eachindex(f)
         g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀
-    end
+    end =#
 
-    df_dk!(dfdk, g_k, sim)  # Compute derivative into dfdk (no aliasing)
+    df_dk!(dfdk, f, sim)  # Compute derivative into dfdk (no aliasing)
 
     v_g = sim.athermalelectrons.v_g
     factor = Constants.q / (Constants.ħ * Constants.c) * B
