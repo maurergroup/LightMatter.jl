@@ -398,7 +398,7 @@ end
     # Returns
     - Fermi energy/energies for each DOS input.
 """
-function FE_initalization(bulk_DOS::Union{String, Vector{String}})
+function FE_initialization(bulk_DOS::Union{String, Vector{String}})
     if bulk_DOS isa String
         FE = get_FermiEnergy(bulk_DOS)
         return FE

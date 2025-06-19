@@ -26,7 +26,7 @@ abstract type SimulationTypes end
 
     FWHM::Float64 # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Float64 # The unabsorbed fluence of the laser
-    n::Union{Float64, Vector{Float64}, Matrix{Float64}, Vector{<:Matrix{Float64}}}# The real part of the refractive index of the material
+    n::Union{Float64, Vector{Float64}, Vector{Vector{Float64}}}# The real part of the refractive index of the material
     hv::Union{Float64, Matrix{Float64}} # The photon frequency of the laser
     ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} # The inverse of the absorption coefficient
     R::Float64 # The reflectivity of the sample

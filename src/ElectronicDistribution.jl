@@ -64,12 +64,12 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq, tot_n, sim, DOS, $B, g_k, tmp))#.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
+    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq, sim, $B, band, sim.structure.egrid, tmp))#.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
 end
 
-function df_dk!(dfdk::Vector{Float64}, g_k::Vector{Float64}, sim::Simulation)
-    k = sim.structure.bandstructure[2](sim.structure.egrid)
-    fspl = DataInterpolations.AkimaInterpolation(g_k, k, extrapolation = ExtrapolationType.Constant)
+function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{AkimaInterpolation}, egrid::Vector{Float64})
+    k = bandstructure[2](egrid)
+    fspl = DataInterpolations.AkimaInterpolation(f, k, extrapolation = ExtrapolationType.Constant)
 
     @inbounds for i in eachindex(k)
         dfdk[i] = DataInterpolations.derivative(fspl, k[i])
@@ -78,7 +78,7 @@ function df_dk!(dfdk::Vector{Float64}, g_k::Vector{Float64}, sim::Simulation)
     return dfdk
 end
 
-function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, n::Float64, sim::Simulation, DOS::spl, B::Float64, g_k::Vector{Float64}, dfdk::Vector{Float64})
+function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, bandstructure::Vector{AkimaInterpolation}, egrid::Vector{Float64}, dfdk::Vector{Float64})
     h_2_e = get_h2e(sim)
 
     #= goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
@@ -87,7 +87,7 @@ function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, n::Fl
         g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀
     end =#
 
-    df_dk!(dfdk, f, sim)  # Compute derivative into dfdk (no aliasing)
+    df_dk!(dfdk, f, bandstructure, egrid)  # Compute derivative into dfdk (no aliasing)
 
     v_g = sim.athermalelectrons.v_g
     factor = Constants.q / (Constants.ħ * Constants.c) * B

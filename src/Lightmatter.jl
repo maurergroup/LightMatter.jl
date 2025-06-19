@@ -4,7 +4,7 @@ using DataInterpolations, DelimitedFiles, Integrals, NonlinearSolve, RecursiveAr
 
 export build_Simulation, run_simulation, post_production, Constants, DensityMatrix, build_DensityMatrix, build_Dimension, FE_initialization
 export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, build_PhononicTemperature, function_builder
-export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure, build_Structure, get_FermiEnergy
+export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure, build_Structure
 export ElectronicDistribution, PhononicDistribution, BaseUnits
 
 

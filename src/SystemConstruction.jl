@@ -363,6 +363,8 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.g_k[i,:]))
             push!(new_name, :Δf_mt)
             push!(new_name, :g_k)
+            push!(old_name, :(p.sim.structure.bandstructure))
+            push!(new_name, :band)
         end
     end
     if sim.electronictemperature.Enabled == true

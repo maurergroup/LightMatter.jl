@@ -60,7 +60,11 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
         push!(exprs,embedding)
     else # No embedding so all heights are treated the same 
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
+            push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
+            if sim.athermalelectrons.MagnetoTransport == true
+                push!(exprs,:($(sys["magneto"])))
+            end
             push!(exprs,:(du.noe[i,:] .= $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
         end
@@ -113,8 +117,8 @@ end
     - An expression block assigning simulation-specific variable names.
 """
 function ar_variable_renaming(sim::Simulation)
-    old_name = [:(p.matsim[X])]
-    new_name = [:sim,]
+    old_name = [:(p.matsim[X]), :(p.sim.structure.tmp[i,:])]
+    new_name = [:sim, :tmp]
     if typeof(sim.structure.DOS) == Vector{Vector{spl}}
         push!(old_name, :(p.matsim[X].structure.DOS[i]))
         push!(new_name, :DOS)
@@ -137,6 +141,14 @@ function ar_variable_renaming(sim::Simulation)
         else 
             push!(old_name, :(u.noe[i]))
             push!(new_name, :n)
+        end
+        if sim.athermalelectrons.MagnetoTransport == true
+            push!(old_name, :(p.Δf_mt[i,:]))
+            push!(old_name, :(p.g_k[i,:]))
+            push!(new_name, :Δf_mt)
+            push!(new_name, :g_k)
+            push!(old_name, :(p.sim.structure.bandstructure[X]))
+            push!(new_name, :band)
         end
     end
     if sim.electronictemperature.Enabled == true
