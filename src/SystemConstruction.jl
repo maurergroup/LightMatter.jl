@@ -299,7 +299,7 @@ function build_loopbody(sys, sim::Simulation)
             if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
             end
-            push!(exprs,:(du.noe[i] += $(sys["noe"])))
+            push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
 
         end
