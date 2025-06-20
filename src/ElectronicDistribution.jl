@@ -67,7 +67,7 @@ function magnetotransport_equations(sim)
     return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, tot_n, band, sim.structure.egrid, g_k, tmp))
 end
 
-function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{AkimaInterpolation}, egrid::Vector{Float64})
+function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64})
     k = bandstructure[2](egrid)
     fspl = DataInterpolations.AkimaInterpolation(f, k, extrapolation = ExtrapolationType.Constant)
 
