@@ -78,16 +78,16 @@ function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector
     return dfdk
 end
 
-function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, bandstructure::Vector{AkimaInterpolation}, egrid::Vector{Float64}, dfdk::Vector{Float64})
+function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, DOS::spl, n::Float64, bandstructure::Vector{AkimaInterpolation}, egrid::Vector{Float64}, g_k::Vector{Float64}, dfdk::Vector{Float64})
     h_2_e = get_h2e(sim)
 
-    #= goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
+    goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
     find_relaxeddistribution(g_k, sim.structure.egrid, goal, n, DOS)
     @inbounds @simd for i in eachindex(f)
         g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀
-    end =#
+    end
 
-    df_dk!(dfdk, f, bandstructure, egrid)  # Compute derivative into dfdk (no aliasing)
+    df_dk!(dfdk, g_k, bandstructure, egrid)  # Compute derivative into dfdk (no aliasing)
 
     v_g = sim.athermalelectrons.v_g
     factor = Constants.q / (Constants.ħ * Constants.c) * B
