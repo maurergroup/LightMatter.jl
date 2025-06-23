@@ -127,11 +127,11 @@ end
 function get_laser_fields(las, dim)
     
     if las.hv isa Matrix
-        ω = :(sim.las.hv[1,:] ./ (Constants.ħ*2*pi))
+        ω = :(sim.laser.hv[1,:] ./ (Constants.ħ*2*pi))
         κ = :(sim.laser.hv[1,:] ./ (4*pi*sim.laser.ϵ))
         power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
     else
-        ω = :(sim.las.hv / (Constants.ħ*2*pi))
+        ω = :(sim.laser.hv / (Constants.ħ*2*pi))
         κ = :(sim.laser.hv / (4*pi*sim.laser.ϵ))
         power = :(1.0)
     end
