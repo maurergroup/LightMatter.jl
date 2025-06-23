@@ -147,9 +147,9 @@ function get_laser_fields(las, dim)
     end
 
     if las.hv isa Matrix
-        E = :(sum($E_0 .* fluc))
+        E = :(sum($E_0 .* $fluc))
     else
-        E = :($E_0 .* fluc)
+        E = :($E_0 .* $fluc)
     end
     B = :($E ./ Constants.c)
     return Fields(E, B)
