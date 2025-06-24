@@ -279,7 +279,7 @@ end
 function DOSScale!(Temp::Matrix{<:Number}, bulk::Vector{<:Number}, Energies::Vector{<:Number})
     fd = FermiDirac(0.0,0.0, Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = extended_Bode(u*fd.*Temp[i,:], Energies) - extended_Bode(fd.*bulk, Energies)
+        f(u) = Bode_rule(u*fd.*Temp[i,:], Energies) - Bode_rule(fd.*bulk, Energies)
         x0 = 1
         prob = ZeroProblem(f,x0)
         rescale = solve(prob, Order16(); atol=1e-12, rtol=1e-12)

@@ -169,7 +169,7 @@ end
 function athem_electronelectronscattering(Tel, μ, sim::Simulation, fneq, DOS, n, τee)
     feq = Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
     ftot = feq .+ fneq
-    goal = extended_Bode(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
+    goal = Bode_rule(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
     frel = find_relaxeddistribution(sim.structure.egrid, goal, n, DOS)
     return (fneq.+frel.-feq) ./ τee
 end
@@ -209,7 +209,7 @@ end
 """
 function find_relaxeddistribution(egrid, goal, n, DOS)
     f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
+    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-12, reltol=1e-12).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
 end
@@ -218,7 +218,7 @@ function find_relaxeddistribution(egrid, goal::ForwardDiff.Dual, noe::ForwardDif
     int = ForwardDiff.value(goal)
     n = ForwardDiff.value(noe)
     f(u,p) = int - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
+    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-12, reltol=1e-12).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
 end

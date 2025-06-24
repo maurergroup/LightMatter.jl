@@ -21,7 +21,7 @@ function find_chemicalpotential(no_part, Tel, DOS, egrid)
     noe = ForwardDiff.value(no_part)
     temp = ForwardDiff.value(Tel)
     f(u,p) = noe - get_thermalparticles(u, temp, DOS, egrid)
-    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
+    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-12, reltol=1e-12).u
 end
 """
     get_thermalparticles(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -38,12 +38,12 @@ end
     - The number of electrons
 """
 function get_thermalparticles(μ, Tel, DOS, egrid)
-    return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end
 
 function get_thermalparticles(μ::ForwardDiff.Dual, Tel::SparseConnectivityTracer.GradientTracer, DOS, egrid)
     μ = ForwardDiff.value(μ)
-    return extended_Bode(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end
 """
     get_noparticles(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
@@ -59,7 +59,7 @@ end
     - The number of electrons
 """
 function get_noparticles(Dis, DOS, egrid)
-    return extended_Bode(Dis.*DOS(egrid),egrid)
+    return Bode_rule(Dis.*DOS(egrid),egrid)
 end
 """
     p_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -76,7 +76,7 @@ end
     - The value of dn/dT
 """
 function p_T(μ, Tel, DOS, egrid)
-    return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
+    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
     p_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -93,7 +93,7 @@ end
     - The value of dn/dμ
 """
 function p_μ(μ, Tel, DOS, egrid)
-    return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
+    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
     get_internalenergy(Dis::Vector{<:Number}, DOS::spl, egrid::Vector{<:Number})
@@ -109,7 +109,7 @@ end
     - The internal energy of the given distribution
 """
 function get_internalenergy(Dis, DOS, egrid)
-    return extended_Bode(Dis .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(Dis .* DOS(egrid) .* egrid, egrid)
 end
 """
     c_T(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -126,7 +126,7 @@ end
     - The value of dU/dT
 """
 function c_T(μ, Tel, DOS, egrid)
-    return extended_Bode(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
     c_μ(μ::Number, Tel::Number, DOS::spl, egrid::Vector{<:Number})
@@ -143,10 +143,10 @@ end
     - The value of dU/dμ
 """
 function c_μ(μ, Tel, DOS, egrid)
-    return extended_Bode(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
-    extended_Bode(y::Vector{<:Number}, x::Vector{<:Number})
+    Bode_rule(y::Vector{<:Number}, x::Vector{<:Number})
     
     Performs numerical integration on a grid using the higher order Bode's method.
     Will integrate from end to end of the x vector
@@ -158,20 +158,22 @@ end
     # Returns
     - The integration value across the range
 """
-function extended_Bode(y, x)
-    n = length(x)
-    h = x[2]-x[1]  # The spacing between points
+function Bode_rule(x::Vector{Float64}, y::Vector{Float64})
+    N = length(x)
+    n = (N-1)/4
+    h = x[2] - x[1]
+
     integral = 0.0
+    for i in 1:n
+        idx = 4 * (i - 1) + 1
+        integral += (2h / 45) * (
+            7y[idx] +
+            32y[idx + 1] +
+            12y[idx + 2] +
+            32y[idx + 3] +
+            7y[idx + 4]
+        )
+    end
 
-    # Determine how many intervals to use for each rule
-    integral_limit = n - 1
-
-    # Apply Composite 3/8 Rule for the remaining intervals
-    integral += (2h / 45) * (
-        7 * y[1] + 7 * y[integral_limit+1] +
-        32 * sum(y[2:2:integral_limit]) +
-        12 * sum(y[3:4:integral_limit]) +
-        14 * sum(y[4:3:integral_limit])
-    )
     return integral
 end
