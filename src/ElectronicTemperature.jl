@@ -78,7 +78,7 @@ end
     - The current heat capacity of the electronic thermal bath
 """
 function nonlinear_electronheatcapacity(Tel, μ, DOS, egrid)
-    return extended_Bode(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid, egrid)
+    return extended_Boole(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid, egrid)
 end
 """
     electronphonon_coupling(sim::Simulation)
@@ -126,7 +126,7 @@ end
 """
 function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph, egrid)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
-    g=prefac .* extended_Bode(DOS(egrid).^2 .*-dFDdE(Tel, μ, egrid), egrid)
+    g=prefac .* extended_Boole(DOS(egrid).^2 .*-dFDdE(Tel, μ, egrid), egrid)
     return -g * (Tel-Tph)
 end
 """
