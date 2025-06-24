@@ -124,32 +124,26 @@ function spatial_xy_laser(sim::Simulation)
     end
 end
 
-function get_laser_fields(las, dim)
-    
+function calculate_laser_fields(las::Laser)
+    return get_laser_fields(las)
+end
+
+function get_laser_fields(las)
     if las.hv isa Matrix
-        ω = :(sim.laser.hv[1,:] ./ (Constants.ħ*2*pi))
-        κ = :(sim.laser.hv[1,:] ./ (4*pi*sim.laser.ϵ))
         power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
     else
-        ω = :(sim.laser.hv / (Constants.ħ*2*pi))
-        κ = :(sim.laser.hv / (4*pi*sim.laser.ϵ))
-        power = :(1.0)
+        power = :(sim.laser.hv)
     end
     if las.envelope == :Rectangular
         E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
     elseif las.envelope == :Gaussian
         E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.las.FWHM^2))
     end
-    if dim.length > 1
-        fluc = :(cos.($ω * t - sim.laser.n*ω/Constants.c*sim.structure.dimension.grid[i])*exp(-κ.*ω*sim.structure.dimension.grid[i]/Constants.c))
-    else
-        fluc = :(cos.($ω * t))
-    end
 
     if las.hv isa Matrix
-        E = :(sum($E_0 .* $fluc))
+        E = :(sum($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t)))
     else
-        E = :($E_0 .* $fluc)
+        E = :($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t))
     end
     B = :($E ./ Constants.c)
     return Fields(E, B)

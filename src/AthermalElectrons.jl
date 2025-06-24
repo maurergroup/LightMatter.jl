@@ -214,14 +214,14 @@ end
 """
 function find_relaxeddistribution(egrid, goal, n, DOS)
     f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-8, reltol=1e-8).u
+    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
 end
 
 function find_relaxeddistribution(out, egrid, goal, n, DOS)
     f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-8, reltol=1e-8).u
+    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     @. out = FermiDirac(Temp, μ, egrid)
 end

@@ -202,7 +202,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
-    las_field = get_laser_fields(las, dimension)
+    las_field = get_laser_fields(las)
     bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
     tmp = zeros(dimension.length, length(egrid))
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = TotalFields(las_field, ext_fields),
