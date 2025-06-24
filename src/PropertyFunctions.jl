@@ -160,7 +160,7 @@ end
 """
 function Bode_rule(x::Vector{Float64}, y::Vector{Float64})
     N = length(x)
-    n = (N-1)/4
+    n = (N-1) ÷   4
     h = x[2] - x[1]
 
     integral = 0.0
