@@ -38,12 +38,12 @@ end
     - The number of electrons
 """
 function get_thermalparticles(μ, Tel, DOS, egrid)
-    return extended_Boole(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end
 
 #= function get_thermalparticles(μ::ForwardDiff.Dual, Tel::SparseConnectivityTracer.GradientTracer, DOS, egrid)
     μ = ForwardDiff.value(μ)
-    return extended_Boole(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
 end =#
 """
     get_noparticles(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
@@ -59,7 +59,7 @@ end =#
     - The number of electrons
 """
 function get_noparticles(Dis, DOS, egrid)
-    return extended_Boole(Dis.*DOS(egrid),egrid)
+    return Bode_rule(Dis.*DOS(egrid),egrid)
 end
 """
     p_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -76,7 +76,7 @@ end
     - The value of dn/dT
 """
 function p_T(μ, Tel, DOS, egrid)
-    return extended_Boole(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
+    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
     p_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -93,7 +93,7 @@ end
     - The value of dn/dμ
 """
 function p_μ(μ, Tel, DOS, egrid)
-    return extended_Boole(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
+    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
 end
 """
     get_internalenergy(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
@@ -109,7 +109,7 @@ end
     - The internal energy of the given distribution
 """
 function get_internalenergy(Dis, DOS, egrid)
-    return extended_Boole(Dis .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(Dis .* DOS(egrid) .* egrid, egrid)
 end
 """
     c_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -126,7 +126,7 @@ end
     - The value of dU/dT
 """
 function c_T(μ, Tel, DOS, egrid)
-    return extended_Boole(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
     c_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -143,10 +143,10 @@ end
     - The value of dU/dμ
 """
 function c_μ(μ, Tel, DOS, egrid)
-    return extended_Boole(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
 end
 """
-    extended_Boole(y::Vector{Float64}, x::Vector{Float64})
+    Bode_rule(y::Vector{Float64}, x::Vector{Float64})
     
     Performs numerical integration on a grid using the higher order Boole's method.
     Will integrate from end to end of the x vector

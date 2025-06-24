@@ -174,7 +174,7 @@ end
 function athem_electronelectronscattering(Tel, μ, sim::Simulation, fneq, DOS, n, τee)
     feq = Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
     ftot = feq .+ fneq
-    goal = extended_Boole(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
+    goal = Bode_rule(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
     frel = find_relaxeddistribution(sim.structure.egrid, goal, n, DOS)
     return (fneq.+frel.-feq) ./ τee
 end
