@@ -392,12 +392,12 @@ function output_TelConductivity(f, results, sim)
     Tph = results["Tph"]
     spat = similar(Tel)
     Threads.@threads for i in eachindex(Tel[:,1])
-        electrontemperature_conductivity!(Tel[i,:], sim.electronictemperature.κ, sim.structure.dimension.spacing, Tph[i,:], spat[i,:])
+        @views electrontemperature_conductivity!(Tel[i,:], sim.electronictemperature.κ, sim.structure.dimension.spacing, Tph[i,:], spat[i,:])
     end
     write_dataset(f["Electronic Temperature"], "Thermal Conductivity", spat)
 end
 
-function output_electronphonon(f, results, sim)
+function output_electronphononcoupling(f, results, sim)
     Tel = results["Tel"]
     Tph = results["Tph"]
     eps = similar(Tel)
@@ -409,12 +409,12 @@ function output_electronphonon(f, results, sim)
         Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
             (omega, lambda) = get_parameterhvalue((ω, λ), sim, i)
-            eps[i,:] .= nonlinear_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i], Ref(sim.structure.egrid))
+            @views eps[i,:] .= nonlinear_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i], Ref(sim.structure.egrid))
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
             g_val = get_parameterhvalue(sim.electronictemperature.g, sim, i)
-            eps[i,:] .= g_val * (Tel[:,i].-Tph[:,i])
+            @views eps[i,:] .= g_val * (Tel[:,i].-Tph[:,i])
         end
     end
     write_dataset(f["Electronic Temperature"], "Electron-Phonon Coupling", eps)
@@ -428,14 +428,14 @@ function output_electronheatcapacity(f, results, sim)
         output_chemicalpotential(f, results, sim)
         μ = results["μ"]
         dos = sim.structure.DOS
-        Threads.@threads for i in eachindex(Tel[:,1])
+        Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
-            hc[i,:] .= nonlinear_electronheatcapacity.(Tel[i,:], μ[i,:], Ref(DOS), Ref(sim.structure.egrid))
+            @views hc[i,:] .= nonlinear_electronheatcapacity.(Tel[:,i], μ[:,i], Ref(DOS), Ref(sim.structure.egrid))
         end
     else
         Threads.@threads for i in eachindex(Tel[:,1])
             gamma =  get_parameterhvalue(sim.electronictemperature.γ, sim, i)
-            hc[i,:] .= gamma*Tel[i,:]
+            @views hc[i,:] .= gamma*Tel[i,:]
         end
     end
     write_dataset(f["Electronic Temperature"], "Electronic Heat Capacity", hc)
@@ -449,12 +449,12 @@ function output_athermalelectronelectronscattering(f, results, sim)
         output_chemicalpotential(f, results, sim)
         μ = results["μ"]
         rel = similar(fneq)
-        lifetime = τ_expr = athem_relaxationtime(sim)
-        mk_function((sim,μ,Tel,),(),τ_expr)
+        τ_expr = athem_relaxationtime(sim)
+        lifetime = mk_function((sim,μ,Tel,),(),τ_expr)
         Threads.@threads for i in eachindex(fneq[:,1,1])
             for j in eachindex(tel[1,:])
                 τee = lifetime(sim, μ[i,j], tel[i,j])
-                rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
+                @views rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
             end
         end
         write_dataset(f["Athermal Electrons"], "Athermal Electron-Electron Scattering", rel)
@@ -463,66 +463,92 @@ function output_athermalelectronelectronscattering(f, results, sim)
 end
 
 function output_athermalelectronelectronenergychange(f, results, sim)
-    uee = zeros(length(relax[1,1,:]),length(relax[1,:,1]))
+    output_athermalelectronelectronscattering(f, results, sim)
+    relax = results["e*erelax"]
+    uee = similar(results["Tel"])
+    dos = sim.structure.DOS
     Threads.@threads for i in eachindex(uee[:,1])
         for j in eachindex(uee[i,:])
-            uee[i,j] = elec_energychange(sim.structure.egrid,-1*relax[:,j,i],mp.DOS)
+            DOS = get_DOS(dos, sim, j)
+            uee[i,j] = get_internalenergy(-1*relax[:,j,i],Ref(DOS), Ref(sim.structure.egrid))
         end
     end
-    return uee
+    write_dataset(f["Electronic Temperature"], "Athermal Electron-Electron Energy Flow", uee)
 end
 
-function pp_phononicheatcapacity(Tph,mp,n,cons)
-    if sim.ParameterApprox.PhononHeatCapacity == true
-        hc = zeros(size(Tph))
-        if sim.Systems.NonEqElectrons == true
-            Threads.@threads for i in eachindex(Tph[:,1])
-                hc[i,:] .= nonlinear_phononheatcapacity.(Tph[i,:],n[i,:],cons.kB,mp.θ)
-            end
-        else
-            Threads.@threads for i in eachindex(Tel[:,1])
-                hc[i,:] .= nonlinear_phononheatcapacity.(Tph[i,:],n,cons.kB,mp.θ)
-            end
+function output_phononicheatcapacity(f, results, sim)
+    if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
+        tph = results["Tph"]
+        cph = similar(tph)
+        Threads.@threads for i in eachindex(Tph[:,1])
+            @views cph[i,:] .= nonlinear_phononheatcapacity.(tph[i,:], sim.phononictemperature.n, sim.phononictemperature.θ)
         end
-        return hc
+        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", cph)
     else
-        return mp.Cph
+        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", sim.phononictemperature.Cph)
     end
 end
 
-function pp_neqelectronphononenergychange(fneq,mp)
-    uep = zeros(length(fneq[1,1,:]),length(fneq[1,:,1])) 
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        for j in eachindex(fneq[1,:,1])
-            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],sim.structure.egrid,mp.τep,mp.DOS)
+function output_athemelectronphononscattering(f, results, sim)
+    if !haskey(results, "e*phrelax")
+        fneq = results["fneq"]
+        Tel = results["Tel"]
+        Tph = results["Tph"]
+        tmp = similar(fneq)
+        τ_expr = phonon_relaxationtime(sim)
+        lifetime = mk_function((sim,Tel,Tph),(),τ_expr)
+        Threads.@threads for i in eachindex(Tel[:,1])
+            for j in eachindex(uep[1,:])
+            @views @. tmp[i,j,:] = -fneq[i,j,:] / lifetime(sim, Tel[i,j], Tph[i,j])
+            end
+        end
+        write_dataset(f["Athermal Electrons"], "Athermal Electron-Phonon Scattering", tmp)
+        merge!(results, Dict("e*phrelax" => tmp))
+    end
+end
+
+function output_athermalelectronphononenergychange(f, results, sim)
+    output_athermalelectronphononscattering(f, results, sim)
+    relax = results["e*phrelax"]
+    uep = similar(results["Tel"])
+    dos = sim.structure.DOS
+    Threads.@threads for i in eachindex(uep[:,1])
+        for j in eachindex(uep[i,:])
+            DOS = get_DOS(dos, sim, j)
+            uep[i,j] = get_internalenergy(-1*relax[:,j,i],Ref(DOS), Ref(sim.structure.egrid))
         end
     end
-    return uep
+    write_dataset(f["Phononic Temperature"], "Athermal Electron-Phonon Energy Flow", uee)
 end
 
-function pp_changeinparticles(relax,mp,μ)
-    Δn = zeros(size(μ))
-    Threads.@threads for i in eachindex(relax[1,1,:])
-        temp = zeros(size(Δn[i,:]))
-        noe_func(-1*relax[:,:,i],μ[i,:],mp,temp)
-        Δn[i,:] .= temp
+function output_dndt(f, results, sim)
+    n = results["n"]
+    δn = similar(n)
+    δn[1,:] = zeros(length(δn[1,:]))
+    Threads.@threads for i in 2:length(n[:,1])
+        @views @. δn[i,:] = n[i,:] .- n[i-1,:]
     end
-    return Δn
+    write_dataset(f["Electronic Temeprature"], "Change in Thermal Particle Number", δn)
 end
 
-function pp_dfneqdt(fneq)
+function output_dfneqdt(f, results, sim)
+    fneq = results["fneq"]
     dfneq = zeros(size(fneq))
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        if i == 1
-            dfneq[:,:,i] .= dfneq[:,:,i]
-        else
-            @. dfneq = fneq[:,:,i] - fneq[:,:,i-1]
-        end
+    dfneq[1,:,:] .= zeros(size(fneq[1,:,:]))
+    Threads.@threads for i in 2:length(fneq[:,1,1])
+        @views @. dfneq = fneq[i,:,:] - fneq[i-1,:,:]
     end
-    return dfneq
+    write_dataset(f["Athermal Electrons"], "Change in fneq", dfneq)
 end
 
-function pp_athemexcitation(ftot,mp,las)
+function output_athemexcitation(f, results, sim) #Currently working on this and below
+    fneq = results["fneq"]
+    Tel = results["Tel"]
+    output_chemicalpotential(f, results, sim)
+    μ = results["μ"]
+    hv = sim.laser.hv
+    dos = sim.structure.DOS
+    M = athem_excitation_matrixelements(sim)
     excite = zeros(size(ftot))
     Threads.@threads for i in eachindex(ftot[1,1,:])
         for j in eachindex(ftot[1,:,1])
@@ -531,14 +557,6 @@ function pp_athemexcitation(ftot,mp,las)
     end
     return FD
 end 
-
-function pp_athemelectronphononrelaxation(fneq,mp)
-    rel = zeros(size(fneq))
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        rel[:,:,i] .= -fneq[:,:,i]./mp.τep
-    end
-    return rel
-end
 
 function pp_temporalprofile(las,dim,timepoints,mp)
     temp_prof = zeros(length(timepoints),length(dim.grid))
