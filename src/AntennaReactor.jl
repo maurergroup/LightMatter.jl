@@ -65,7 +65,7 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
             if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
             end
-            push!(exprs,:(du.noe[i] .= $(sys["noe"])))
+            push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
         end
 
@@ -73,10 +73,10 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
         if sim.electronictemperature.Enabled== true
-            push!(exprs,:(du.Tel[i] .= $(sys["Tel"])))
+            push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
         if sim.phononictemperature.Enabled == true
-            push!(exprs,:(du.Tph[i] .= $(sys["Tph"])))
+            push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
         end
     end
     return Expr(:block, exprs...)
