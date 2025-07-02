@@ -384,7 +384,6 @@ function output_dTeldt(f, results, sim)
         end
     end
     write_dataset(f["Electronic Temperature"], "Temperature Derivative", dTemp)
-    #Does this one need merging??
 end
 
 function output_TelConductivity(f, results, sim)
@@ -418,7 +417,6 @@ function output_electronphononcoupling(f, results, sim)
         end
     end
     write_dataset(f["Electronic Temperature"], "Electron-Phonon Coupling", eps)
-    # Don't think this needs adding to results
 end     
 
 function output_electronheatcapacity(f, results, sim)
@@ -451,9 +449,13 @@ function output_athermalelectronelectronscattering(f, results, sim)
         rel = similar(fneq)
         τ_expr = athem_relaxationtime(sim)
         lifetime = mk_function((sim,μ,Tel,),(),τ_expr)
+        grid = sim.structure.dimension.grid
+        sims = vec_simulation(sim)
+
         Threads.@threads for i in eachindex(fneq[:,1,1])
             for j in eachindex(tel[1,:])
-                τee = lifetime(sim, μ[i,j], tel[i,j])
+                X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+                τee = lifetime(sims[X], μ[i,j], tel[i,j])
                 @views rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
             end
         end
@@ -480,8 +482,12 @@ function output_phononicheatcapacity(f, results, sim)
     if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
         tph = results["Tph"]
         cph = similar(tph)
+        (; n, θ) = sim.phononictemperature
         Threads.@threads for i in eachindex(Tph[:,1])
-            @views cph[i,:] .= nonlinear_phononheatcapacity.(tph[i,:], sim.phononictemperature.n, sim.phononictemperature.θ)
+            for j in eachindex(Tph[1,:])
+                (no_elec, θD) = get_parameterhvalue((n, θ), sim, j)
+                cph[i,j] .= nonlinear_phononheatcapacity(tph[i,j], no_elec, θD)
+            end
         end
         write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", cph)
     else
@@ -497,9 +503,13 @@ function output_athemelectronphononscattering(f, results, sim)
         tmp = similar(fneq)
         τ_expr = phonon_relaxationtime(sim)
         lifetime = mk_function((sim,Tel,Tph),(),τ_expr)
+        grid = sim.structure.dimension.grid
+        sims = vec_simulation(sim)
+
         Threads.@threads for i in eachindex(Tel[:,1])
             for j in eachindex(uep[1,:])
-            @views @. tmp[i,j,:] = -fneq[i,j,:] / lifetime(sim, Tel[i,j], Tph[i,j])
+                X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+                @views @. tmp[i,j,:] = -fneq[i,j,:] / lifetime(sims[X], Tel[i,j], Tph[i,j])
             end
         end
         write_dataset(f["Athermal Electrons"], "Athermal Electron-Phonon Scattering", tmp)
@@ -546,26 +556,39 @@ function output_athemexcitation(f, results, sim) #Currently working on this and 
     Tel = results["Tel"]
     output_chemicalpotential(f, results, sim)
     μ = results["μ"]
-    hv = sim.laser.hv
     dos = sim.structure.DOS
-    M = athem_excitation_matrixelements(sim)
-    excite = zeros(size(ftot))
-    Threads.@threads for i in eachindex(ftot[1,1,:])
-        for j in eachindex(ftot[1,:,1])
-            excite[:,j,i] .= athemexcitation(ftot[:,j,i],sim.structure.egrid,mp.DOS,las.hv)
+    grid = sim.structure.dimension.grid
+    sims = vec_simulation(sim)
+
+    excite = similar(fneq)
+    M = mk_function((), (), athem_excitation_matrixelements(sim))
+    las = mk_function((t, sim, i),(), laser_factory(sim))
+    Threads.@threads for i in eachindex(fneq[:,1,1])
+        for j in eachindex(fneq[1,:,1])
+            X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+            ftot = fneq[i,j,:] .+ FermiDirac(Tel[i,j], μ[i,j], sim.structure.egrid)
+            DOS = get_DOS(dos, sim, j)
+            @views excite[i,j,:] .= las(t, sims[X], j) * athemexcitation(ftot, sim.structure.egrid, DOS, sim.laser.hv, M())
         end
     end
-    return FD
+    write_dataset(f["Athermal Electrons"], "Excitation", excite)
 end 
 
-function pp_temporalprofile(las,dim,timepoints,mp)
-    temp_prof = zeros(length(timepoints),length(dim.grid))
-    if typeof(las) == Gaussian
-        for i in eachindex(timepoints)
-            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-mp.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
+function output_laserprofile(f, results, sim)
+    time = results["times"]
+    grid = sim.structure.dimension.grid
+    temp_prof = zeros(length(time),length(grid))
+    las = mk_function((t, sim, i),(), laser_factory(sim))
+
+    sims = vec_simulation(sim)
+
+    for i in eachindex(time)
+        for j in eachindex(grid)
+            X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+            temp_prof[i,j] = las(time[i], sims[X], j)
         end
     end
-    return temp_prof
+    write_dataset(f["Laser"], "Temporal Profile", temp_prof)
 end
 
 function write_dataset(file,dataset,data)
@@ -597,12 +620,12 @@ function get_DOS(DOS, sim, i)
     end
 end   
 
-function get_parameterhvalue(tup, sim, i)
+function get_parameterhvalue(val, sim, i)
     if sim.structure.Elemental_System > 1
         X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return getindex(tup, X)
+        return getindex(val, X)
     else
-        return tup
+        return val
     end
 end
 
@@ -613,6 +636,15 @@ function get_parameterhvalue(tup::Tuple, sim, i)
     else
         return tup
     end
+end
+
+function vec_simulation(sim::Simulation)
+    if sim.structure.Elemental_System > 1
+        sims = sim_seperation(sim)
+    else 
+        sims = sim
+    end
+    return sims
 end
 
 function output_functions(f,sim)
