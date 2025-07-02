@@ -114,7 +114,7 @@ function get_h2e(sim::Simulation)
     return h_2_e
 end
 
-function pauli_blocking(f,E,E')
+#= function pauli_blocking(f,E,E')
     return (f(E') * (1-f(E))) - (f(E) * (1-f(E')))
 end
 
@@ -123,7 +123,9 @@ function delta_peak(val)
 end
 
 function boltzmann_E_excitation(f, sim)
-    ϵ = sim.structure.ϵ_k
+    egrid = sim.structure.egrid
+    k_ϵ
     for i in eachindex(f)
-
+        k = sim.structure.ϵ_k()
         *delta_peak(ϵ(k+Δk) - ϵ(k) + l*sim.laser.hv)
+ =#
