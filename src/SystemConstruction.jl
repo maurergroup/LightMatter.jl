@@ -308,10 +308,10 @@ function build_loopbody(sys, sim::Simulation)
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
         if sim.electronictemperature.Enabled== true
-            push!(exprs,:(du.Tel[i] .= $(sys["Tel"])))
+            push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
         if sim.phononictemperature.Enabled == true
-            push!(exprs,:(du.Tph[i] .= $(sys["Tph"])))
+            push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
         end
     end
     return Expr(:block, exprs...)
