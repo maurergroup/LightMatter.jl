@@ -34,9 +34,8 @@ function post_production(sol, file_name::String, initial_temps::Dict{String,Floa
 
     create_group(fid, "System Equations")
     output_functions(fid["System Equations"], sim)
-    close(temp_name)
     rm(temp_name)
-    close(file_name)
+    close(fid)
 end
 """
     create_datafile_and_structure(file_name::String)
