@@ -71,7 +71,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => Lightmatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim::Simulation)
-            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, tot_n, $τee))))
+            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, $τee))))
         end
     end
     return exprs
@@ -255,9 +255,6 @@ function conductivity_expressions(sim::Simulation)
     end
     if sim.athermalelectrons.Conductivity == true
         push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
-        if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-            push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(p.sim.athermalelectrons.v_g, p.sim.structure.egrid, u.noe, p.Δn, p.sim.structure.dimension.spacing)))
-        end
     end 
     return Expr(:block,cond_exprs...)
 end
@@ -294,19 +291,18 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,embedding)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
-            if sim.athermalelectrons.MagnetoTransport == true
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
+#=             if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
-            end
+            end =#
             push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
-
-        end
-
-        if sim.athermalelectrons.Enabled == true
+        elseif sim.athermalelectrons.Enabled == true
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
+        
         if sim.electronictemperature.Enabled== true
             push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
@@ -355,7 +351,7 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i]))
+            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
         end
         if sim.athermalelectrons.MagnetoTransport == true

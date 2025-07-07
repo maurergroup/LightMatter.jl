@@ -60,18 +60,18 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
         push!(exprs,embedding)
     else # No embedding so all heights are treated the same 
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
-            if sim.athermalelectrons.MagnetoTransport == true
+            #= if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
-            end
+            end =#
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
             push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
-        end
-
-        if sim.athermalelectrons.Enabled == true
+        elseif sim.athermalelectrons.Enabled == true
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
+
         if sim.electronictemperature.Enabled== true
             push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
@@ -139,7 +139,7 @@ function ar_variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i]))
+            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
         end
         if sim.athermalelectrons.MagnetoTransport == true

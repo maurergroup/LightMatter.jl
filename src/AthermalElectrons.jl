@@ -304,19 +304,7 @@ end
     - Expr for the time dependence of the thermal electron number.
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
-    part_change = :(Lightmatter.get_noparticles(relax_dis, DOS, sim.structure.egrid))
-    args = Vector{Union{Symbol,Expr}}([part_change])
-    if sim.athermalelectrons.Conductivity == true
-        push!(args, :n_cond)
-    end
-    if sim.athermalelectrons.AthermalElectron_PhononCoupling == true
-        τep = phonon_relaxationtime(sim)
-        push!(args, :(Lightmatter.get_noparticles(fneq./$τep,DOS, sim.structure.egrid)))
-    end
-    if sim.athermalelectrons.MagnetoTransport == true
-        push!(args, :(Lightmatter.get_noparticles(Δf_mt,DOS, sim.structure.egrid)))
-    end
-    return Expr(:call, :+, args...)
+    return :(-Lightmatter.get_noparticles(du.fneq[i,:],DOS,egrid))
 end
 """
     electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)
@@ -367,7 +355,7 @@ end
 function thermal_particle_transport!(v_g::Vector{Float64}, egrid, n, Δn, dz)
     idx_0 = findmin(abs.(egrid.-0.0))[2]
     v_F = v_g[idx_0]
-    for i in 2:length(Δn) -1
+    for i in 2:length(Δn) - 1
         Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
     end
     Δn[1] = (n[2] - n[1]) / dz * v_F

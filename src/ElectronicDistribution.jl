@@ -64,7 +64,7 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, tot_n, band, sim.structure.egrid, g_k, tmp))
+    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, n, band, sim.structure.egrid, g_k, tmp))
 end
 
 function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64})

@@ -326,7 +326,7 @@ function write_dynamicalvariables(f, results)
         elseif name == "fneq"
             write_dataset(f["Athermal Electrons"],"Non-Equilibrium Distribution",result)
         elseif name =="noe"
-            write_dataset(f,"Particle Float64",result)
+            write_dataset(f,"Particle Number",result)
         end
     end
 end
