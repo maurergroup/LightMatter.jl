@@ -304,7 +304,7 @@ end
     - Expr for the time dependence of the thermal electron number.
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
-    return :(-Lightmatter.get_noparticles(du.fneq[i,:],DOS,egrid))
+    return :(-Lightmatter.get_noparticles(du.fneq[i,:],DOS,sim.structure.egrid))
 end
 """
     electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)

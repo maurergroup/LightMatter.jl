@@ -273,7 +273,6 @@ function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
     push!(exprs,variable_renaming(sim))
     push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
-
     if sim.athermalelectrons.EmbeddedAthEM == true
         embedding = quote
             if i == 1
