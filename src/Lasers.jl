@@ -131,9 +131,9 @@ end
 function get_laser_fields(las)
     if las !== nothing
         if las.hv isa Matrix
-            power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
+            power = :(sim.laser.hv[:,2])  
         else
-            power = :(sim.laser.hv)
+            power = :(1.0)
         end
         if las.envelope == :Rectangular
             E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
@@ -155,4 +155,9 @@ end
 
 function photon_energytofrequency(hv)
     return hv / Constants.ħ
+end
+
+function E_magnitude(las_field, ext_field)
+    sum = :(las_field .+ ext_field)
+    return :(sqrt($(sum[1])^2 + $(sum[2])^2 + $(sum[3])^2))
 end

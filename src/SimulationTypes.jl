@@ -490,7 +490,6 @@ function build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoup
                                PhononicHeatCapacity=PhononicHeatCapacity, θ=θ, n=n, Cph=Cph, κ=κ)
 end
 """
-    W.I.P!!!
     struct ElectronicDistribution <: SimulationTypes
         Enabled::Bool = false
 
@@ -505,6 +504,7 @@ end
 
     Ω::Real
     me::Real
+    cs::Real
 
 end
 """
