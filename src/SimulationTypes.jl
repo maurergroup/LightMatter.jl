@@ -117,8 +117,8 @@ end
     Struct that contains all information regarding electromagnetic fields in the simulation.
 """
 struct Fields <: SimulationTypes
-    electric::Union{Expr,Float64}
-    magnetic::Union{Expr,Float64}
+    electric::Union{Vector{Expr}, Vector{Float64}}
+    magnetic::Union{Vector{Expr}, Vector{Float64}}
 end
 """
     TotalFields <: SimulationTypes
@@ -198,14 +198,19 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{Float64} = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(:(0.0), :(0.0)), bandstructure::Union{spl, Nothing, Vector{spl}} = nothing, FE=0.0)
+    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{spl, Nothing, Vector{spl}} = nothing, FE=0.0, fields = false)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
-    las_field = get_laser_fields(las)
+    if fields
+        las_field = get_laser_fields(las)
+        total_field = TotalFields(las_field, ext_fields)
+    else
+        total_field = TotalFields(Fields(fill(0.0, 3), fill(0.0, 3)), Fields(fill(0.0, 3), fill(0.0, 3)))
+    end
     bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
     tmp = zeros(dimension.length, length(egrid))
-    return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = TotalFields(las_field, ext_fields),
+    return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
                     bandstructure = bandstructure, tmp = tmp)
 end
 """
@@ -220,6 +225,9 @@ end
 """
 @kwdef struct DensityMatrix <: SimulationTypes
     Enabled::Bool
+    DipoleMatrix::Vector{Matrix{Complex}}
+    Fields::Fields
+    H0::Matrix{Complex}
 end
 """
     WIP!!!
@@ -227,8 +235,14 @@ end
 
     Once implemented will build a density matrix and store Hamiltonian for propagation via the vonNeumann equation.
 """
-function build_DensityMatrix(; Enabled = false)
-    return DensityMatrix(Enabled = Enabled)
+function build_DensityMatrix(; Enabled = false, las=build_Laser(), DipoleMatrix= fill(zeros(2,2,),3), H0=zeros(2,2), ext_fields = Fields(fill(:(0.0),3), fill(:(0.0),3)))
+    las_field = get_laser_fields(las)
+    total_fields = Fields(Vector{Expr}(undef,3), Vector{Expr}(undef,3))
+    for i in 1:3
+        total_fields.electric[i] = Expr(:call, :(.+), (las_field.electric[i], ext_fields.electric[i])...)
+        total_fields.magnetic[i] = Expr(:call, :(.+), (las_field.magnetic[i], ext_fields.magnetic[i])...)
+    end
+    return DensityMatrix(Enabled = Enabled, DipoleMatrix = DipoleMatrix, Fields=total_fields, H0=H0)
 end
 """
     AthermalElectrons <: SimulationTypes
@@ -517,7 +531,6 @@ end
     This struct contains all the others and is the main simulation object both in assembling a simulation and during it
 """
 @kwdef struct Simulation <: SimulationTypes
-    densitymatrix::DensityMatrix
     electronictemperature::ElectronicTemperature
     phononictemperature::PhononicTemperature
     athermalelectrons::AthermalElectrons
@@ -525,6 +538,7 @@ end
     phononicdistribution::PhononicDistribution
     structure::Structure
     laser::Laser
+    densitymatrix::DensityMatrix
 end
 """
     build_Simulation(;densitymatrix::Union{DensityMatrix,NamedTuple,Nothing}=nothing, electronictemperature::Union{ElectronicTemperature,NamedTuple,Nothing}=nothing,

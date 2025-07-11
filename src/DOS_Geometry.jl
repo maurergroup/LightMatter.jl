@@ -83,6 +83,22 @@ function generate_DOS(File::String, unit_scalar::Float64)
     return get_interpolant(TotalDOS[:,1], TotalDOS[:,2] * unit_scalar)
 end
 """
+    build_DOS(dos_file::String, geometry_file::String)
+
+    A convenient constructor for building a DOS from the DOS and geometry file.
+
+    # Arguments
+    - 'dos_file': Path to the total DOS file.
+    - 'geometry_file': Path to the geometry.in file
+
+    # Returns
+    - An interpolation object representing the DOS.
+"""
+function build_DOS(dos_file::String, geometry_file::String)
+    v = get_unitcellvolume(geometry_file::String)
+    return generate_DOS(dos_file, 1/v)
+end
+"""
     get_unitcellvolume(geometry_file::String)
     
     Calculates the volume of the unit cell for DOS unit conversion

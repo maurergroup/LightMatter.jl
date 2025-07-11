@@ -129,22 +129,26 @@ function calculate_laser_fields(las::Laser)
 end
 
 function get_laser_fields(las)
-    if las.hv isa Matrix
-        power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
-    else
-        power = :(sim.laser.hv)
-    end
-    if las.envelope == :Rectangular
-        E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
-    elseif las.envelope == :Gaussian
-        E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.laser.FWHM^2))
-    end
+    if las !== nothing
+        if las.hv isa Matrix
+            power = :(sim.laser.hv[:,2]*abs(sim.laser.hv[2,1]-sim.laser.hv[1,1]))  
+        else
+            power = :(sim.laser.hv)
+        end
+        if las.envelope == :Rectangular
+            E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
+        elseif las.envelope == :Gaussian
+            E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.laser.FWHM^2))
+        end
 
-    if las.hv isa Matrix
-        E = :(sum($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t)))
-    else
-        E = :($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t))
+        if las.hv isa Matrix
+            E = [:(sum($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t))), :(0.0+0.0), :(0.0+0.0)]
+        else
+            E = [:($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t)), :(0.0+0.0), :(0.0+0.0)]
+        end
+        B = [:(0.0+0.0), :($E ./ Constants.c), :(0.0+0.0)]
+        return Fields(E, B)
+    else 
+        return Fields(:(0.0), :(0.0))
     end
-    B = :($E ./ Constants.c)
-    return Fields(E, B)
 end

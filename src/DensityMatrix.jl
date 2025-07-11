@@ -1,10 +1,4 @@
-###
-# This file currently contains all work based on DM Anderson Holstein from NQCDynamics. But want to use some of this as a base
-# such as keeping the vonNeumann propagator and making it work with any arbritary Hamilotnian. Porbably only therefore requires
-# the final few functions of this
-###
-
-function vonNeumann(dρ,ρ,H,t)
+function vonNeumann(dρ,ρ,H)
     dρ .= 1/(1im * Constants.ħ  )*(H*ρ - ρ*H)
     return nothing
 end
@@ -26,15 +20,47 @@ function build_dm(N,occ)
 end
 
 function thermal_bath_densitymatrix(H,β,ne)
-    thermal_occupation = 1 ./(exp.(diag(H[2:end,2:end])./8.617e-5./β).+1)
+    thermal_occupation = 1 ./(exp.(diag(H[1:end,1:end])*β).+1)
     ρ=Matrix(Diagonal(thermal_occupation))
     return Complex.(ρ./tr(ρ).*ne)
 end
 
-function build_initaldm(H,β,ne,imp_occ)
-    ρ_th = thermal_bath_densitymatrix(H,β,ne)
-    ρ = Complex.(zeros(bathstates+1,bathstates+1))
-    ρ[1,1] = imp_occ
-    ρ[2:end,2:end] .= ρ_th
-    return ρ
+function discretize_DOS(dos_file, no_states, egrid)
+    dos= readdlm(dos_file,comments=true)
+    energy = dos[:,1]
+    states = dos[:,2]
+    DOS_tmp = generate_DOS(dos_file, 1.0)
+    total_states = total_DOS_states(DOS_tmp, egrid)
+    
+    DOS = get_interpolant(energy, states*no_states ./ total_states)
+
+    DOS_states = zeros(length(egrid))
+    step = egrid[2]-egrid[1]
+    for (i,E) in enumerate(egrid)
+        int(u,p) = DOS(u)
+        prob = IntegralProblem(int, E-step/2, E+step/2)
+        DOS_states[i] = solve(prob, HCubatureJL(initdiv=1000), abstol=1e-8, reltol=1e-8).u
+    end
+    int_states  = round.(Int, DOS_states)
+    disc_vector = vcat([fill(x,r) for (x,r) in zip(egrid, int_states)]...)
+    return disc_vector
+end
+
+function total_DOS_states(DOS, egrid)
+    int(u,p) = DOS(u)
+    prob = IntegralProblem(int, egrid[1], egrid[end])
+    return solve(prob, HCubatureJL(initdiv=1000), abstol=1e-8, reltol=1e-8).u
+end
+
+function construct_dipolevonNeumann(sim::Simulation)
+    expr = quote
+        println(t)
+        sim = p.sim
+        d̂ = sim.densitymatrix.DipoleMatrix
+        H_tot = sim.densitymatrix.H0 .- (d̂[1] .* $(sim.densitymatrix.Fields.electric[1])) 
+                                     .- (d̂[2] .* $(sim.densitymatrix.Fields.electric[2])) 
+                                     .- (d̂[3] .* $(sim.densitymatrix.Fields.electric[3])) 
+        Lightmatter.vonNeumann(du,u,H_tot)
+    end
+    return expr
 end
