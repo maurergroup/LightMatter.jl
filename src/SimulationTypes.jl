@@ -143,7 +143,7 @@ end
         egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
 
         dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
-         bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} 
+        bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} 
                         # The band structure of the simulation both in terms of k->E and E-> k
     end
 
@@ -198,7 +198,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{Float64} = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{spl, Nothing, Vector{spl}} = nothing, FE=0.0, fields = false)
+    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE=0.0, fields = false)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
@@ -502,6 +502,10 @@ end
     Enabled::Bool = false
 
     Electron_PhononCoupling::Bool = false
+
+    Ω::Real
+    me::Real
+
 end
 """
     W.I.P!!!

@@ -176,7 +176,7 @@ function ar_variable_renaming(sim::Simulation)
     assignments = [:(local $(lhs) = $(rhs)) for (lhs, rhs) in zip(new_name, old_name)]
     return quote
         $(assignments...)
-    end # Writes a single line which renames all the variables correctly
+    end
 end
 """
     sim_seperation(sim::Simulation)

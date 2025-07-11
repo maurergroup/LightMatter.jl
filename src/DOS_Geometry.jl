@@ -486,7 +486,7 @@ function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
 end
 
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
-    if bandstructure isa Nothing
+    if bandstructure == :effectiveoneband
         if DOS isa AbstractArray
             E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
             for i in eachindex(DOS)
@@ -506,6 +506,7 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                     DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
         end
     else
-        return bandstructure
+        return [DataInterpolations.AkimaInterpolation([1,2,3],[4,5,6],extrapolation = ExtrapolationType.Constant),
+                DataInterpolations.AkimaInterpolation([1,2,3],[4,5,6],extrapolation = ExtrapolationType.Constant)]
     end
 end

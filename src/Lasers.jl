@@ -152,3 +152,7 @@ function get_laser_fields(las)
         return Fields(:(0.0), :(0.0))
     end
 end
+
+function photon_energytofrequency(hv)
+    return hv / Constants.ħ
+end
