@@ -1,6 +1,6 @@
 """
-    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
-    tspan::Tuple{Number,Number}, sim::Simulation; 
+    run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, Float64},
+    tspan::Tuple{Float64,Float64}, sim::Simulation; 
     save, tolerance, max_step, min_step, callbacks)
     
     Generates the problem the dynamics will solve and then solves the coupled system of ODE's.
@@ -18,17 +18,18 @@
     # Returns
     - The solution of the dynamics calculation
 """
-function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, <:Number},
-    tspan::Tuple{Number,Number}, sim::Simulation, alg=Tsit5(), kwargs...)
+function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps::Dict{String, Float64},
+    tspan::Tuple{Float64,Float64}, sim::Simulation; alg=Tsit5(), kwargs...)
 
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
     simulation_expr = simulation_construction(sys,sim)
     simulation_problem! = mk_function((:du,:u,:p,:t),(),simulation_expr)
-
+    println("Precompiling")
     simulation_problem!(similar(u0),u0,p,0.0)
     prob=ODEProblem(simulation_problem!,u0,tspan,p)
-    sol = solve(prob, alg, kwargs...,)
+    println("Running Script")
+    sol = solve(prob, alg; kwargs...)
     return sol
 end
 

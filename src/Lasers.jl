@@ -10,13 +10,13 @@
     - Expression for the power of the laser as a function of time and depth
 """
 function laser_factory(sim::Simulation)
-    temporal = temporal_laser(sim)
+    temporal = temporal_laser(sim.laser)
     power = :((1-sim.laser.R) * sim.laser.ϕ)
     spatial = spatial_laser(sim)
     return Expr(:call, :*, temporal, spatial, power)
 end
 """
-    temporal_laser(sim::Simulation)
+    temporal_laser(las::Laser)
     
     Assembles the expression for the user desired temporal shape of the laser
     Currently implemented:
@@ -26,13 +26,13 @@ end
     - :Rectangular : Constant illumination style method. The laser is on for 2*FWHM at either side of 0.0 fs
 
     # Arguments
-    - 'sim': Simulation settings and parameters
+    - 'las': Settings and parameters of the laser
 
     # Returns
     - Expression for the temporal shape of the laser
 """
-function temporal_laser(sim::Simulation)
-    type = sim.laser.envelope
+function temporal_laser(laser::Laser)
+    type = laser.envelope
     if type == :Gaussian
         return :(sqrt(4*log(2)/pi) / sim.laser.FWHM * exp(-4*log(2)*t^2/sim.laser.FWHM^2))
     elseif type == :HyperbolicSecant
@@ -122,4 +122,42 @@ function spatial_xy_laser(sim::Simulation)
     else
         return 1
     end
+end
+
+function calculate_laser_fields(las::Laser)
+    return get_laser_fields(las)
+end
+
+function get_laser_fields(las)
+    if las !== nothing
+        if las.hv isa Matrix
+            power = :(sim.laser.hv[:,2])  
+        else
+            power = :(1.0)
+        end
+        if las.envelope == :Rectangular
+            E_0 = :(-2*sim.laser.FWHM ≤ t ≤ 2*sim.laser.FWHM ? sqrt.(2*sim.laser.ϕ.*$power ./ (Constants.c*Constants.ϵ0*4*sim.laser.FWHM*sim.laser.n)) : 0.0)
+        elseif las.envelope == :Gaussian
+            E_0 = :(sqrt.(2*sim.laser.ϕ*sqrt(4*log(2)).*$power./(Constants.c*Constants.ϵ0*sim.laser.FWHM*sim.laser.n*sqrt(pi))).*exp(-2*log(2)*t^2/sim.laser.FWHM^2))
+        end
+
+        if las.hv isa Matrix
+            E = [:(sum($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t))), :(0.0+0.0), :(0.0+0.0)]
+        else
+            E = [:($E_0 .* cos.(sim.laser.hv * 1/(Constants.ħ*2*pi) * t)), :(0.0+0.0), :(0.0+0.0)]
+        end
+        B = [:(0.0+0.0), :($E ./ Constants.c), :(0.0+0.0)]
+        return Fields(E, B)
+    else 
+        return Fields(:(0.0), :(0.0))
+    end
+end
+
+function photon_energytofrequency(hv)
+    return hv / Constants.ħ
+end
+
+function E_magnitude(las_field, ext_field)
+    sum = :(las_field .+ ext_field)
+    return :(sqrt($(sum[1])^2 + $(sum[2])^2 + $(sum[3])^2))
 end

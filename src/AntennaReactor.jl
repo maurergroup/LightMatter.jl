@@ -60,25 +60,29 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
         push!(exprs,embedding)
     else # No embedding so all heights are treated the same 
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
+            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
-            push!(exprs,:(du.noe[i,:] .= $(sys["noe"])))
+            #= if sim.athermalelectrons.MagnetoTransport == true
+                push!(exprs,:($(sys["magneto"])))
+            end =#
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
+            push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
+        elseif sim.athermalelectrons.Enabled == true
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
 
-        if sim.athermalelectrons.Enabled == true
-            push!(exprs,:(du.fneq[i,:] .= $(sys["fneq"])))
-        end
         if sim.electronictemperature.Enabled== true
-            push!(exprs,:(du.Tel[i,:] .= $(sys["Tel"])))
+            push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
         if sim.phononictemperature.Enabled == true
-            push!(exprs,:(du.Tph[i,:] .= $(sys["Tph"])))
+            push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
         end
     end
     return Expr(:block, exprs...)
 end
 """
-    mat_picker(height::Number, cutoffs::Union{Number,Vector{<:Number}})
+    mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
 
     Selects an index based on material interface height and given cutoffs.
 
@@ -89,7 +93,7 @@ end
     # Returns
     - The index of the region in which `height` lies.
 """
-function mat_picker(height::Number, cutoffs::Union{Number,Vector{<:Number}})
+function mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
     subindex = 1
     for i in eachindex(cutoffs) 
         if height < cutoffs[i]
@@ -113,8 +117,8 @@ end
     - An expression block assigning simulation-specific variable names.
 """
 function ar_variable_renaming(sim::Simulation)
-    old_name = [:(p.matsim[X])]
-    new_name = [:sim,]
+    old_name = [:(p.matsim[X]), :(p.sim.structure.tmp[i,:])]
+    new_name = [:sim, :tmp]
     if typeof(sim.structure.DOS) == Vector{Vector{spl}}
         push!(old_name, :(p.matsim[X].structure.DOS[i]))
         push!(new_name, :DOS)
@@ -135,8 +139,16 @@ function ar_variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i]))
+            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
+        end
+        if sim.athermalelectrons.MagnetoTransport == true
+            push!(old_name, :(p.Δf_mt[i,:]))
+            push!(old_name, :(p.g_k[i,:]))
+            push!(new_name, :Δf_mt)
+            push!(new_name, :g_k)
+            push!(old_name, :(p.sim.structure.bandstructure[X]))
+            push!(new_name, :band)
         end
     end
     if sim.electronictemperature.Enabled == true
@@ -164,7 +176,7 @@ function ar_variable_renaming(sim::Simulation)
     assignments = [:(local $(lhs) = $(rhs)) for (lhs, rhs) in zip(new_name, old_name)]
     return quote
         $(assignments...)
-    end # Writes a single line which renames all the variables correctly
+    end
 end
 """
     sim_seperation(sim::Simulation)
@@ -201,7 +213,7 @@ end
 
     # Arguments
     - `data`: A subsystem of the simulation e.g. neq electrons or Tel
-    - `number`: Number of subdivisions (usually the number of elements).
+    - `number`: Float64 of subdivisions (usually the number of elements).
 
     # Returns
     - A vector of the subsystem with scalar data extracted from the original vector fields.
@@ -242,20 +254,20 @@ function split_structure(structure::Structure)
     ] # Creates a vector of the Structure struct with the DOS split into their seperate materials
 end
 """
-    split_grid(grid::Vector{<:Number}, cutoffs::Union{Number, Vector{Number}})
+    split_grid(grid::Vector{Float64}, cutoffs::Union{Float64, Vector{Float64}})
 
     Splits a numerical grid into regions that connect to each material
 
     # Arguments
-    - `grid`: A vector of Number numbers representing the full z-grid
+    - `grid`: A vector of Float64 numbers representing the full z-grid
     - `cutoffs`: A single value or vector of values defining the interfaces between each material 
 
     # Returns
     - A vector of sub-vectors representing segments of the original z-grid.
 """
-function split_grid(grid::Vector{<:Number}, cutoffs::Union{Number,Vector{Number}})
+function split_grid(grid::Vector{Float64}, cutoffs::Union{Float64,Vector{Float64}})
     cutoffs = isa(cutoffs, Vector) ? cutoffs : [cutoffs]
-    sections = Vector{Vector{<:Number}}()
+    sections = Vector{Vector{Float64}}()
     start_idx = 1
     for cutoff in cutoffs
         end_idx = findfirst(x -> x > cutoff, grid)

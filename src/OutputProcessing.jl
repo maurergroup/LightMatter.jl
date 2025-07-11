@@ -4,7 +4,7 @@
 # This generally needs a good tidying
 ###
 """
-    post_production(sol,file_name::String,initial_temps::Dict{String,<:Number},output::Symbol,sim::Simulation)
+    post_production(sol,file_name::String,initial_temps::Dict{String,Float64},output::Symbol,sim::Simulation)
     
     Handles processing, saving the simulation after it has completed. Uses HDF5 file format
     Currently the only output setting supported is :minimum which only saves the parameters, chemical potential and
@@ -20,7 +20,7 @@
     # Returns
     - Nothing is returned but a file is created
 """
-function post_production(sol, file_name::String, initial_temps::Dict{String,<:Number}, output::Vector{Symbol}, sim::Simulation)
+function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, output::Vector{Symbol}, sim::Simulation)
     temp_name = "temp_"*file_name[1:end-5]*".jld2" 
     @save temp_name sol
     fid = create_datafile_and_structure(file_name)
@@ -28,13 +28,14 @@ function post_production(sol, file_name::String, initial_temps::Dict{String,<:Nu
 
     results = seperate_results(sol,initial_temps,sim)
     fid["Time Span"] = results["times"]
-    write_dynamicalvariables(f, results)
+    write_dynamicalvariables(fid, results)
 
     selected_output_functions(fid, results, sim, output)
 
     create_group(fid, "System Equations")
     output_functions(fid["System Equations"], sim)
     rm(temp_name)
+    close(fid)
 end
 """
     create_datafile_and_structure(file_name::String)
@@ -81,6 +82,9 @@ end
 """
 function dict_to_hdf5(f, d)
     for (key, value) in d
+        if typeof(value) <:Vector{<:Vector}
+            value = stack(value, dims=1)
+        end
         f[key] = value
     end
 end
@@ -189,7 +193,7 @@ function write_DOS(structure::Structure)
     return Dict("DOS" => DOS)
 end
 """
-    seperate_results(sol, initial_temps::Dict{String,<:Number}, sim::Simulation)
+    seperate_results(sol, initial_temps::Dict{String,Float64}, sim::Simulation)
     
     Seperates the results held inside of the solution object
     Also fills all unpropagated subsystems with parameter/temp information where neccessary
@@ -202,7 +206,7 @@ end
     # Returns
     - Dictionary of values of each of the seperated systems 
 """
-function seperate_results(sol, initial_temps::Dict{String,<:Number}, sim::Simulation)
+function seperate_results(sol, initial_temps::Dict{String,Float64}, sim::Simulation)
     fields = propertynames(sol[1])
     vals = generate_valuedict(sol, sim, fields)
     populate_value_dict!(sol, fields, vals)
@@ -224,7 +228,7 @@ end
     - Dictionary of values of each of the propgated subsystems 
 """
 function generate_valuedict(sol, sim::Simulation, fields)
-    vals = Dict{String,Union{Number,AbstractArray}}()
+    vals = Dict{String,Union{Float64,AbstractArray}}()
     for i in fields
         if i in [:Tel, :Tph, :noe]
             merge!(vals,Dict(String(i) => zeros(length(sol.t), sim.structure.dimension.length)))
@@ -235,7 +239,7 @@ function generate_valuedict(sol, sim::Simulation, fields)
     return vals
 end
 """
-    populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{<:Number}})
+    populate_value_dict!(sol ,fields::Vector{Symbol}, vals::Dict{String,AbstractArray{Float64}})
     
     Populates the subsystem dictionary with the reuslting vlaues from the simulation
 
@@ -257,7 +261,7 @@ function populate_value_dict!(sol, fields, vals)
     return vals
 end
 """
-    populate_unpropagatedvalues!(sol, initial_temps::Dict{String,<:Number}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{<:Number}})
+    populate_unpropagatedvalues!(sol, initial_temps::Dict{String,Float64}, fields::Vector{Symbol}, sim::Simulation, vals::Dict{String,AbstractArray{Float64}})
     
     Adds placeholder information to any unpropagated fields
 
@@ -271,7 +275,7 @@ end
     # Returns
     - vals dictionary with the added unpropagated subsystems
 """
-function populate_unpropagatedvalues!(initial_temps::Dict{String,<:Number}, fields, sim::Simulation, vals)
+function populate_unpropagatedvalues!(initial_temps::Dict{String,Float64}, fields, sim::Simulation, vals)
     if :Tel ∉ fields
         merge!(vals, Dict("Tel" => fill(initial_temps["Tel"], sim.structure.dimension.length)'))
     end
@@ -381,7 +385,6 @@ function output_dTeldt(f, results, sim)
         end
     end
     write_dataset(f["Electronic Temperature"], "Temperature Derivative", dTemp)
-    #Does this one need merging??
 end
 
 function output_TelConductivity(f, results, sim)
@@ -389,12 +392,12 @@ function output_TelConductivity(f, results, sim)
     Tph = results["Tph"]
     spat = similar(Tel)
     Threads.@threads for i in eachindex(Tel[:,1])
-        electrontemperature_conductivity!(Tel[i,:], sim.electronictemperature.κ, sim.structure.dimension.spacing, Tph[i,:], spat[i,:])
+        @views electrontemperature_conductivity!(Tel[i,:], sim.electronictemperature.κ, sim.structure.dimension.spacing, Tph[i,:], spat[i,:])
     end
     write_dataset(f["Electronic Temperature"], "Thermal Conductivity", spat)
 end
 
-function output_electronphonon(f, results, sim)
+function output_electronphononcoupling(f, results, sim)
     Tel = results["Tel"]
     Tph = results["Tph"]
     eps = similar(Tel)
@@ -406,16 +409,15 @@ function output_electronphonon(f, results, sim)
         Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
             (omega, lambda) = get_parameterhvalue((ω, λ), sim, i)
-            eps[i,:] .= nonlinear_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i], Ref(sim.structure.egrid))
+            @views eps[i,:] .= nonlinear_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i], Ref(sim.structure.egrid))
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
             g_val = get_parameterhvalue(sim.electronictemperature.g, sim, i)
-            eps[i,:] .= g_val * (Tel[:,i].-Tph[:,i])
+            @views eps[i,:] .= g_val * (Tel[:,i].-Tph[:,i])
         end
     end
     write_dataset(f["Electronic Temperature"], "Electron-Phonon Coupling", eps)
-    # Don't think this needs adding to results
 end     
 
 function output_electronheatcapacity(f, results, sim)
@@ -425,14 +427,14 @@ function output_electronheatcapacity(f, results, sim)
         output_chemicalpotential(f, results, sim)
         μ = results["μ"]
         dos = sim.structure.DOS
-        Threads.@threads for i in eachindex(Tel[:,1])
+        Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
-            hc[i,:] .= nonlinear_electronheatcapacity.(Tel[i,:], μ[i,:], Ref(DOS), Ref(sim.structure.egrid))
+            @views hc[i,:] .= nonlinear_electronheatcapacity.(Tel[:,i], μ[:,i], Ref(DOS), Ref(sim.structure.egrid))
         end
     else
         Threads.@threads for i in eachindex(Tel[:,1])
             gamma =  get_parameterhvalue(sim.electronictemperature.γ, sim, i)
-            hc[i,:] .= gamma*Tel[i,:]
+            @views hc[i,:] .= gamma*Tel[i,:]
         end
     end
     write_dataset(f["Electronic Temperature"], "Electronic Heat Capacity", hc)
@@ -446,12 +448,16 @@ function output_athermalelectronelectronscattering(f, results, sim)
         output_chemicalpotential(f, results, sim)
         μ = results["μ"]
         rel = similar(fneq)
-        lifetime = τ_expr = athem_relaxationtime(sim)
-        mk_function((sim,μ,Tel,),(),τ_expr)
+        τ_expr = athem_relaxationtime(sim)
+        lifetime = mk_function((sim,μ,Tel,),(),τ_expr)
+        grid = sim.structure.dimension.grid
+        sims = vec_simulation(sim)
+
         Threads.@threads for i in eachindex(fneq[:,1,1])
             for j in eachindex(tel[1,:])
-                τee = lifetime(sim, μ[i,j], tel[i,j])
-                rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
+                X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+                τee = lifetime(sims[X], μ[i,j], tel[i,j])
+                @views rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
             end
         end
         write_dataset(f["Athermal Electrons"], "Athermal Electron-Electron Scattering", rel)
@@ -460,91 +466,130 @@ function output_athermalelectronelectronscattering(f, results, sim)
 end
 
 function output_athermalelectronelectronenergychange(f, results, sim)
-    uee = zeros(length(relax[1,1,:]),length(relax[1,:,1]))
+    output_athermalelectronelectronscattering(f, results, sim)
+    relax = results["e*erelax"]
+    uee = similar(results["Tel"])
+    dos = sim.structure.DOS
     Threads.@threads for i in eachindex(uee[:,1])
         for j in eachindex(uee[i,:])
-            uee[i,j] = elec_energychange(sim.structure.egrid,-1*relax[:,j,i],mp.DOS)
+            DOS = get_DOS(dos, sim, j)
+            uee[i,j] = get_internalenergy(-1*relax[:,j,i],Ref(DOS), Ref(sim.structure.egrid))
         end
     end
-    return uee
+    write_dataset(f["Electronic Temperature"], "Athermal Electron-Electron Energy Flow", uee)
 end
 
-function pp_phononicheatcapacity(Tph,mp,n,cons)
-    if sim.ParameterApprox.PhononHeatCapacity == true
-        hc = zeros(size(Tph))
-        if sim.Systems.NonEqElectrons == true
-            Threads.@threads for i in eachindex(Tph[:,1])
-                hc[i,:] .= nonlinear_phononheatcapacity.(Tph[i,:],n[i,:],cons.kB,mp.θ)
-            end
-        else
-            Threads.@threads for i in eachindex(Tel[:,1])
-                hc[i,:] .= nonlinear_phononheatcapacity.(Tph[i,:],n,cons.kB,mp.θ)
+function output_phononicheatcapacity(f, results, sim)
+    if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
+        tph = results["Tph"]
+        cph = similar(tph)
+        (; n, θ) = sim.phononictemperature
+        Threads.@threads for i in eachindex(Tph[:,1])
+            for j in eachindex(Tph[1,:])
+                (no_elec, θD) = get_parameterhvalue((n, θ), sim, j)
+                cph[i,j] .= nonlinear_phononheatcapacity(tph[i,j], no_elec, θD)
             end
         end
-        return hc
+        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", cph)
     else
-        return mp.Cph
+        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", sim.phononictemperature.Cph)
     end
 end
 
-function pp_neqelectronphononenergychange(fneq,mp)
-    uep = zeros(length(fneq[1,1,:]),length(fneq[1,:,1])) 
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        for j in eachindex(fneq[1,:,1])
-            uep[i,j] = neq_electronphonontransfer(fneq[:,j,i],sim.structure.egrid,mp.τep,mp.DOS)
+function output_athemelectronphononscattering(f, results, sim)
+    if !haskey(results, "e*phrelax")
+        fneq = results["fneq"]
+        Tel = results["Tel"]
+        Tph = results["Tph"]
+        tmp = similar(fneq)
+        τ_expr = phonon_relaxationtime(sim)
+        lifetime = mk_function((sim,Tel,Tph),(),τ_expr)
+        grid = sim.structure.dimension.grid
+        sims = vec_simulation(sim)
+
+        Threads.@threads for i in eachindex(Tel[:,1])
+            for j in eachindex(uep[1,:])
+                X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+                @views @. tmp[i,j,:] = -fneq[i,j,:] / lifetime(sims[X], Tel[i,j], Tph[i,j])
+            end
+        end
+        write_dataset(f["Athermal Electrons"], "Athermal Electron-Phonon Scattering", tmp)
+        merge!(results, Dict("e*phrelax" => tmp))
+    end
+end
+
+function output_athermalelectronphononenergychange(f, results, sim)
+    output_athermalelectronphononscattering(f, results, sim)
+    relax = results["e*phrelax"]
+    uep = similar(results["Tel"])
+    dos = sim.structure.DOS
+    Threads.@threads for i in eachindex(uep[:,1])
+        for j in eachindex(uep[i,:])
+            DOS = get_DOS(dos, sim, j)
+            uep[i,j] = get_internalenergy(-1*relax[:,j,i],Ref(DOS), Ref(sim.structure.egrid))
         end
     end
-    return uep
+    write_dataset(f["Phononic Temperature"], "Athermal Electron-Phonon Energy Flow", uee)
 end
 
-function pp_changeinparticles(relax,mp,μ)
-    Δn = zeros(size(μ))
-    Threads.@threads for i in eachindex(relax[1,1,:])
-        temp = zeros(size(Δn[i,:]))
-        noe_func(-1*relax[:,:,i],μ[i,:],mp,temp)
-        Δn[i,:] .= temp
+function output_dndt(f, results, sim)
+    n = results["n"]
+    δn = similar(n)
+    δn[1,:] = zeros(length(δn[1,:]))
+    Threads.@threads for i in 2:length(n[:,1])
+        @views @. δn[i,:] = n[i,:] .- n[i-1,:]
     end
-    return Δn
+    write_dataset(f["Electronic Temeprature"], "Change in Thermal Particle Number", δn)
 end
 
-function pp_dfneqdt(fneq)
+function output_dfneqdt(f, results, sim)
+    fneq = results["fneq"]
     dfneq = zeros(size(fneq))
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        if i == 1
-            dfneq[:,:,i] .= dfneq[:,:,i]
-        else
-            @. dfneq = fneq[:,:,i] - fneq[:,:,i-1]
-        end
+    dfneq[1,:,:] .= zeros(size(fneq[1,:,:]))
+    Threads.@threads for i in 2:length(fneq[:,1,1])
+        @views @. dfneq = fneq[i,:,:] - fneq[i-1,:,:]
     end
-    return dfneq
+    write_dataset(f["Athermal Electrons"], "Change in fneq", dfneq)
 end
 
-function pp_athemexcitation(ftot,mp,las)
-    excite = zeros(size(ftot))
-    Threads.@threads for i in eachindex(ftot[1,1,:])
-        for j in eachindex(ftot[1,:,1])
-            excite[:,j,i] .= athemexcitation(ftot[:,j,i],sim.structure.egrid,mp.DOS,las.hv)
+function output_athemexcitation(f, results, sim) #Currently working on this and below
+    fneq = results["fneq"]
+    Tel = results["Tel"]
+    output_chemicalpotential(f, results, sim)
+    μ = results["μ"]
+    dos = sim.structure.DOS
+    grid = sim.structure.dimension.grid
+    sims = vec_simulation(sim)
+
+    excite = similar(fneq)
+    M = mk_function((), (), athem_excitation_matrixelements(sim))
+    las = mk_function((t, sim, i),(), laser_factory(sim))
+    Threads.@threads for i in eachindex(fneq[:,1,1])
+        for j in eachindex(fneq[1,:,1])
+            X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+            ftot = fneq[i,j,:] .+ FermiDirac(Tel[i,j], μ[i,j], sim.structure.egrid)
+            DOS = get_DOS(dos, sim, j)
+            @views excite[i,j,:] .= las(t, sims[X], j) * athemexcitation(ftot, sim.structure.egrid, DOS, sim.laser.hv, M())
         end
     end
-    return FD
+    write_dataset(f["Athermal Electrons"], "Excitation", excite)
 end 
 
-function pp_athemelectronphononrelaxation(fneq,mp)
-    rel = zeros(size(fneq))
-    Threads.@threads for i in eachindex(fneq[1,1,:])
-        rel[:,:,i] .= -fneq[:,:,i]./mp.τep
-    end
-    return rel
-end
+function output_laserprofile(f, results, sim)
+    time = results["times"]
+    grid = sim.structure.dimension.grid
+    temp_prof = zeros(length(time),length(grid))
+    las = mk_function((t, sim, i),(), laser_factory(sim))
 
-function pp_temporalprofile(las,dim,timepoints,mp)
-    temp_prof = zeros(length(timepoints),length(dim.grid))
-    if typeof(las) == Gaussian
-        for i in eachindex(timepoints)
-            temp_prof[i,:] = sqrt(4*log(2)/pi)/las.FWHM*exp(-4*log(2)*timepoints[i]^2/las.FWHM^2)*(1-mp.R)*las.Power*1/(mp.ϵ*(1-exp(-dim.grid[end]/mp.ϵ))).*exp.(-dim.grid./mp.ϵ)
+    sims = vec_simulation(sim)
+
+    for i in eachindex(time)
+        for j in eachindex(grid)
+            X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+            temp_prof[i,j] = las(time[i], sims[X], j)
         end
     end
-    return temp_prof
+    write_dataset(f["Laser"], "Temporal Profile", temp_prof)
 end
 
 function write_dataset(file,dataset,data)
@@ -564,22 +609,24 @@ function write_dataset(file,dataset,data)
 end
 
 function get_DOS(DOS, sim, i)
-    if length(DOS) == sim.structure.dimension.length
-        return DOS[i]
-    elseif DOS isa AbstractArray
-        X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return DOS[X]
+    if DOS isa AbstractArray
+        if length(DOS) == sim.structure.dimension.length
+            return DOS[i]
+        else 
+            X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
+            return DOS[X]
+        end
     else
         return DOS
     end
 end   
 
-function get_parameterhvalue(tup, sim, i)
+function get_parameterhvalue(val, sim, i)
     if sim.structure.Elemental_System > 1
         X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return getindex(tup, X)
+        return getindex(val, X)
     else
-        return tup
+        return val
     end
 end
 
@@ -590,6 +637,15 @@ function get_parameterhvalue(tup::Tuple, sim, i)
     else
         return tup
     end
+end
+
+function vec_simulation(sim::Simulation)
+    if sim.structure.Elemental_System > 1
+        sims = sim_seperation(sim)
+    else 
+        sims = sim
+    end
+    return sims
 end
 
 function output_functions(f,sim)

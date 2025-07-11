@@ -63,6 +63,9 @@ function generate_expressions(sim::Simulation, laser::Expr)
     if sim.phononictemperature.Enabled == true
         merge!(exprs,Dict("Tph" => Lightmatter.phonontemperature_factory(sim)))
     end
+    if sim.athermalelectrons.MagnetoTransport == true
+        merge!(exprs,Dict("magneto" => Lightmatter.magnetotransport_equations(sim)))
+    end
     if sim.athermalelectrons.Enabled == true
         merge!(exprs,Dict("fneq" => Lightmatter.athemdistribution_factory(sim, laser)))
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
@@ -74,7 +77,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
     return exprs
 end
 """
-    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
+    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64})
     
     Generates the initial conditions (u0) NamedArrayPartition for the ODE 
 
@@ -85,7 +88,7 @@ end
     # Returns
     - NamedArrayPartition containing the initial conditions of the simulation
 """
-function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
+function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64})
     temp_u0 = Dict()
     if sim.athermalelectrons.Enabled == true
         merge!(temp_u0, Dict("fneq"=>zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
@@ -119,7 +122,7 @@ function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, 
     return NamedArrayPartition(namtup)
 end
 """
-    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, <:Number})
+    generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64})
     
     Generates the parameters as a NamedTuple for the ODE 
 
@@ -130,23 +133,26 @@ end
     # Returns
     - NamedTuple containing the parameters of the simulation
 """
-function generate_parameters(sim::Simulation, initialtemps::Dict{String, <:Number})
+function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
     if sim.structure.Elemental_System > 1
         p = (sim=sim,matsim=sim_seperation(sim))
     else
         p = (sim=sim,)
     end
     if sim.electronictemperature.Conductivity == true
-        p = (; p..., Tel_cond = Vector{Number}(undef,sim.structure.dimension.length))
+        p = (; p..., Tel_cond = Vector{Float64}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true
-        p = (; p..., f_cond = Matrix{Number}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
+        p = (; p..., f_cond = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.phononictemperature.Conductivity == true
-        p = (; p..., Tph_cond = Vector{Number}(undef,sim.structure.dimension.length))
+        p = (; p..., Tph_cond = Vector{Float64}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-        p = (; p..., Δn = Vector{Number}(undef,sim.structure.dimension.length))
+        p = (; p..., Δn = Vector{Float64}(undef,sim.structure.dimension.length))
+    end
+    if sim.athermalelectrons.MagnetoTransport == true
+        p = (; p..., Δf_mt = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)), g_k = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
@@ -249,9 +255,6 @@ function conductivity_expressions(sim::Simulation)
     end
     if sim.athermalelectrons.Conductivity == true
         push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
-        if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-            push!(cond_exprs,:(n_cond = Lightmatter.thermal_particle_transport!(p.sim.athermalelectrons.v_g, p.sim.structure.egrid, u.noe, p.Δn, p.sim.structure.dimension.spacing)))
-        end
     end 
     return Expr(:block,cond_exprs...)
 end
@@ -270,7 +273,6 @@ function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
     push!(exprs,variable_renaming(sim))
     push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
-
     if sim.athermalelectrons.EmbeddedAthEM == true
         embedding = quote
             if i == 1
@@ -288,19 +290,23 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,embedding)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
+            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
-            push!(exprs,:(du.noe[i,:] .= $(sys["noe"])))
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
+#=             if sim.athermalelectrons.MagnetoTransport == true
+                push!(exprs,:($(sys["magneto"])))
+            end =#
+            push!(exprs,:(du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
+        elseif sim.athermalelectrons.Enabled == true
+            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
         end
-
-        if sim.athermalelectrons.Enabled == true
-            push!(exprs,:(du.fneq[i,:] .= $(sys["fneq"])))
-        end
+        
         if sim.electronictemperature.Enabled== true
-            push!(exprs,:(du.Tel[i,:] .= $(sys["Tel"])))
+            push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
         end
         if sim.phononictemperature.Enabled == true
-            push!(exprs,:(du.Tph[i,:] .= $(sys["Tph"])))
+            push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
         end
     end
     return Expr(:block, exprs...)
@@ -318,8 +324,8 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim)]
-    new_name = [:sim]
+    old_name = [:(p.sim), :(p.sim.structure.tmp[i,:])]
+    new_name = [:sim, :tmp]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)
@@ -344,8 +350,16 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i]))
+            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
+        end
+        if sim.athermalelectrons.MagnetoTransport == true
+            push!(old_name, :(p.Δf_mt[i,:]))
+            push!(old_name, :(p.g_k[i,:]))
+            push!(new_name, :Δf_mt)
+            push!(new_name, :g_k)
+            push!(old_name, :(p.sim.structure.bandstructure))
+            push!(new_name, :band)
         end
     end
     if sim.electronictemperature.Enabled == true
