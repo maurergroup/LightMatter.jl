@@ -230,7 +230,7 @@ end
     int = ForwardDiff.value(goal)
     n = ForwardDiff.value(noe)
     f(u,p) = int - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
+    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-12, reltol=1e-12).u
     μ = find_chemicalpotential(n, Temp, DOS, egrid)
     return FermiDirac(Temp, μ, egrid)
 end =#
