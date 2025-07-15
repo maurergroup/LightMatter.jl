@@ -72,5 +72,5 @@ end
 
 function E_magnitude(las_field, ext_field)
     sum = las_field .+ ext_field
-    return sqrt($(sum[1])^2 + $(sum[2])^2 + $(sum[3])^2)
+    return sqrt((sum[1])^2 + (sum[2])^2 + (sum[3])^2)
 end

@@ -75,13 +75,6 @@ function nonlinear_phononheatcapacity(Tph, n, θ)
     prob = IntegralProblem(int, (0.0, θ/Tph))
     return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
 end
-
-#= function nonlinear_phononheatcapacity(Tph::ForwardDiff.Dual, n, θ)
-    temp = ForwardDiff.value(Tph)
-    int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
-    prob = IntegralProblem(int, (0.0, θ/temp))
-    return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
-end =#
 """
     phonontemperature_source(sim::Simulation)
     
@@ -134,9 +127,18 @@ end
     # Returns
     - Updates cond with the change in temperature at each z-grid point
 """
-function phonontemperature_conductivity!(Tph, κ, dz, cond)
+function phononictemperature_conductivity!(p, u, enable::Val{true})
+    Tph = u.Tph
+    κ = p.sim.phononictemperature.κ
+    dz = sp.sim.structure.dimension.dz
+    cond = p.Tph_cond
+
     depthderivative!(Tph, dz, cond)
     cond[1] = 0.0
     cond[end] = 0.0
     depthderivative!((cond.*κ), dz, cond)
+end
+
+function phononictemperature_conductivity!(p, u, enable::Val{false})
+    return nothing
 end

@@ -1,3 +1,46 @@
+function electronicdistribution_conductivity!(p, u, enable::Val{true}, method::Val{:AthEM})
+    electron_distribution_transport!(p.f_cond, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.dz)
+end
+
+function electronicdistribution_conductivity!(p, u, enable::Val{true}, method::Val{:Boltzmann})
+    electron_distribution_transport!(p.f_cond, p.sim.athermalelectrons.v_g, u.f, p.sim.structure.dimension.dz)
+end
+#Remember to make conductivity vectors as Zero from FillArrays to save space when unused
+function electronicdistribution_conductivity!(p, u, enable::Val{false}, method::Val{:Boltzmann})
+    return nothing
+end
+"""
+    electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)
+
+    Computes ballistic transport of an electronic distribution using second-order finite differences via a kinetic like model.
+    Uses forward(reverse) difference for the boundaries. 
+
+    # Arguments
+    - `v_g`: Group velocity vector or vector of vectors(spatially-resolved DOS)
+    - `f`: Distribution function.
+    - `Δf`: Output array to store result.
+    - `dz`: Spatial resolution.
+
+    # Returns
+    - In-place change to Δf
+"""
+function electron_distribution_transport!(Δf::Matrix{Float64}, v_g::Vector{Float64}, f::Matrix{Float64}, dz::Real)
+    @views @inbounds for i in 2:size(f, 1)-1
+        @. Δf[i, :] = ((f[i-1, :] - 2 * f[i, :] + f[i+1, :]) / dz) * v_g
+    end
+
+    @views @. Δf[1, :] = (-(f[1, :] - f[2, :]) / dz) * v_g
+    @views @. Δf[end, :] = ((f[end-1, :] - f[end, :]) / dz) * v_g
+end
+
+function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz)
+    @views @inbounds for i in 2:size(f, 1)-1
+        @. Δf[i,:] = (f[i-1,:] - 2*f[i,:] + f[i+1,:]) / dz * v_g[i,:]
+    end
+    @views @. Δf[1,:] = -(f[1,:] - f[2,:]) ./ dz *v_g[1,:]
+    @views @. Δf[end,:] = (f[end-1,:] - f[end,:]) / dz * v_g[end,:]
+end
+
 """
     FermiDirac(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64}) 
     
@@ -62,63 +105,12 @@ end
     return exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 
-function magnetotransport_equations(sim)
-    B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, n, band, sim.structure.egrid, g_k, tmp))
-end
+function boltzmann_E_excitation(f, sim, t, DOS)
+    las_field = laserfield(t, sim)[1] # Gets the electric component of the laser field
+    ext_field = sim.structure.fields.electric(t) #Calls the electric field 
 
-function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64})
-    k = bandstructure[2](egrid)
-    fspl = DataInterpolations.AkimaInterpolation(f, k, extrapolation = ExtrapolationType.Constant)
+    E_mag = E_magnitude(las_field, ext_field)
 
-    @inbounds for i in eachindex(k)
-        dfdk[i] = DataInterpolations.derivative(fspl, k[i])
-    end
-
-    return dfdk
-end
-
-function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, DOS::spl, n::Float64, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64}, g_k::Vector{Float64}, dfdk::Vector{Float64})
-    h_2_e = get_h2e(sim)
-
-    goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
-    find_relaxeddistribution(g_k, sim.structure.egrid, goal, n, DOS)
-    @inbounds @simd for i in eachindex(f)
-        g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀
-    end
-
-    df_dk!(dfdk, g_k, bandstructure, egrid)  # Compute derivative into dfdk (no aliasing)
-
-    v_g = sim.athermalelectrons.v_g
-    factor = Constants.q / (Constants.ħ * Constants.c) * B
-
-    @inbounds @simd for i in 1:h_2_e
-        Δf_mt[i] = -factor * v_g[i] * dfdk[i] * -1
-    end
-    @inbounds @simd for i in (h_2_e + 1):length(Δf_mt)
-        Δf_mt[i] = factor * v_g[i] * dfdk[i] * -1
-    end
-end
-
-function get_h2e(sim::Simulation)
-    egrid = sim.structure.egrid
-    h_2_e = 1
-    best = abs(egrid[1])
-    @inbounds for i in 2:length(egrid)
-        v = abs(egrid[i])
-        if v < best
-            best = v
-            h_2_e = i
-        end
-    end
-    return h_2_e
-end
-
-function delta_peak(val)
-    return isapprox(val, 0.0; rtol=1e-6, atol=1e-6)
-end
-
-function boltzmann_E_excitation(f, sim, E_mag, DOS)
     kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
     γ = bessel_gamma(E_mag, sim)
     κ = boltzmann_screening(f, kgrid, sim)
@@ -236,7 +228,7 @@ function scatter_conservation(k, k1, k2, k3)
     end
 end
 
-function boltzmann_E_electronphonon()
+function boltzmann_E_electronphonon(f, g, sim, DOS)
     kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
     κ = boltzmann_screening(f, kgrid, sim)
     γ = bessel_gamma(E_mag, sim)

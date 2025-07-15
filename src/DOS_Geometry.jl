@@ -510,3 +510,20 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                 DataInterpolations.AkimaInterpolation([1,2,3],[4,5,6],extrapolation = ExtrapolationType.Constant)]
     end
 end
+
+function get_DOS(sim, i, spatial::Val{true}, complex)::spl
+    return sim.structure.DOS[i]
+end
+
+function get_DOS(sim, i, spatial::Val{false}, complex)::spl
+    return get_DOS(sim, i, complex)
+end
+
+function get_DOS(sim, i, complex::Val{true})::spl
+    x = mat_picker(sim.structure.dimension[i], sim.structure.interfaceheight)
+    return sim.structure.DOS[x]
+end
+
+function get_DOS(sim, i, complex::Val{false})::spl
+    return sim.structure.DOS
+end

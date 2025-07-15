@@ -608,7 +608,7 @@ function write_dataset(file,dataset,data)
     HDF5.write_dataset(file, dataset, data, chunk=chunk_size, shuffle=true, deflate=3)
 end
 
-function get_DOS(DOS, sim, i)
+function get_DOS(DOS, sim::Simulation, i::Int)
     if DOS isa AbstractArray
         if length(DOS) == sim.structure.dimension.length
             return DOS[i]

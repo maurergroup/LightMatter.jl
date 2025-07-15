@@ -1,4 +1,4 @@
-function boltzmann_E_phononelectron()
+function boltzmann_E_phononelectron(g, f, sim, DOS)
     kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
     κ = boltzmann_screening(f, kgrid, sim)
     dgdt = zeros(length(g))

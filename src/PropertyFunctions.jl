@@ -12,16 +12,14 @@
     # Returns
     - The value of the chemical potential
 """
-#= function find_chemicalpotential(no_part, Tel, DOS, egrid)
-    f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
-end =#
-
-function find_chemicalpotential(no_part, Tel, DOS, egrid)::Float64
-    #noe = ForwardDiff.value(no_part)
+function find_chemicalpotential(no_part, Tel, DOS, egrid, calculate::Val{true})::Float64
     temp = ForwardDiff.value(Tel)
     f(u,p) = no_part - get_thermalparticles(u, temp, DOS, egrid)
     return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-12, reltol=1e-12).u
+end
+
+function find_chemicalpotential(no_part, Tel, DOS, egrid, calculate::Val{false})
+    return 0.0
 end
 """
     get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
