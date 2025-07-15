@@ -123,11 +123,20 @@ function spatial_xy_laser(sim::Simulation)
         return 1
     end
 end
+"""
+    get_laser_fields(las::Laser)
+    
+    Returns an expression for the electric field induced by the laser
+    Currently implemented:
+    - :Gaussian
+    - :Rectangular
 
-function calculate_laser_fields(las::Laser)
-    return get_laser_fields(las)
-end
+    # Arguments
+    - 'las': Laser settings 
 
+    # Returns
+    - Expression for the electric field of the laser
+"""
 function get_laser_fields(las)
     if las !== nothing
         if las.hv isa Matrix
@@ -152,11 +161,28 @@ function get_laser_fields(las)
         return Fields(:(0.0), :(0.0))
     end
 end
+"""
+    photon_energytofrequency(hv::Real)
+    
+    # Arguments
+    - 'hv': Photon energy in eV
 
+    # Returns
+    - Photon frequency in 1 / fs 
+"""
 function photon_energytofrequency(hv)
     return hv / Constants.ħ
 end
+"""
+    E_magnitude(las_field::Vector{Expr}, ext_field::Vector{Expr})
+    
+    # Arguments
+    - 'las_field': Electric field vector from the laser
+    - 'ext_field': Electric field vector from external sources
 
+    # Returns
+    - Expression for the total magntitude of electric fields
+"""
 function E_magnitude(las_field, ext_field)
     sum = :(las_field .+ ext_field)
     return :(sqrt($(sum[1])^2 + $(sum[2])^2 + $(sum[3])^2))

@@ -398,7 +398,15 @@ function FE_initialization(bulk_DOS::Union{String, Vector{String}})
         return FE
     end
 end
+"""
+    athem_magneotransport(sim::Simulation)
 
+    # Arguments
+    - `sim`: Settings of the requested simulation
+
+    # Returns
+    - A placeholder variable for including the magnetotransport or not to be added to the total fneq equation
+"""
 function athem_magneotransport(sim)
     if sim.athermalelectrons.MagnetoTransport == true
         return :(Δf_mt)

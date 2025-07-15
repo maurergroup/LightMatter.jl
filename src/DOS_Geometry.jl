@@ -484,7 +484,21 @@ function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     end
     return k_E
 end
+"""
+    bandstructure_initialization(bandstructure::Symbol, DOS::Union{spl, Vector{spl}}, egrid::Vector{Float64}, FE::Union{Float64, Vector{Float64}})
+    
+    Calculates the bandstructure of the material. Currently the only methods implemented is the :effectiveoneband. Hopefully soon users will be
+    able to load in bandstructures calculated from DFT etc. 
 
+    # Arguments
+    - 'bandstructure': The type of bandstructure to be constructed
+    - 'DOS': The density-of-states of the system as a spline
+    - 'egrid': Energy grid all distributions are solved on
+    - 'FE': The Fermi energy, calculated from get_FermiEnergy
+
+    # Returns
+    - The bandstructure of the system as a spline, returns a vector of both k->E and E->k for the :effectiveoneband model. 
+"""
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
     if bandstructure == :effectiveoneband
         if DOS isa AbstractArray

@@ -239,10 +239,3 @@ function depthderivative!(vec, dz, Diff)
     Diff[1] = (vec[2]-vec[1])/dz
     Diff[end] = (vec[end]-vec[end-1])/dz
 end
-
-function harmonic_average_K(K)
-    new_K = zeros(length(K))
-    @views new_K[1:end-1] = 2 .* K[2:end] .* K[1:end-1] ./ (K[2:end] .+ K[1:end-1])
-    new_K[end] = 2 * K[end] * K[end-1] ./ (K[end-1] + K[end])
-    return new_K
-end
