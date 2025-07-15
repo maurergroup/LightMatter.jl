@@ -33,6 +33,10 @@ function run_simulation(sys::Dict{String,Union{Expr,Vector{Expr}}}, initialtemps
     return sol
 end
 
+function dynamical_system(du, u, p, t)
+    return dynamical_system(du, u, p, t, Val(p.sim.method))
+end
+
 # Temporary function overloading to work with stiff integrators such as Trapezoid()
 
 using ArrayInterface

@@ -1,3 +1,17 @@
+
+function dynamical_system(du, u, p, t, type::Val{:AthEM})
+    athem_conductivity!(p, u)
+    μ = find_chemicalpotential()
+    athem_loop()
+end
+
+function athem_conductivity(p, u)
+    electronictemperature_conductivity()
+    phononictemperature_conductivity()
+    electronicdistribution_conductivity()
+end
+
+
 """
     athemdistribution_factory(sim::Simulation, laser_expr::Expr)
 

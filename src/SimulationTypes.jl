@@ -21,8 +21,8 @@ abstract type SimulationTypes end
     Struct that contains all laser parameters and any material parameters that affect laser absorption
 """
 @kwdef struct Laser <: SimulationTypes
-    envelope::Symbol = :Gaussian # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
-    Transport::Symbol # :optical, :ballistic and :combined are the options for how the laser decays into a slab
+    envelope::Symbol # Currently implemented are :Gaussian, :HyperbolicSecant, :Lorentzian and :Rectangular
+    Transport::Symbol # :Optical, :Ballistic and :Combined are the options for how the laser decays into a slab
 
     FWHM::Float64 # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Float64 # The unabsorbed fluence of the laser
@@ -52,7 +52,7 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Float64 = 0.0, ϕ::Float64 = 0.0, hv::Union{Float64, Matrix{Float64}} = 0.0, Transport::Symbol = :optical,
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Float64 = 0.0, ϕ::Float64 = 0.0, hv::Union{Float64, Matrix{Float64}} = 0.0, Transport::Symbol = :Optical,
                       ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0, R::Float64 = 0.0, δb::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0,
                       n::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0)
     
@@ -81,7 +81,7 @@ end
     length::Int # The length of the grid, not the depth of the slab
     grid::AbstractArray{Float64} # The grid the simulation is solved over
     spacing::Union{Float64, Vector{Float64}} #The spacing between grid points
-    InterfaceHeight::Union{Float64, Vector{Float64}} # Height sorted list of the interfaces between materials
+    interfaceheight::Union{Float64, Vector{Float64}} # Height sorted list of the interfaces between materials
 end
 """
     build_Dimension(grid=[0.0]::AbstractArray{Float64}, cutoff=0.0::Union{Vector{Float64},Float64})
@@ -535,6 +535,7 @@ end
     This struct contains all the others and is the main simulation object both in assembling a simulation and during it
 """
 @kwdef struct Simulation <: SimulationTypes
+    Method::Symbol
     electronictemperature::ElectronicTemperature
     phononictemperature::PhononicTemperature
     athermalelectrons::AthermalElectrons
