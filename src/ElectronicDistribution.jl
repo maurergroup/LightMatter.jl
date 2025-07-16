@@ -246,7 +246,7 @@ function boltzmann_E_electronphonon()
     for i in eachindex(f)
         k = kgrid[i]
         prefac = 2 * sim.electronicdistribution.Ω * pi^3 / Constants.ħ / k
-        int(u,p) = boltzmann_epscatter_int(i, sim, κ, DOS, fspl, gspl, γ)
+        int(u,p) = boltzmann_epscatter_int(u, sim, κ, DOS, fspl, gspl, γ)
         prob = IntegralProblem(int, 0.0, sim.phononicdistribution.ED)
         sol = solve(prob, HCubatureJL(initdiv=10), abstol=1e-3, reltol=1e-3)
         dfdt[i] = sol.u * prefac

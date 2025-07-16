@@ -152,6 +152,7 @@ end
 """
 @kwdef struct Structure <: SimulationTypes
     Spatial_DOS::Bool # Whether to vary the DOS with height - if so the DOS becomes a vector
+    ChemicalPotential::Bool
 
     Elemental_System::Int # The number of elemental systems, if > 1 then each constant and vector
                           # of material parameters needs to become a vector of length=Elemental_System
@@ -198,7 +199,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{Float64} = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE=0.0, fields = false)
+    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE=0.0, fields = false, chemicalpotential=false)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
@@ -211,7 +212,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
     tmp = zeros(dimension.length, length(egrid))
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, tmp = tmp)
+                    bandstructure = bandstructure, tmp = tmp, ChemicalPotential=chemicalpotential)
 end
 """
     WIP!!!
@@ -498,14 +499,24 @@ end
     Struct that defines and holds all values for the propagation of an electronic distribution
 """
 @kwdef struct ElectronicDistribution <: SimulationTypes
-    Enabled::Bool = false
+    Enabled::Bool
 
-    Electron_PhononCoupling::Bool = false
+    Electron_PhononCoupling::Bool
 
     Ω::Real
     me::Real
-    cs::Real
+end
 
+function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false,
+                                       Ω=1.0, me = Constants.me)
+
+    Ω = convert_units(u"nm^3", Ω)
+    if me == Quantity
+        me = convert_units(u"kg", me)
+        me = me*BaseUnits.mass
+    end
+    return ElectronicDistribution(Enabled=Enabled, Electron_PhononCoupling=Electron_PhononCoupling,
+                                  Ω=Ω, me=me)
 end
 """
     W.I.P!!!
@@ -517,9 +528,22 @@ end
     Struct that defines and holds all values for the propagation of a phononic distribution
 """
 @kwdef struct PhononicDistribution <: SimulationTypes
-    Enabled::Bool = false
+    Enabled::Bool
 
-    Electron_PhononCoupling::Bool = false
+    Electron_PhononCoupling::Bool
+
+    cs::Real
+    DOS_ph::spl
+    ED::Real
+end
+
+function build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false,
+                                     cs = 0.0, DOS_ph = get_interpolant([1,2,3], [1,2,3]), ED=0.0)
+
+    ED = convert_units(u"eV", ED)
+    cs = convert_units(u"nm/fs", cs)
+    return PhononicDistribution(Enabled=Enabled, Electron_PhononCoupling=Electron_PhononCoupling,
+                                  ED=ED, cs=cs, DOS_ph = DOS_ph)
 end
 """
     struct Simulation <: SimulationTypes
@@ -602,13 +626,13 @@ function build_Simulation(;densitymatrix::Union{DensityMatrix,NamedTuple,Nothing
     electronicdistribution = if electronicdistribution isa ElectronicDistribution
         electronicdistribution
     else
-        ElectronicDistribution(; merge(temp, electronicdistribution isa NamedTuple ? electronicdistribution : NamedTuple())...)
+        build_ElectronicDistribution(; merge(temp, electronicdistribution isa NamedTuple ? electronicdistribution : NamedTuple())...)
     end
 
     phononicdistribution = if phononicdistribution isa PhononicDistribution
         phononicdistribution
     else
-        PhononicDistribution(; merge(temp, phononicdistribution isa NamedTuple ? phononicdistribution : NamedTuple())...)
+        build_PhononicDistribution(; merge(temp, phononicdistribution isa NamedTuple ? phononicdistribution : NamedTuple())...)
     end
 
     structure = if structure isa Structure
