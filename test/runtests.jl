@@ -1,6 +1,6 @@
-using Lightmatter
+using LightMatter
 using Test
 
-@testset "Lightmatter.jl" begin
+@testset "LightMatter.jl" begin
     # Write your tests here.
 end

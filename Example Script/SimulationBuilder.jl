@@ -1,4 +1,4 @@
-using Lightmatter
+using LightMatter
 
 
 dim = define_sim_dimensions(Dimension=0) #For 1D call something like define_sim_dimensions(Dimension=1,Lengths=400,spacing=2.0)

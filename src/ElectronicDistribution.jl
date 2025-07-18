@@ -64,7 +64,7 @@ end
 
 function magnetotransport_equations(sim)
     B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(Lightmatter.magnetotransport_1d!(Δf_mt, fneq.+Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, n, band, sim.structure.egrid, g_k, tmp))
+    return :(LightMatter.magnetotransport_1d!(Δf_mt, fneq.+LightMatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, n, band, sim.structure.egrid, g_k, tmp))
 end
 
 function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64})
@@ -81,7 +81,7 @@ end
 function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, DOS::spl, n::Float64, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64}, g_k::Vector{Float64}, dfdk::Vector{Float64})
     h_2_e = get_h2e(sim)
 
-    goal = Lightmatter.get_internalenergy(f, DOS, sim.structure.egrid)
+    goal = LightMatter.get_internalenergy(f, DOS, sim.structure.egrid)
     find_relaxeddistribution(g_k, sim.structure.egrid, goal, n, DOS)
     @inbounds @simd for i in eachindex(f)
         g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀

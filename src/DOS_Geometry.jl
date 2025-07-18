@@ -455,14 +455,14 @@ function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl
     if eltype(v_g) <: AbstractVector
         for j in eachindex(v_g)
             dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
-            kE_spl = Lightmatter.get_interpolant(egrid,k_E)
-            dEdk_spl = Lightmatter.get_interpolant(k_E,dE_dk)
+            kE_spl = LightMatter.get_interpolant(egrid,k_E)
+            dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
             v_g[j] = dEdk_spl(kE_spl(egrid))./ Constants.ħ
         end
     else
         dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
-        kE_spl = Lightmatter.get_interpolant(egrid,k_E)
-        dEdk_spl = Lightmatter.get_interpolant(k_E,dE_dk)
+        kE_spl = LightMatter.get_interpolant(egrid,k_E)
+        dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
         v_g = dEdk_spl(kE_spl(egrid))./ Constants.ħ
     end
     return v_g

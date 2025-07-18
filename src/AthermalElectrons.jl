@@ -12,16 +12,16 @@
     - The total expression for the evolution of the athermal electron distribution, combining excitation and scattering terms.
 """
 function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
-    feq = :(Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid))
+    feq = :(LightMatter.FermiDirac(Tel, μ, sim.structure.egrid))
     ftot = :($feq .+ fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
     mag_trans = athem_magneotransport(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
-        athemexcite = :(vec(sum($laser_expr .* Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
+        athemexcite = :(vec(sum($laser_expr .* LightMatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
     else
-        athemexcite = :($laser_expr .* Lightmatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+        athemexcite = :($laser_expr .* LightMatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
     end
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
 end
@@ -172,7 +172,7 @@ end
     - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
 """
 function athem_electronelectronscattering(Tel, μ, sim::Simulation, fneq, DOS, n, τee)
-    feq = Lightmatter.FermiDirac(Tel, μ, sim.structure.egrid)
+    feq = LightMatter.FermiDirac(Tel, μ, sim.structure.egrid)
     ftot = feq .+ fneq
     goal = Bode_rule(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
     frel = find_relaxeddistribution(sim.structure.egrid, goal, n, DOS)
@@ -296,7 +296,7 @@ end
     - Expr for the time dependence of the thermal electron number.
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
-    return :(-Lightmatter.get_noparticles(du.fneq[i,:],DOS,sim.structure.egrid))
+    return :(-LightMatter.get_noparticles(du.fneq[i,:],DOS,sim.structure.egrid))
 end
 """
     electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)

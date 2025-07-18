@@ -57,7 +57,7 @@ end
 """
 function electrontemperature_heatcapacity(sim::Simulation)
     if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
-        return :(Lightmatter.nonlinear_electronheatcapacity(Tel, μ, DOS, sim.structure.egrid))
+        return :(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS, sim.structure.egrid))
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
         return :(sim.electronictemperature.γ * Tel)
     end
@@ -97,7 +97,7 @@ end
 function electronphonon_coupling(sim::Simulation)
     if sim.electronictemperature.Electron_PhononCoupling == true
         if sim.electronictemperature.ElectronPhononCouplingValue == :variable
-            return :(Lightmatter.nonlinear_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))
+            return :(LightMatter.nonlinear_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))
         elseif sim.electronictemperature.ElectronPhononCouplingValue == :constant
             return :(-sim.electronictemperature.g*(Tel-Tph))
         end
@@ -142,9 +142,9 @@ end
     - Expression for the time evolution of a, AthEM electronic temperature
 """
 function build_athemelectron(Δu::Expr)
-    return :( 1 / (Lightmatter.c_T(μ,Tel,DOS,sim.structure.egrid)*Lightmatter.p_μ(μ,Tel,DOS,sim.structure.egrid)
-    - Lightmatter.p_T(μ,Tel,DOS,sim.structure.egrid)*Lightmatter.c_μ(μ,Tel,DOS,sim.structure.egrid)) *
-    (Lightmatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu - Lightmatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*Δn))
+    return :( 1 / (LightMatter.c_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)
+    - LightMatter.p_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)) *
+    (LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu - LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*Δn))
 end
 """
     athem_electempenergychange(sim::Simulation)
@@ -159,7 +159,7 @@ end
 """
 function athem_electempenergychange(sim::Simulation)
     args = Vector{Union{Expr,Symbol}}(undef, 0)
-    push!(args, :(Lightmatter.elec_energychange(sim.structure.egrid, relax_dis, DOS)))
+    push!(args, :(LightMatter.elec_energychange(sim.structure.egrid, relax_dis, DOS)))
     if sim.phononictemperature.Enabled == true
        push!(args, electronphonon_coupling(sim::Simulation))
     end
@@ -167,7 +167,7 @@ function athem_electempenergychange(sim::Simulation)
         push!(args, :(Tel_cond))
     end
     if sim.athermalelectrons.MagnetoTransport == true
-        push!(args, :(-1*Lightmatter.get_internalenergy(Δf_mt, sim.structure.DOS, sim.structure.egrid)))
+        push!(args, :(-1*LightMatter.get_internalenergy(Δf_mt, sim.structure.DOS, sim.structure.egrid)))
     end
     return Expr(:call, :+, args...)
 end
@@ -186,7 +186,7 @@ end
     - The change in the internal energy of the thermal system due to e-e scattering
 """
 function elec_energychange(egrid, relax_dis, DOS)
-    return Lightmatter.get_internalenergy(relax_dis, DOS, egrid)
+    return LightMatter.get_internalenergy(relax_dis, DOS, egrid)
 end
 """
     electrontemperature_conductivity!(Tel::Vector{Float64}, κ::Union{Float64,Vector{Float64}}, dz::Float64, Tph::Vector{Float64}, cond::Vector{Float64})

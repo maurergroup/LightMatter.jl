@@ -38,9 +38,9 @@ end
 """
 function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
     exprs = Vector{Expr}(undef, 0) # Miscellaneous expressions at the top of the loop
-    push!(exprs, :(X = Lightmatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
-    push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to Lightmatter.jl
-    push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid))) # Calculates the current chemical potential
+    push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
+    push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl
+    push!(exprs, :(μ = LightMatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid))) # Calculates the current chemical potential
 
     if sim.athermalelectrons.EmbeddedAthEM == true 
         # Embeds AthEM to reduce computational cost - do not use with non-eq transport but with both electronic and phononic temperature
@@ -60,7 +60,7 @@ function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Si
         push!(exprs,embedding)
     else # No embedding so all heights are treated the same 
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            #push!(exprs, :(tot_n = n + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
             #= if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
@@ -108,7 +108,7 @@ end
 """
     ar_variable_renaming(sim::Simulation)
 
-    Generates variable renaming expressions for translation between the variibale names in DiffEq.jl and Lightmatter.jl
+    Generates variable renaming expressions for translation between the variibale names in DiffEq.jl and LightMatter.jl
 
     # Arguments
     - `sim`: The Simulation struct containing all information about the simulation
@@ -139,7 +139,7 @@ function ar_variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
         end
         if sim.athermalelectrons.MagnetoTransport == true

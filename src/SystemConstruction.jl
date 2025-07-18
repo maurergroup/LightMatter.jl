@@ -58,20 +58,20 @@ end
 function generate_expressions(sim::Simulation, laser::Expr)
     exprs = Dict{String,Union{Expr,Vector{Expr}}}()
     if sim.electronictemperature.Enabled == true
-        merge!(exprs,Dict("Tel" => Lightmatter.electrontemperature_factory(sim, laser)))
+        merge!(exprs,Dict("Tel" => LightMatter.electrontemperature_factory(sim, laser)))
     end
     if sim.phononictemperature.Enabled == true
-        merge!(exprs,Dict("Tph" => Lightmatter.phonontemperature_factory(sim)))
+        merge!(exprs,Dict("Tph" => LightMatter.phonontemperature_factory(sim)))
     end
     if sim.athermalelectrons.MagnetoTransport == true
-        merge!(exprs,Dict("magneto" => Lightmatter.magnetotransport_equations(sim)))
+        merge!(exprs,Dict("magneto" => LightMatter.magnetotransport_equations(sim)))
     end
     if sim.athermalelectrons.Enabled == true
-        merge!(exprs,Dict("fneq" => Lightmatter.athemdistribution_factory(sim, laser)))
+        merge!(exprs,Dict("fneq" => LightMatter.athemdistribution_factory(sim, laser)))
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-            merge!(exprs,Dict("noe" => Lightmatter.athem_thermalelectronparticlechange(sim)))
+            merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim::Simulation)
-            merge!(exprs,Dict("relax" => :(Lightmatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, $τee))))
+            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering(Tel, μ, sim, fneq, DOS, n, $τee))))
         end
     end
     return exprs
@@ -248,13 +248,13 @@ end
 function conductivity_expressions(sim::Simulation)
     cond_exprs = []
     if sim.electronictemperature.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.electrontemperature_conductivity!(u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph, p.Tel_cond)))
+        push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph, p.Tel_cond)))
     end
     if sim.phononictemperature.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.phonontemperature_conductivity!(u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing, p.Tph_cond)))
+        push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing, p.Tph_cond)))
     end
     if sim.athermalelectrons.Conductivity == true
-        push!(cond_exprs,:(Lightmatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
     end 
     return Expr(:block,cond_exprs...)
 end
@@ -273,7 +273,7 @@ function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
     push!(exprs,variable_renaming(sim))
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
     else
         push!(exprs, :(μ = 0.0))
     end
@@ -353,7 +353,7 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i] + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
         end
         if sim.athermalelectrons.MagnetoTransport == true

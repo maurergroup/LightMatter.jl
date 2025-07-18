@@ -334,8 +334,8 @@ end
 function selected_output_functions(f, results, sim, output)
     for sym in output
         func_name = Symbol("output_", sym)
-        if isdefined(Lightmatter, func_name)
-            func = getfield(Lightmatter, func_name)
+        if isdefined(LightMatter, func_name)
+            func = getfield(LightMatter, func_name)
             func(f, results, sim,)
         else
             @warn "Function $func_name not defined"

@@ -1,7 +1,7 @@
 """
     SimulationTypes
     
-    Parent type of all subtypes in Lightmatter.jl
+    Parent type of all subtypes in LightMatter.jl
 """
 abstract type SimulationTypes end
 

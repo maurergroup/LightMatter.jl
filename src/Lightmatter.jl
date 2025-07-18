@@ -12,11 +12,11 @@ export ElectronicDistribution, PhononicDistribution, BaseUnits, build_Electronic
 Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
 
 """
-    Lightmatter_units
+    LightMatter_units
 
-    A list of the units used in Lightmatter.jl: Please convert all units to this 
+    A list of the units used in LightMatter.jl: Please convert all units to this 
 """
-global const Lightmatter_units = [u"eV", u"nm", u"fs", u"K"] 
+global const LightMatter_units = [u"eV", u"nm", u"fs", u"K"] 
 
 """
     spl=DataInterpolations.LinearInterpolation

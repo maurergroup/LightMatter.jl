@@ -133,7 +133,7 @@ function construct_dipolevonNeumann(sim::Simulation)
         H_tot = sim.densitymatrix.H0 .- (d̂[1] .* $(sim.densitymatrix.Fields.electric[1])) 
                                      .- (d̂[2] .* $(sim.densitymatrix.Fields.electric[2])) 
                                      .- (d̂[3] .* $(sim.densitymatrix.Fields.electric[3])) 
-        Lightmatter.vonNeumann(du,u,H_tot)
+        LightMatter.vonNeumann(du,u,H_tot)
     end
     return expr
 end

@@ -51,7 +51,7 @@ end
 """
 function phonontemperature_heatcapacity(sim::Simulation)
     if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
-        return :(Lightmatter.nonlinear_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))
+        return :(LightMatter.nonlinear_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))
     elseif sim.phononictemperature.PhononicHeatCapacity == :constant
         return :(sim.phononictemperature.Cph)
     end
@@ -98,7 +98,7 @@ end =#
 function phonontemperature_source(sim::Simulation)
     if sim.phononictemperature.AthermalElectron_PhononCoupling == true
         τep = phonon_relaxationtime(sim::Simulation)
-        return :(Lightmatter.neqelectron_phonontransfer(fneq, sim.structure.egrid, $τep, DOS))
+        return :(LightMatter.neqelectron_phonontransfer(fneq, sim.structure.egrid, $τep, DOS))
     else
         return 0.0
     end
@@ -118,7 +118,7 @@ end
     - Value of the change in the phonon internal energy
 """
 function neqelectron_phonontransfer(fneq, egrid, τep, DOS)
-    return Lightmatter.get_internalenergy(fneq./τep,DOS,egrid)
+    return LightMatter.get_internalenergy(fneq./τep,DOS,egrid)
 end
 """
     phonontemperature_conductivity!(Tph::Vector{Float64}, κ::Union{Float64,Vector{Float64}}, dz::Float64, cond::Vector{Float64})
