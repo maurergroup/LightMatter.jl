@@ -140,19 +140,19 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64
         p = (sim=sim,)
     end
     if sim.electronictemperature.Conductivity == true
-        p = (; p..., Tel_cond = Vector{Float64}(undef,sim.structure.dimension.length))
+        p = (; p..., Tel_cond = Zeros{Float64}(sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true
-        p = (; p..., f_cond = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
+        p = (; p..., f_cond = Zeros{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.phononictemperature.Conductivity == true
-        p = (; p..., Tph_cond = Vector{Float64}(undef,sim.structure.dimension.length))
+        p = (; p..., Tph_cond = Zeros{Float64}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-        p = (; p..., Δn = Vector{Float64}(undef,sim.structure.dimension.length))
+        p = (; p..., Δn = Zeros{Float64}(undef,sim.structure.dimension.length))
     end
     if sim.athermalelectrons.MagnetoTransport == true
-        p = (; p..., Δf_mt = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)), g_k = Matrix{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
+        p = (; p..., Δf_mt = Zeros{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)), g_k = Zeros{Float64}(undef,sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
@@ -274,6 +274,8 @@ function build_loopbody(sys, sim::Simulation)
     push!(exprs,variable_renaming(sim))
     if sim.structure.ChemicalPotential
         push!(exprs, :(μ = Lightmatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
+    else
+        push!(exprs, :(μ = 0.0))
     end
     if sim.athermalelectrons.EmbeddedAthEM == true
         embedding = quote
@@ -292,7 +294,6 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,embedding)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(exprs,:(relax_dis = $(sys["relax"])))
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
 #=             if sim.athermalelectrons.MagnetoTransport == true
@@ -326,7 +327,7 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim), :(p.sim.structure.tmp[i,:])]
+    old_name = [:(p.sim), :(@view p.sim.structure.tmp[i,:])]
     new_name = [:sim, :tmp]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
@@ -336,10 +337,10 @@ function variable_renaming(sim::Simulation)
         push!(new_name, :DOS)
     end
     if sim.athermalelectrons.Enabled == true
-        push!(old_name,:(u.fneq[i,:]))
+        push!(old_name,:(@view u.fneq[i,:]))
         push!(new_name,:fneq)
         if sim.athermalelectrons.Conductivity == true
-            push!(old_name,:(p.f_cond[i,:]))
+            push!(old_name,:(@view p.f_cond[i,:]))
             push!(new_name,:f_cond)
             if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
                 push!(old_name,:(p.Δn[i]))
@@ -356,8 +357,8 @@ function variable_renaming(sim::Simulation)
             push!(new_name, :n)
         end
         if sim.athermalelectrons.MagnetoTransport == true
-            push!(old_name, :(p.Δf_mt[i,:]))
-            push!(old_name, :(p.g_k[i,:]))
+            push!(old_name, :(@view p.Δf_mt[i,:]))
+            push!(old_name, :(@view p.g_k[i,:]))
             push!(new_name, :Δf_mt)
             push!(new_name, :g_k)
             push!(old_name, :(p.sim.structure.bandstructure))
@@ -386,7 +387,7 @@ function variable_renaming(sim::Simulation)
     end
     old_name = Tuple(old_name)
     new_name = Tuple(new_name)
-    assignments = [:(local $(lhs) = $(rhs)) for (lhs, rhs) in zip(new_name, old_name)]
+    assignments = [:( local $(lhs) = $(rhs)) for (lhs, rhs) in zip(new_name, old_name)]
     return quote
         $(assignments...)
     end

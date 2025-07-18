@@ -226,14 +226,6 @@ function find_relaxeddistribution(out, egrid, goal, n, DOS)
     @. out = FermiDirac(Temp, μ, egrid)
 end
 
-#= function find_relaxeddistribution(egrid, goal::ForwardDiff.Dual, noe::ForwardDiff.Dual, DOS)
-    int = ForwardDiff.value(goal)
-    n = ForwardDiff.value(noe)
-    f(u,p) = int - find_temperatureandμ(u, n, DOS, egrid)
-    Temp = solve(NonlinearProblem(f,1000.0); abstol=1e-12, reltol=1e-12).u
-    μ = find_chemicalpotential(n, Temp, DOS, egrid)
-    return FermiDirac(Temp, μ, egrid)
-end =#
 """
     find_temperatureandμ(Tel::Float64,n::Float64,DOS::spl,egrid::Vector{Float64})
 

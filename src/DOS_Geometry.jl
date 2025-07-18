@@ -118,6 +118,16 @@ function get_unitcellvolume(geometry_file::String)
     c = vectors[3,2:4]
     return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
+
+function get_unitcellatoms(geometry_file::String)
+    geometry = readdlm(geometry_file, comments=true)
+    atoms = count(x->x=="atom_frac", geometry[:,1])
+    vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
+    a = vectors[1,2:4]
+    b = vectors[2,2:4]
+    c = vectors[3,2:4]
+    return atoms / (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
+end
 """
     spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Float64,dim::Dimension,tolerance::Float64)
     

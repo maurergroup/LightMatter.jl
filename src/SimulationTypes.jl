@@ -52,9 +52,8 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM::Float64 = 0.0, ϕ::Float64 = 0.0, hv::Union{Float64, Matrix{Float64}} = 0.0, Transport::Symbol = :optical,
-                      ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0, R::Float64 = 0.0, δb::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0,
-                      n::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} = 0.0)
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = 0.0, Transport::Symbol = :optical,
+                      ϵ = 0.0, R::Float64 = 0.0, δb = 0.0, n = 0.0)
     
     FWHM = convert_units(u"fs", FWHM)
     Power = convert_units(u"eV/nm^2", ϕ)
@@ -198,11 +197,12 @@ end
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
-    atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid::Vector{Float64} = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE=0.0, fields = false, chemicalpotential=false)
+    atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
+    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
+    FE = convert_units(u"eV", FE)
     if fields
         las_field = get_laser_fields(las)
         total_field = TotalFields(las_field, ext_fields)

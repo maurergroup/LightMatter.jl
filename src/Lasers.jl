@@ -11,7 +11,7 @@
 """
 function laser_factory(sim::Simulation)
     temporal = temporal_laser(sim.laser)
-    power = :((1-sim.laser.R) * sim.laser.ϕ)
+    power = :((1 .-sim.laser.R) .* sim.laser.ϕ)
     spatial = spatial_laser(sim)
     return Expr(:call, :*, temporal, spatial, power)
 end
