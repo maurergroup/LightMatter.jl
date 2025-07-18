@@ -126,7 +126,7 @@ function boltzmann_E_excitation(f, sim, E_mag, DOS)
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = sim.electronicdistribution.Ω * pi / Constants.ħ / k
+        prefac = pi / Constants.ħ / k
         for l in -3:3
             E1 = sim.structure.egrid[i] + l*sim.laser.hv
             k1 = sim.stucture.bandstructure[2](E1)
@@ -152,7 +152,7 @@ function boltzmann_E_momentumintegral(l, k, k1, κ, γ, sim)
 end
 
 function electron_electron_matrix(sim, Δk, κ)
-    frac1 = Constants.q^2 / Constants.ϵ0 / sim.electronicdistribution.Ω
+    frac1 = Constants.q^2 / Constants.ϵ0
     frac2 = 1/ (Δk^2 + κ^2)
     return (frac1*frac2)^2
 end
@@ -189,7 +189,7 @@ function boltzmann_E_electronelectron(f, sim, DOS)
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = sim.electronicdistribution.Ω^3 * pi^3 / Constants.ħ / k
+        prefac = pi^3 / Constants.ħ / k
         dfdt[i] = prefac * boltzmann_eescatter_int1(E, k, DOS, fspl, κ, sim)
     end
     return dfdt
@@ -245,7 +245,7 @@ function boltzmann_E_electronphonon()
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = 2 * sim.electronicdistribution.Ω * pi^3 / Constants.ħ / k
+        prefac = 2 * pi^3 / Constants.ħ / k
         int(u,p) = boltzmann_epscatter_int(u, sim, κ, DOS, fspl, gspl, γ)
         prob = IntegralProblem(int, 0.0, sim.phononicdistribution.ED)
         sol = solve(prob, HCubatureJL(initdiv=10), abstol=1e-3, reltol=1e-3)
@@ -274,7 +274,7 @@ function boltzmann_epscatter_int(Eq, sim, κ, DOS, f, g, γ)
 end
 
 function electron_phonon_matrix(sim, Eq, q, κ)
-    frac1 = Constants.q^2 / (2*Constants.ϵ0 * sim.electronicdistribution.Ω)
+    frac1 = Constants.q^2 / (2*Constants.ϵ0)
     frac2 = Eq / (q^2 + κ^2)
     return frac1 * frac2
 end

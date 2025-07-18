@@ -5,7 +5,7 @@ function boltzmann_E_phononelectron()
     for i in eachindex(g)
         Eq = sim.structure.egrid[i]
         q = Eq / (Constants.ħ * sim.phononicdistribution.cs)
-        prefac = sim.electronicdistribution.Ω * pi^3 / (3*Constants.ħ*q)
+        prefac = pi^3 / (3*Constants.ħ*q)
         M = electron_phonon_matrix(sim, Eq, q, κ)
         int(u,p) = boltzmann_pescatter_int(u, q, Eq, sim, f, g, DOS)
         prob = IntegralProblem(int, 0.0, sim.phononicdistribution.ED)

@@ -506,9 +506,23 @@ end
     Ω::Real
     me::Real
 end
+"""
+    build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, Ω=1.0, me = Constants.me)
 
-function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false,
-                                       Ω=1.0, me = Constants.me)
+    Boltzmann clacluations are currently WIP.
+    Outer constructor function to assemble the ElectronicDistribution struct. Unit conversion is detected on all parameters.
+    Defaults allow any unneccessary parameters for users simulation to be ignored. Recommended to use Unitful Quantity
+    for me due to the unusual mass units in LightMatter.jl
+
+    # Arguments
+    - 'Enabled': Bool for enabling the full electronic distriubtion propagation
+    - 'Electron_PhononCoupling': Enables electronic distribution - phononic distribution bath coupling
+    - 'me': unit = eVm : Mass of conduction electron in LightMatter.jl mass units
+
+    # Returns
+    - The ElectronicDistribution struct with the users settings and parameters with any neccessary unit conversion.
+"""
+function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, me = Constants.me)
 
     Ω = convert_units(u"nm^3", Ω)
     if me == Quantity
@@ -536,7 +550,23 @@ end
     DOS_ph::spl
     ED::Real
 end
+"""
+    build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false, Ω=1.0, me = Constants.me)
 
+    Boltzmann clacluations are currently WIP.
+    Outer constructor function to assemble the PhononicDistribution struct. Unit conversion is detected on all parameters.
+    Defaults allow any unneccessary parameters for users simulation to be ignored. Recommended to use Unitful Quantity
+    for me due to the unusual mass units in LightMatter.jl
+
+    # Arguments
+    - 'Enabled': Bool for enabling the full phononic distriubtion propagation
+    - 'Electron_PhononCoupling': Enables electronic distribution - phononic distribution bath coupling
+    - 'cs': unit = nm/fs : Speed of sound of longitudinal mode
+    = 'ED': unit = eV : Deybe energy of the material
+
+    # Returns
+    - The PhononicDistribution struct with the users settings and parameters with any neccessary unit conversion.
+"""
 function build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false,
                                      cs = 0.0, DOS_ph = get_interpolant([1,2,3], [1,2,3]), ED=0.0)
 
