@@ -522,7 +522,7 @@ end
     # Returns
     - The ElectronicDistribution struct with the users settings and parameters with any neccessary unit conversion.
 """
-function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, me = Constants.me)
+function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, me = Constants.me, Ω=1.0)
 
     Ω = convert_units(u"nm^3", Ω)
     if me == Quantity
