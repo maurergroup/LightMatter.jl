@@ -315,7 +315,7 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-@inline get_interpolant(xvals, yvals) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
+@inline get_interpolant(xvals, yvals) = Interpolations.linear_interpolation(xvals, yvals, extrapolation_bc = Flat())
 """
     build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     
@@ -496,6 +496,7 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                     fe = FE
                 end
                 temp_k = effective_onebandmodel(DOS[i], egrid, fe)
+
                 E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
                           DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
             end

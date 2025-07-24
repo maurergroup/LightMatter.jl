@@ -251,7 +251,7 @@ end
         AthermalElectron_ElectronCoupling::Bool # Enables coupling to an electronic bath
         AthermalElectron_PhononCoupling::Bool # Enables coupling to a phononic bath
         Conductivity::Bool # Provides conductivity of a ballistic nature using velocity given by v_g
-        EmbeddedAthEM::Bool
+        EmbeddedAthEM::Bool #Currently WIP!! DO not set to true
 
         ElectronicRelaxation::Symbol # Implementations are Fermi Liquid Theory (:FLT) or constant (:constant)
         PhononicRelaxation::Symbol # Implementations are constant (:constant) or quasiparticle scattering (:quasi)

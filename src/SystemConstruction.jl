@@ -290,13 +290,12 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,embedding)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            #push!(exprs, :(tot_n = n + Lightmatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
-            push!(exprs,:(relax_dis = $(sys["relax"])))
+            push!(exprs,:($(sys["relax"])))
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
 #=             if sim.athermalelectrons.MagnetoTransport == true
                 push!(exprs,:($(sys["magneto"])))
             end =#
-            push!(exprs,:(du.noe[i] = $(sys["noe"])))
+            push!(exprs,:(@views du.noe[i] = $(sys["noe"])))
             push!(exprs,:(Δn = du.noe[i]))
         elseif sim.athermalelectrons.Enabled == true
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))

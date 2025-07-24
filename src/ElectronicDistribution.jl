@@ -12,7 +12,15 @@
     # Returns
     - Value or vector of the Fermi-Dirac distribution
 """
-@inline FermiDirac(Tel, μ, E) = 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
+function FermiDirac(Tel, μ, E)
+    return 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
+end
+
+function FermiDirac!(dis, Tel, μ, E)
+    @inbounds for i in eachindex(dis)
+        dis[i] = 1 / (exp((E[i]-μ) / (Constants.kB*Tel))+1)
+    end
+end
 """
     dFDdE(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
