@@ -22,7 +22,6 @@ PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 SimpleNonlinearSolve = "727e6d20-b764-4bd8-a329-72de5adea6c7"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
@@ -43,6 +42,7 @@ OrdinaryDiffEq = "6"
 PreallocationTools = "0.4"
 RecursiveArrayTools = "3"
 SimpleNonlinearSolve = "2.0"
+StaticArrays = "1.9"
 Unitful = "1.21"
 julia = "1.6.7"
 
