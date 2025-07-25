@@ -1,14 +1,13 @@
-###
-    #To-Do: Add spatial DOS support to antenna-reactor complex
-###
 """
-    antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
+    antenna_reactor_system(sys, sim)
 
     Constructs the main expression for an antenna reactor simulation system.
 
     # Arguments
-    - `sys`: A dictionary or configuration object containing the expressions for each system propagated
-    - `sim`: A simulation object containing all necessary input data for the simulation.
+    - `sys`::Dict{String, Union{Expr, Vector{Expr}}}
+           A dictionary or configuration object containing the expressions for each system propagated
+    - `sim`::Simulation
+           A simulation object containing all necessary input data for the simulation.
 
     # Returns
     - An expression block containing the time output, conductivity expressions, and a threaded simulation loop.
@@ -25,13 +24,15 @@ function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, si
     end # The whole simulation that is propgated as one Expr block
 end
 """
-    mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
+    mat_picker(height, cutoffs)
 
     Selects an index based on material interface height and given cutoffs.
 
     # Arguments
-    - `height`: The height value to compare.
-    - `cutoffs`: A vector of cutoff heights defining material regions.
+    - `height`::Float64
+              The height value to compare.
+    - `cutoffs`::Union{Float64,Vector{Float64}}
+               A vector of cutoff heights defining material regions.
 
     # Returns
     - The index of the region in which `height` lies.
@@ -49,12 +50,13 @@ function mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
     return subindex
 end
 """
-    ar_variable_renaming(sim::Simulation)
+    ar_variable_renaming(sim)
 
     Generates variable renaming expressions for translation between the variibale names in DiffEq.jl and LightMatter.jl
 
     # Arguments
-    - `sim`: The Simulation struct containing all information about the simulation
+    - `sim`::Simulation
+           The Simulation struct containing all information about the simulation
 
     # Returns
     - An expression block assigning simulation-specific variable names.
@@ -120,12 +122,13 @@ function ar_variable_renaming(sim::Simulation)
     end
 end
 """
-    sim_seperation(sim::Simulation)
+    sim_seperation(sim)
 
     Splits a composite `Simulation` object into separate simulations for each elemental subsystem.
 
     # Arguments
-    - `sim`: The composite simulation containing multiple subsystems.
+    - `sim`::Simulation
+           The composite simulation containing multiple subsystems.
 
     # Returns
     - A vector of `Simulation` objects, each corresponding to a single elemental subsystem.
@@ -148,13 +151,15 @@ function sim_seperation(sim::Simulation)
     return new_sim
 end
 """
-    split_struct(data::SimulationTypes, number::Int)
+    split_struct(data, number)
 
     Splits fields of a composite object with vector fields into a vector of scalar instances.
 
     # Arguments
-    - `data`: A subsystem of the simulation e.g. neq electrons or Tel
-    - `number`: Float64 of subdivisions (usually the number of elements).
+    - `data`::SimulationTypes 
+            A subsystem of the simulation e.g. AthermalElectrons or ElectronicTemperature
+    - `number`::Int 
+              Number of different elemental systems.
 
     # Returns
     - A vector of the subsystem with scalar data extracted from the original vector fields.
@@ -170,13 +175,14 @@ function split_struct(data::SimulationTypes, number::Int)
     ] # Creates a vector of the subsystem with each containing one value of the vector fields as a scalar
 end
 """
-    split_structure(structure::Structure)
+    split_structure(structure)
 
     Splits a `Structure` object into multiple structures if `DOS` is a vector. Different to split_struct due to the possibility 
     of spatially resolved DOS' though currently that isn't implemented
 
     # Arguments
-    - `structure`: The struct containing the information of the simulatkion structure
+    - `structure`::Structure
+                 The struct containing the information of the simulatkion structure
 
     # Returns
     - A vector of `Structure` objects, one per element if applicable.
@@ -195,13 +201,15 @@ function split_structure(structure::Structure)
     ] # Creates a vector of the Structure struct with the DOS split into their seperate materials
 end
 """
-    split_grid(grid::Vector{Float64}, cutoffs::Union{Float64, Vector{Float64}})
+    split_grid(grid, cutoffs)
 
     Splits a numerical grid into regions that connect to each material
 
     # Arguments
-    - `grid`: A vector of Float64 numbers representing the full z-grid
-    - `cutoffs`: A single value or vector of values defining the interfaces between each material 
+    - `grid`::Vector{Float64}
+            A vector of Float64 numbers representing the full z-grid
+    - `cutoffs`::Union{Float64, Vector{Float64}}
+               A single value or vector of values defining the interfaces between each material 
 
     # Returns
     - A vector of sub-vectors representing segments of the original z-grid.

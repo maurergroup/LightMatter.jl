@@ -1,13 +1,15 @@
 
 """
-    athemdistribution_factory(sim::Simulation, laser_expr::Expr)
+    athemdistribution_factory(sim, laser_expr)
 
     Constructs the time evolution of the non-equilibrium distribution in the AthEM model
     Find out more at https://arxiv.org/abs/2503.09479
 
     # Arguments
-    - `sim`: Simulation struct containing physical and model parameters.
-    - `laser_expr`: Expression representing the laser excitation term.
+    - `sim`::Simulation
+           Simulation struct containing physical and model parameters.
+    - `laser_expr`::Expr
+                  Expression representing the laser excitation term.
 
     # Returns
     - The total expression for the evolution of the athermal electron distribution, combining excitation and scattering terms.
@@ -17,46 +19,55 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     ftot = :($feq .+ fneq)
     Elecelec = athem_electronelectroninteraction(sim)
     Elecphon = athem_electronphononinteraction(sim)
-    mag_trans = athem_magneotransport(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
-        athemexcite = :(vec(sum($laser_expr .* LightMatter.athemexcitation!(tmp, Δfexcite, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
+        athemexcite = quote
+            Δfexcite .= vec(sum($laser_expr .* LightMatter.athemexcitation!(Δfexcite, tmp, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1))
+            Δfexcite
+        end
     else
         athemexcite = quote
-                        LightMatter.athemexcitation!(tmp, Δfexcite, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M)
+                        LightMatter.athemexcitation!(Δfexcite, tmp, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M)
                         Δfexcite = LightMatter.access_DiffCache(Δfexcite, fneq[1])
                         $laser_expr .* Δfexcite
                       end
     end
-    return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
+    return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
 end
 """
-    build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr, Float64}, Elecphon::Union{Expr, Float64})
+    build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
 
     Combines excitation and scattering contributions into a single broadcasted sum expression in the AthEM model
 
     # Arguments
-    - `sim`: The simulation object.
-    - `athemexcite`: Expression for athermal excitation.
-    - `Elecelec`: Electron-electron scattering Expr or 0.0 if disabled
-    - `Elecphon`: Electron-phonon scattering Expr or 0.0 if disabled
+    - `sim`::Simulation
+           The simulation object.
+    - `athemexcite`::Expr
+                   Expression for athermal excitation.
+    - `Elecelec`::Union{Expr, Float64}
+                Electron-electron scattering Expr or 0.0 if disabled
+    - `Elecphon`::Union{Expr, Float64}
+                Electron-phonon scattering Expr or 0.0 if disabled
 
     # Returns
     - A broadcasted summation of all interaction terms.
 """
-function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Float64}, Elecphon::Union{Expr,Float64}, mag_trans::Union{Symbol,Float64})
-    args = Union{Expr, Symbol, Float64}[athemexcite, Elecelec, Elecphon, mag_trans]
+function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Float64}, Elecphon::Union{Expr,Float64})
+    args = Union{Expr, Symbol, Float64}[athemexcite, Elecelec, Elecphon]
     if sim.athermalelectrons.Conductivity == true
         push!(args, :f_cond)
     end
     return Expr(:call, :(.+), (args)...)
 end
 """
-    athemexcitation(ftot::Vector{Float64}, egrid::Vector{Float64}, DOS::spl, hv::Float64, M::Union{Float64,Vector{Float64}})
+    athemexcitation!(Δfneqe::DiffCache, Δfneqh::DiffCache, ftot::Vector{Float64}, egrid::Vector{Float64}, DOS::spl, hv::Float64, M::Union{Float64,Vector{Float64}})
 
     Computes the net non-equilibrium excitation using Fermi's Golden Rule.
 
     # Arguments
+    - 'Δfneqe': A pre-initialized vector to reduce allocations. Can be DiffCache or Vector. 
+                This vector contains the final result
+    - 'Δfneqh': A pre-initialized vector to reduce allocations. Can be DiffCache or Vector.
     - `ftot`: Total distribution (f_eq + f_neq).
     - `egrid`: Energy grid.
     - `DOS`: Density of states spline.
@@ -64,9 +75,10 @@ end
     - `M`: Matrix elements.
 
     # Returns
-    - Normalized excitation change in the distribution.
+    - In-place normalized change in particle distribution shape. Multiply by inputted laser energy at time t to get 
+      full excitation shape change
 """
-function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Float64, M)
+function athemexcitation!(Δfneqe, Δfneqh, ftot, egrid, DOS, hv::Float64, M)
     Δfneqh = get_tmp(Δfneqh, ftot)
     Δfneqe = get_tmp(Δfneqe, ftot)
     ftotspl = get_interpolant(egrid, ftot)
@@ -91,11 +103,12 @@ function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Matrix{Float64
     return Δneqs # Returns the different frequency changes
 end
 """
-    athem_holegeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
+    athem_holegeneration!(tmp::Vector, egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
 
     Computes the shape of the distribution change due to hole generation.
 
     # Arguments
+    - `tmp`: Temporary vector for in-place update
     - `egrid`: Energy grid.
     - `DOS`: Density of states spline.
     - `ftotspl::spl`: Spline of the total distribution.
@@ -112,11 +125,12 @@ function athem_holegeneration!(tmp, egrid, DOS, ftotspl, hv, M)
     return nothing
 end
 """
-    athem_electrongeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
+    athem_electrongeneration!(tmp::Vector, egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
 
     Computes the shape of the distribution change due to electron generation.
 
     # Arguments
+    - `tmp`: Temporary vector for in-place update
     - `egrid`: Energy grid.
     - `DOS`: Density of states spline.
     - `ftotspl::spl`: Spline of the total distribution.
@@ -164,7 +178,7 @@ end
 function athem_electronelectroninteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
         expr = quote
-            relax_dis = LightMatter.access_DiffCache(relax_dis, 1.0)
+            relax_dis = LightMatter.access_DiffCache(relax_dis, fneq[1])
             -1 * relax_dis
         end
         return expr # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
@@ -193,7 +207,7 @@ function electron_relaxationtime(sim::Simulation)
     end
 end       
 """
-    athem_electronelectronscattering(Tel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
+    athem_electronelectronscattering(fdis::VectorTel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
 
     Calculates the electron-electron scattering contribution using a modified relaxation time approximation.
 
@@ -371,21 +385,5 @@ function FE_initialization(bulk_DOS::Union{String, Vector{String}})
             FE[i] = get_FermiEnergy(bulk_DOS[i])
         end
         return FE
-    end
-end
-"""
-    athem_magneotransport(sim)
-    # Arguments
-    # WIP!
-    - `sim`: Settings of the requested simulation
-
-    # Returns
-    - A placeholder variable for including the magnetotransport or not to be added to the total fneq equation
-"""
-function athem_magneotransport(sim)
-    if sim.athermalelectrons.MagnetoTransport == true
-        return :(Δf_mt)
-    else
-        return :(0.0)
     end
 end
