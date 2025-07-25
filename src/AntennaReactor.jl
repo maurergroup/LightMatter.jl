@@ -15,7 +15,7 @@
 """
 function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
     expr_cond = conductivity_expressions(sim) # Expr block for the conductivity of each system
-    loop_body = ar_build_loopbody(sys, sim) # Expr block for the body of a threaded for loop over the systems and depth
+    loop_body = build_loopbody(sys, sim) # Expr block for the body of a threaded for loop over the systems and depth
     return quote 
         println(t)
         $expr_cond
@@ -23,63 +23,6 @@ function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, si
             $loop_body
         end
     end # The whole simulation that is propgated as one Expr block
-end
-"""
-    ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
-
-    Builds the core loop body expression for the antenna reactor simulation.
-
-    # Arguments
-    - `sys`: Dict of Expr for each subsystem
-    - `sim`: All simulation parameters
-
-    # Returns
-    - An expression representing the simulation loop body.
-"""
-function ar_build_loopbody(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
-    exprs = Vector{Expr}(undef, 0) # Miscellaneous expressions at the top of the loop
-    push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
-    push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl
-    push!(exprs, :(μ = LightMatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid))) # Calculates the current chemical potential
-
-    if sim.athermalelectrons.EmbeddedAthEM == true 
-        # Embeds AthEM to reduce computational cost - do not use with non-eq transport but with both electronic and phononic temperature
-        embedding = quote
-            if i == 1
-                relax_dis = $(sys["relax_AthEM"])
-                du.noe = $(sys["noe_AthEM"])
-                Δn = du.noe[1]
-                du.fneq[1,:] .= $(sys["fneq_AthEM"])
-                du.Tel[1] = $(sys["Tel_AthEM"])
-                du.Tph[1] = $(sys["Tph_AthEM"])
-            else
-                du.Tel[i] = $(sys["Tel"])
-                du.Tph[i] = $(sys["Tph"])
-            end
-        end
-        push!(exprs,embedding)
-    else # No embedding so all heights are treated the same 
-        if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
-            #push!(exprs, :(tot_n = n + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
-            push!(exprs,:(relax_dis = $(sys["relax"])))
-            #= if sim.athermalelectrons.MagnetoTransport == true
-                push!(exprs,:($(sys["magneto"])))
-            end =#
-            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
-            push!(exprs,:(du.noe[i] = $(sys["noe"])))
-            push!(exprs,:(Δn = du.noe[i]))
-        elseif sim.athermalelectrons.Enabled == true
-            push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
-        end
-
-        if sim.electronictemperature.Enabled== true
-            push!(exprs,:(du.Tel[i] = $(sys["Tel"])))
-        end
-        if sim.phononictemperature.Enabled == true
-            push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
-        end
-    end
-    return Expr(:block, exprs...)
 end
 """
     mat_picker(height::Float64, cutoffs::Union{Float64,Vector{Float64}})
@@ -127,8 +70,12 @@ function ar_variable_renaming(sim::Simulation)
         push!(new_name, :DOS)
     end
     if sim.athermalelectrons.Enabled == true
-        push!(old_name, :(u.fneq[i,:]))
-        push!(new_name, :fneq)
+        push!(old_name,:(@view u.fneq[i,:]))
+        push!(new_name,:fneq)
+        push!(old_name, :(p.tmp[i]))
+        push!(new_name, :tmp)
+        push!(old_name, :(p.Δfexcite[i]))
+        push!(new_name, :Δfexcite)
         if sim.athermalelectrons.Conductivity == true
             push!(old_name, :(p.f_cond[i,:]))
             push!(new_name, :f_cond)
@@ -141,14 +88,8 @@ function ar_variable_renaming(sim::Simulation)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
-        end
-        if sim.athermalelectrons.MagnetoTransport == true
-            push!(old_name, :(p.Δf_mt[i,:]))
-            push!(old_name, :(p.g_k[i,:]))
-            push!(new_name, :Δf_mt)
-            push!(new_name, :g_k)
-            push!(old_name, :(p.sim.structure.bandstructure[X]))
-            push!(new_name, :band)
+            push!(old_name, :(p.relax_dis[i]))
+            push!(new_name, :relax_dis)
         end
     end
     if sim.electronictemperature.Enabled == true
