@@ -1,3 +1,4 @@
+
 """
     athemdistribution_factory(sim::Simulation, laser_expr::Expr)
 
@@ -19,9 +20,13 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
     mag_trans = athem_magneotransport(sim)
     M = athemexcitation_matrixelements(sim)
     if sim.laser.hv isa Matrix
-        athemexcite = :(vec(sum($laser_expr .* LightMatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
+        athemexcite = :(vec(sum($laser_expr .* LightMatter.athemexcitation!(tmp, Δfexcite, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M), dims=1)))
     else
-        athemexcite = :($laser_expr .* LightMatter.athemexcitation($ftot, sim.structure.egrid, DOS, sim.laser.hv, $M))
+        athemexcite = quote
+                        LightMatter.athemexcitation!(tmp, Δfexcite, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M)
+                        Δfexcite = LightMatter.access_DiffCache(Δfexcite, fneq[1])
+                        $laser_expr .* Δfexcite
+                      end
     end
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon, mag_trans)
 end
@@ -61,24 +66,27 @@ end
     # Returns
     - Normalized excitation change in the distribution.
 """
-function athemexcitation(ftot, egrid, DOS, hv::Float64, M)
+function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Float64, M)
+    Δfneqh = get_tmp(Δfneqh, ftot)
+    Δfneqe = get_tmp(Δfneqe, ftot)
     ftotspl = get_interpolant(egrid, ftot)
-    Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv, M)
-    Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv, M)
+    athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv, M)
+    athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv, M)
     pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
-    Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
-    return Δfneqtot ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
+    Δfneqe .-= (pc_sf * Δfneqh)
+    Δfneqe ./= get_internalenergy(Δfneqe, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
+    return nothing
 end
 
-function athemexcitation(ftot, egrid, DOS, hv::Matrix{Float64}, M)
+function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Matrix{Float64}, M)
     Δneqs = zeros(size(hv,1),length(egrid))
     for i in 1:size(hv,1)
         ftotspl = get_interpolant(egrid, ftot)
-        Δfneqh = athem_holegeneration(egrid, DOS, ftotspl, hv[i,1], M)
-        Δfneqe = athem_electrongeneration(egrid, DOS, ftotspl,hv[i,1], M)
+        athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv[i,1], M)
+        athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv[i,1], M)
         pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
-        Δfneqtot = Δfneqe .- (pc_sf * Δfneqh)
-        Δneqs[i,:] .= Δfneqtot .* hv[i,2] ./ get_internalenergy(Δfneqtot, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
+        Δfneqe .-= (pc_sf * Δfneqh)
+        Δneqs[i,:] .= Δfneqe .* hv[i,2] ./ get_internalenergy(Δfneqe, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
     end
     return Δneqs # Returns the different frequency changes
 end
@@ -97,8 +105,11 @@ end
     # Returns
     - Change in distribution due to hole generation
 """
-function athem_holegeneration(egrid, DOS, ftotspl, hv, M)
-    return (2*pi/Constants.ħ) .* M .* DOS(egrid.+hv) .* ftotspl(egrid) .* (1 .- ftotspl(egrid.+hv))
+function athem_holegeneration!(tmp, egrid, DOS, ftotspl, hv, M)
+    for i in eachindex(egrid)
+        tmp[i] = (2*pi/Constants.ħ) * M * DOS(egrid[i]+hv) * ftotspl(egrid[i]) * (1 - ftotspl(egrid[i]+hv))
+    end
+    return nothing
 end
 """
     athem_electrongeneration(egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
@@ -115,8 +126,11 @@ end
     # Returns
     - Change in distribution due to electron generation
 """
-function athem_electrongeneration(egrid, DOS, ftotspl, hv, M)
-    return (2*pi/Constants.ħ) .* M .* DOS(egrid.-hv) .* ftotspl(egrid.-hv) .* (1 .-ftotspl(egrid))
+function athem_electrongeneration!(tmp, egrid, DOS, ftotspl, hv, M)
+    for i in eachindex(egrid)
+        tmp[i] = (2*pi/Constants.ħ) * M * DOS(egrid[i]-hv) * ftotspl(egrid[i]-hv) * (1 - ftotspl(egrid[i]))
+    end
+    return nothing
 end
 """
     athemexcitation_matrixelements(sim::Simulation)
@@ -149,34 +163,14 @@ end
 """
 function athem_electronelectroninteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
-        return :(-1 * relax_dis) # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
+        expr = quote
+            relax_dis = LightMatter.access_DiffCache(relax_dis, 1.0)
+            -1 * relax_dis
+        end
+        return expr # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
     else
         return 0.0
     end
-end
-"""
-    athem_electronelectronscattering(Tel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
-
-    Calculates the electron-electron scattering contribution using a modified relaxation time approximation.
-
-    # Arguments
-    - 'Tel': Electronic temperature of the system
-    - 'μ': Chemical potential at the current temperature
-    - 'sim': Simulation settings and parameters
-    - 'fneq': Current non-equilibrium electron distribution
-    - 'DOS': Spline of the density-of-states
-    - 'n': The number of electrons in the thermal system
-    - 'τee': The athermal electron lifetime
-
-    # Returns
-    - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
-"""
-function athem_electronelectronscattering(Tel, μ, sim::Simulation, fneq, DOS, n, τee)
-    feq = LightMatter.FermiDirac(Tel, μ, sim.structure.egrid)
-    ftot = feq .+ fneq
-    goal = Bode_rule(ftot.*DOS(sim.structure.egrid).*sim.structure.egrid, sim.structure.egrid)
-    frel = find_relaxeddistribution(sim.structure.egrid, goal, n, DOS)
-    return (fneq.+frel.-feq) ./ τee
 end
 """
     electron_relaxationtime(sim::Simulation)
@@ -195,9 +189,36 @@ function electron_relaxationtime(sim::Simulation)
     if sim.athermalelectrons.ElectronicRelaxation == :constant
         return :(sim.athermalelectrons.τ)
     elseif sim.athermalelectrons.ElectronicRelaxation == :FLT
-        return :(sim.athermalelectrons.τ * (μ.+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))
+        return :(sim.athermalelectrons.τ * (μ+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))
     end
 end       
+"""
+    athem_electronelectronscattering(Tel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
+
+    Calculates the electron-electron scattering contribution using a modified relaxation time approximation.
+
+    # Arguments
+    - 'Tel': Electronic temperature of the system
+    - 'μ': Chemical potential at the current temperature
+    - 'sim': Simulation settings and parameters
+    - 'fneq': Current non-equilibrium electron distribution
+    - 'DOS': Spline of the density-of-states
+    - 'n': The number of electrons in the thermal system
+    - 'τee': The athermal electron lifetime
+
+    # Returns
+    - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
+"""
+function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS, n, τee)
+    fdis = get_tmp(fdis, Tel)
+    LightMatter.FermiDirac!(fdis, Tel, μ, egrid)
+    fdis .+= fneq
+    goal = get_internalenergy(fdis, DOS, egrid)
+    find_relaxeddistribution!(frel, egrid, goal, n, DOS)
+    frel = get_tmp(frel, Tel)
+    @. fdis = (fneq+frel-fdis+fneq) ./ τee #fdis = feq + fneq so we need to subtract fneq twice to get feq - fneq
+    return nothing
+end
 """
     find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64)
     
@@ -212,20 +233,13 @@ end
     # Returns
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
-function find_relaxeddistribution(egrid, goal, n, DOS)
-    f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
-    μ = find_chemicalpotential(n, Temp, DOS, egrid)
-    return FermiDirac(Temp, μ, egrid)
+function find_relaxeddistribution!(out, egrid, goal, n, DOS)
+    prob = NonlinearProblem(find_temperatureandμ!, SA[1000.0,0.0], (out, n, DOS, egrid, goal))
+    sol = solve(prob, SimpleNewtonRaphson(); abstol=1e-10, reltol=1e-10).u
+    out = get_tmp(out, n)
+    FermiDirac!(out, sol[1], sol[2], egrid)
+    return nothing
 end
-
-function find_relaxeddistribution(out, egrid, goal, n, DOS)
-    f(u,p) = goal - find_temperatureandμ(u, n, DOS, egrid)
-    Temp::Float64 = solve(NonlinearProblem(f,1000.0); abstol=1e-10, reltol=1e-10).u
-    μ = find_chemicalpotential(n, Temp, DOS, egrid)
-    @. out = FermiDirac(Temp, μ, egrid)
-end
-
 """
     find_temperatureandμ(Tel::Float64,n::Float64,DOS::spl,egrid::Vector{Float64})
 
@@ -240,10 +254,15 @@ end
     # Returns
     - Internal energy of the current temperature guess.
 """
-function find_temperatureandμ(Tel, n, DOS, egrid)
-    μ = find_chemicalpotential(n, Tel, DOS, egrid)
-    return get_internalenergy(FermiDirac(Tel,μ,egrid), DOS, egrid)
-end
+function find_temperatureandμ!(du, u, (out, n, DOS, egrid, goal))
+    n = ForwardDiff.value(n)
+    goal = ForwardDiff.value(goal)
+    out = get_tmp(out, u[1])
+    FermiDirac!(out,u[1], u[2],egrid)
+    du[1] = goal - get_internalenergy(out, DOS, egrid)
+    du[2] = n - get_noparticles(out, DOS, egrid)
+    return nothing
+end 
 """
     athem_electronelectroninteraction(sim::Simulation)
 
@@ -258,7 +277,7 @@ end
 function athem_electronphononinteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_PhononCoupling == true 
         τep = phonon_relaxationtime(sim)
-        return :(-fneq ./ $τep)
+        return :(-fneq / $τep)
     else
         return 0.0
     end
@@ -330,42 +349,6 @@ function electron_distribution_transport!(v_g::Matrix{Float64}, f, Δf, dz)
     @views @. Δf[end,:] = (f[end-1,:] - f[end,:]) / dz * v_g[end,:]
 end
 """
-    thermal_particle_transport(v_g::Vector{Float64},egrid::Vector{Float64},n::Vector{Float64},Δn::Vector{Float64},dz::Float64)
-
-    Calculates transport correction for thermal particle distribution using the Fermi velocity.
-
-    # Arguments
-    - `v_g`: Group velocity vector or vector of vectors(spatially-resolved DOS)
-    - `egrid`: Energy grid.
-    - `n`: Float64 of particles in thermal system
-    - `Δn`: Output array.
-    - `dz`: Spatial resolution.
-
-    # Returns
-    - Updated transport correction array.
-"""
-function thermal_particle_transport!(v_g::Vector{Float64}, egrid, n, Δn, dz)
-    idx_0 = findmin(abs.(egrid.-0.0))[2]
-    v_F = v_g[idx_0]
-    for i in 2:length(Δn) - 1
-        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
-    end
-    Δn[1] = (n[2] - n[1]) / dz * v_F
-    Δn[end] = (n[end-1] - n[end]) / dz * v_F
-end
-
-function thermal_particle_transport!(v_g::Matrix{Float64}, egrid, n, Δn, dz)
-    idx_0 = findmin(abs.(egrid.-0.0))[2]
-    for i in 2:length(Δn) -1
-        v_F = v_g[i,idx_0]
-        Δn[i] = (n[i+1] - (2*n[i]) + n[i-1]) / dz * v_F
-    end
-    v_F1 = v_g[1,idx_0]
-    Δn[1] = (n[2] - n[1]) / dz * v_F1
-    v_Fend = v_g[end,idx_0]
-    Δn[end] = (n[end-1] - n[end]) / dz * v_Fend
-end
-"""
     FE_initalization(bulk_DOS::Union{String, Vector{String}})
 
     Initializes Fermi energy based on bulk density of states. This is defined as the difference between the bottom of the
@@ -391,9 +374,9 @@ function FE_initialization(bulk_DOS::Union{String, Vector{String}})
     end
 end
 """
-    athem_magneotransport(sim::Simulation)
-
+    athem_magneotransport(sim)
     # Arguments
+    # WIP!
     - `sim`: Settings of the requested simulation
 
     # Returns

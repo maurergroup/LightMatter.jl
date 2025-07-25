@@ -1,12 +1,12 @@
 module LightMatter
 
-using DataInterpolations, DelimitedFiles, Integrals, NonlinearSolve, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful, JLD2, ForwardDiff
-using Bessels, FillArrays, ArrayInterface
+using DelimitedFiles, Integrals, NonlinearSolve, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful, JLD2, ForwardDiff
+using Bessels, FillArrays, ArrayInterface, Interpolations, DataInterpolations, PreallocationTools, StaticArrays, SimpleNonlinearSolve
 
 export build_Simulation, run_simulation, post_production, Constants, DensityMatrix, build_DensityMatrix, build_Dimension, FE_initialization
 export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, build_PhononicTemperature, function_builder
 export Laser, build_Laser, AthermalElectrons, build_AthermalElectrons, Structure, build_Structure
-export ElectronicDistribution, PhononicDistribution, BaseUnits, build_ElectronicDistribution, build_PhononicDistribution
+export ElectronicDistribution, PhononicDistribution, BaseUnits
 
 
 Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
@@ -23,7 +23,7 @@ global const LightMatter_units = [u"eV", u"nm", u"fs", u"K"]
 
     A convenience type definition to make type specificity easier throughout the code
 """
-global const spl=DataInterpolations.LinearInterpolation
+global const spl=Interpolations.AbstractExtrapolation
 
 import Base.getindex
 

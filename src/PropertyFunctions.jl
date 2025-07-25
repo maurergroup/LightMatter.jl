@@ -12,17 +12,10 @@
     # Returns
     - The value of the chemical potential
 """
-#= function find_chemicalpotential(no_part, Tel, DOS, egrid)
+function find_chemicalpotential(no_part, Tel, DOS, egrid)
     f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, 0.0); abstol=1e-3, reltol=1e-3).u
-end =#
-
-function find_chemicalpotential(no_part, Tel, DOS, egrid)::Float64
-    #noe = ForwardDiff.value(no_part)
-    temp = ForwardDiff.value(Tel)
-    f(u,p) = no_part - get_thermalparticles(u, temp, DOS, egrid)
-    return sol = solve(NonlinearProblem(f, 0.0); abstol=1e-12, reltol=1e-12).u
-end
+    return sol = solve(NonlinearProblem(f, 0.0), SimpleNewtonRaphson(); abstol=1e-12, reltol=1e-12).u
+end 
 """
     get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -38,13 +31,9 @@ end
     - The number of electrons
 """
 function get_thermalparticles(μ, Tel, DOS, egrid)
-    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
+    f = i -> DOS(egrid[i]) * FermiDirac(Tel,μ,egrid[i])
+    return Bode_rule(f, egrid)
 end
-
-#= function get_thermalparticles(μ::ForwardDiff.Dual, Tel::SparseConnectivityTracer.GradientTracer, DOS, egrid)
-    μ = ForwardDiff.value(μ)
-    return Bode_rule(DOS(egrid) .* FermiDirac(Tel,μ,egrid), egrid)
-end =#
 """
     get_noparticles(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
     
@@ -59,7 +48,8 @@ end =#
     - The number of electrons
 """
 function get_noparticles(Dis, DOS, egrid)
-    return Bode_rule(Dis.*DOS(egrid),egrid)
+    f = i -> Dis[i] * DOS(egrid[i])
+    return Bode_rule(f,egrid)
 end
 """
     p_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -76,7 +66,8 @@ end
     - The value of dn/dT
 """
 function p_T(μ, Tel, DOS, egrid)
-    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid), egrid)
+    f = i -> dFDdT(Tel,μ,egrid[i]) * DOS(egrid[i])
+    return Bode_rule(f, egrid)
 end
 """
     p_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -93,7 +84,8 @@ end
     - The value of dn/dμ
 """
 function p_μ(μ, Tel, DOS, egrid)
-    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid), egrid)
+    f = i -> dFDdμ(Tel,μ,egrid[i]) * DOS(egrid[i])
+    return Bode_rule(f, egrid)
 end
 """
     get_internalenergy(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
@@ -109,7 +101,8 @@ end
     - The internal energy of the given distribution
 """
 function get_internalenergy(Dis, DOS, egrid)
-    return Bode_rule(Dis .* DOS(egrid) .* egrid, egrid)
+    f = i -> Dis[i] * DOS(egrid[i]) * egrid[i]
+    return Bode_rule(f, egrid)
 end
 """
     c_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -126,7 +119,8 @@ end
     - The value of dU/dT
 """
 function c_T(μ, Tel, DOS, egrid)
-    return Bode_rule(dFDdT(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    f = i -> dFDdT(Tel,μ,egrid[i]) * DOS(egrid[i]) * egrid[i]
+    return Bode_rule(f, egrid)
 end
 """
     c_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
@@ -143,7 +137,8 @@ end
     - The value of dU/dμ
 """
 function c_μ(μ, Tel, DOS, egrid)
-    return Bode_rule(dFDdμ(Tel,μ,egrid) .* DOS(egrid) .* egrid, egrid)
+    f = i -> dFDdμ(Tel,μ,egrid[i]) * DOS(egrid[i]) * egrid[i]
+    return Bode_rule(f, egrid)
 end
 """
     Bode_rule(y::Vector{Float64}, x::Vector{Float64})
@@ -158,13 +153,13 @@ end
     # Returns
     - The integration value across the range
 """
-function Bode_rule(y, x)
+function Bode_rule(y::Vector{Float64}, x)
     N = length(x)
-    n = (N-1) ÷ 4
+    n = (N-1) ÷   4
     h = x[2] - x[1]
 
     integral = 0.0
-    for i in 1:n
+    @inbounds for i in 1:n
         idx = 4 * (i - 1) + 1
         integral += (2h / 45) * (
             7y[idx] +
@@ -172,6 +167,26 @@ function Bode_rule(y, x)
             12y[idx + 2] +
             32y[idx + 3] +
             7y[idx + 4]
+        )
+    end
+
+    return integral
+end
+
+function Bode_rule(y::Function, x)
+    N = length(x)
+    n = (N-1) ÷ 4
+    h = x[2] - x[1]
+
+    integral = 0.0
+    @inbounds for i in 1:n
+        idx = 4 * (i - 1) + 1
+        integral += (2h / 45) * (
+            7y(idx) +
+            32y(idx + 1) +
+            12y(idx + 2) +
+            32y(idx + 3) +
+            7y(idx + 4)
         )
     end
 

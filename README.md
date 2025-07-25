@@ -14,7 +14,7 @@ Quantum: Dipole Approximation Single Particle State Hamiltonian propagation
 A simple way to get started with LightMatter.jl is to build and simulate a
 0D Two-Temperature-Model.
 ```
-using Lightmatter, Unitful
+using LightMatter, Unitful
 
 “First we define our laser input to the system, this includes laser-material 
 parameters such as penetration depth (ϵ), reflectivity (R) etc.”

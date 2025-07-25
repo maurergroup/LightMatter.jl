@@ -162,7 +162,6 @@ end
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
-    tmp::Matrix{Float64} #Temporary matrix of grid length by energy grid length for sotring vectors
 end
 """
     build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
@@ -210,9 +209,8 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
         total_field = TotalFields(Fields(fill(0.0, 3), fill(0.0, 3)), Fields(fill(0.0, 3), fill(0.0, 3)))
     end
     bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
-    tmp = zeros(dimension.length, length(egrid))
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, tmp = tmp, ChemicalPotential=chemicalpotential)
+                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential)
 end
 """
     WIP!!!
@@ -252,7 +250,7 @@ end
         AthermalElectron_ElectronCoupling::Bool # Enables coupling to an electronic bath
         AthermalElectron_PhononCoupling::Bool # Enables coupling to a phononic bath
         Conductivity::Bool # Provides conductivity of a ballistic nature using velocity given by v_g
-        EmbeddedAthEM::Bool
+        EmbeddedAthEM::Bool #WIP!! Do not set to true
 
         ElectronicRelaxation::Symbol # Implementations are Fermi Liquid Theory (:FLT) or constant (:constant)
         PhononicRelaxation::Symbol # Implementations are constant (:constant) or quasiparticle scattering (:quasi)
@@ -568,7 +566,7 @@ end
     - The PhononicDistribution struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false,
-                                     cs = 0.0, DOS_ph = get_interpolant([1,2,3], [1,2,3]), ED=0.0)
+                                     cs = 0.0, DOS_ph = get_interpolant([1,2,3], [4,5,6]), ED=0.0)
 
     ED = convert_units(u"eV", ED)
     cs = convert_units(u"nm/fs", cs)
@@ -704,4 +702,8 @@ function build_egrid(egrid)
         end
     end
     return egrid
+end
+
+function access_DiffCache(tmp, u)
+    return get_tmp(tmp,u)
 end

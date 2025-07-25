@@ -57,7 +57,7 @@ end
 """
 function electrontemperature_heatcapacity(sim::Simulation)
     if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
-        return :(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS, sim.structure.egrid))
+        return :(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS))
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
         return :(sim.electronictemperature.γ * Tel)
     end
@@ -77,8 +77,10 @@ end
     # Returns
     - The current heat capacity of the electronic thermal bath
 """
-function nonlinear_electronheatcapacity(Tel, μ, DOS, egrid)
-    return Bode_rule(dFDdT(Tel,μ,egrid).*DOS(egrid).*egrid, egrid)
+function nonlinear_electronheatcapacity(Tel, μ, DOS)
+    int(u,p) = dFDdT(Tel, μ, u) * DOS(u) * u
+    prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
+    return solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
 end
 """
     electronphonon_coupling(sim::Simulation)
@@ -124,10 +126,12 @@ end
     # Returns
     - Energy flow between an electronic and phononic bath with a calculate g parameter
 """
-function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph, egrid)
+function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
-    g=prefac .* Bode_rule(DOS(egrid).^2 .*-dFDdE(Tel, μ, egrid), egrid)
-    return -g * (Tel-Tph)
+    int(u,p) = DOS(u)^2 *-dFDdE(Tel, μ, u) * prefac
+    prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
+    sol = solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
+    return -sol.u * (Tel-Tph)
 end
 """
     build_athemelectron(Δu::Expr)
@@ -144,7 +148,7 @@ end
 function build_athemelectron(Δu::Expr)
     return :( 1 / (LightMatter.c_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)
     - LightMatter.p_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)) *
-    (LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu - LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*Δn))
+    (LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu - LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*du.noe[i]))
 end
 """
     athem_electempenergychange(sim::Simulation)

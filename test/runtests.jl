@@ -6,6 +6,15 @@ using Test
 # Added tests should name the section in the file the same as the test name commented above it.
 
 io = h5open("TestSolutions.hdf5")
+using LightMatter, PreallocationTools, BenchmarkTools, HDF5
+egrid = collect(-6.2:0.02:6.2)
+ftot = LightMatter.FermiDirac(300.0,0.0,egrid)
+DOS = LightMatter.generate_DOS("../DOS/Au_DOS.dat", 1.0)
+τee = 0.5 * (0.0+9.0)^2 ./((egrid.-0.0).^2 .+ (pi*Constants.kB*300.0)^2)
+fneq = zeros(length(egrid))
+n = LightMatter.get_thermalparticles(0.0, 1e-16, DOS, egrid)
+tmp1 = DiffCache(similar(egrid))
+tmp2 = DiffCache(similar(egrid))
 
 @testset "LightMatter" begin
     #This section should contain tests that test full-code functionality,
@@ -19,9 +28,20 @@ end
 @testset "AthermalElectrons" begin
     file = io["AthermalElectrons"]
     egrid = collect(-6.2:0.02:6.2)
-    ftot = FermiDirac(300.0,0.0,egrid)
-    DOS = get_DOS("../DOS/Au_DOS.dat")
-    @test LightMatter.athemexcitation(ftot, egrid, DOS, 3.1, 1.0) == read(file["athemexcitation"])
+    ftot = LightMatter.FermiDirac(300.0,0.0,egrid)
+    DOS = LightMatter.generate_DOS("../DOS/Au_DOS.dat", 1.0)
+    tmp1 = DiffCache(similar(egrid))
+    tmp2 = DiffCache(similar(egrid))
+
+    LightMatter.athemexcitation!(tmp1, tmp2, ftot, egrid, DOS, 3.1, 1.0)
+    @test get_tmp(tmp2,0.0) == read(file["athemexcitation"])
+
+    τee = 0.5 * (0.0+9.0)^2 ./((egrid.-0.0).^2 .+ (pi*Constants.kB*300.0)^2)
+    fneq = zeros(length(egrid))
+    n = LightMatter.get_thermalparticles(0.0, 1e-16, DOS, egrid)
+    LightMatter.athem_electronelectronscattering!(tmp1, tmp2, 300.0, 0.0, egrid, fneq, DOS, n, τee) 
+    @test isapprox(get_tmp(tmp1, 0.0), read(file["athemelectronelectronscattering"]), atol=1e-8, rtol=1e-8)
+
 end
 
 @testset "DensityMatrix" begin

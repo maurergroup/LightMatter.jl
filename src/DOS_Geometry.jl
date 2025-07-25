@@ -24,7 +24,7 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
         return DOS
     else
         if bulk_DOS isa Nothing
-            return get_interpolant(fill(NaN, 4), fill(NaN, 4))
+            return get_interpolant([1,2,3], [4,5,6])
         elseif bulk_DOS isa String
             Vbulk = get_unitcellvolume(bulk_geometry)
             if zDOS == true 
@@ -117,16 +117,6 @@ function get_unitcellvolume(geometry_file::String)
     b = vectors[2,2:4]
     c = vectors[3,2:4]
     return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
-end
-
-function get_unitcellatoms(geometry_file::String)
-    geometry = readdlm(geometry_file, comments=true)
-    atoms = count(x->x=="atom_frac", geometry[:,1])
-    vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
-    a = vectors[1,2:4]
-    b = vectors[2,2:4]
-    c = vectors[3,2:4]
-    return atoms / (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
 """
     spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Float64,dim::Dimension,tolerance::Float64)
@@ -325,7 +315,7 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-@inline get_interpolant(xvals, yvals) = DataInterpolations.LinearInterpolation(yvals, xvals, extrapolation = ExtrapolationType.Constant)
+@inline get_interpolant(xvals, yvals) = Interpolations.linear_interpolation(xvals, yvals, extrapolation_bc = Flat())
 """
     build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     
@@ -494,21 +484,7 @@ function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     end
     return k_E
 end
-"""
-    bandstructure_initialization(bandstructure::Symbol, DOS::Union{spl, Vector{spl}}, egrid::Vector{Float64}, FE::Union{Float64, Vector{Float64}})
-    
-    Calculates the bandstructure of the material. Currently the only methods implemented is the :effectiveoneband. Hopefully soon users will be
-    able to load in bandstructures calculated from DFT etc. 
 
-    # Arguments
-    - 'bandstructure': The type of bandstructure to be constructed
-    - 'DOS': The density-of-states of the system as a spline
-    - 'egrid': Energy grid all distributions are solved on
-    - 'FE': The Fermi energy, calculated from get_FermiEnergy
-
-    # Returns
-    - The bandstructure of the system as a spline, returns a vector of both k->E and E->k for the :effectiveoneband model. 
-"""
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
     if bandstructure == :effectiveoneband
         if DOS isa AbstractArray
@@ -520,6 +496,7 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                     fe = FE
                 end
                 temp_k = effective_onebandmodel(DOS[i], egrid, fe)
+
                 E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
                           DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
             end

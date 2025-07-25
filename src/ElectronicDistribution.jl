@@ -1,3 +1,4 @@
+
 """
     FermiDirac(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64}) 
     
@@ -12,7 +13,15 @@
     # Returns
     - Value or vector of the Fermi-Dirac distribution
 """
-@inline FermiDirac(Tel, μ, E) = 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
+function FermiDirac(Tel, μ, E)
+    return 1 ./ (exp.((E.-μ) ./ (Constants.kB*Tel)).+1)
+end
+
+function FermiDirac!(dis, Tel, μ, E)
+    @inbounds for i in eachindex(dis)
+        dis[i] = 1 / (exp((E[i]-μ) / (Constants.kB*Tel))+1)
+    end
+end
 """
     dFDdE(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -26,9 +35,10 @@
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to energy
 """
-@inline function dFDdE(Tel, μ, E)
+function dFDdE(Tel, μ, E)
     return -exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
+
 """
     dFDdT(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -42,7 +52,7 @@ end
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to temperature
 """
-@inline function dFDdT(Tel, μ, E)
+function dFDdT(Tel, μ, E)
     return (E.-μ) .* exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel^2 * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 """
@@ -58,64 +68,8 @@ end
     # Returns
     - Value or vector of the partial derivative of the Fermi distribution with respect to chemical potential
 """
-@inline function dFDdμ(Tel, μ, E)
+function dFDdμ(Tel, μ, E)
     return exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
-end
-
-function magnetotransport_equations(sim)
-    B = :($(sim.structure.fields.laser.magnetic) + $(sim.structure.fields.external.magnetic))
-    return :(LightMatter.magnetotransport_1d!(Δf_mt, fneq.+LightMatter.FermiDirac(Tel, μ, sim.structure.egrid), sim, $B, DOS, n, band, sim.structure.egrid, g_k, tmp))
-end
-
-function df_dk!(dfdk::Vector{Float64}, f::Vector{Float64}, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64})
-    k = bandstructure[2](egrid)
-    fspl = DataInterpolations.AkimaInterpolation(f, k, extrapolation = ExtrapolationType.Constant)
-
-    @inbounds for i in eachindex(k)
-        dfdk[i] = DataInterpolations.derivative(fspl, k[i])
-    end
-
-    return dfdk
-end
-
-function magnetotransport_1d!(Δf_mt::Vector{Float64}, f::Vector{Float64}, sim::Simulation, B::Float64, DOS::spl, n::Float64, bandstructure::Vector{<:AkimaInterpolation}, egrid::Vector{Float64}, g_k::Vector{Float64}, dfdk::Vector{Float64})
-    h_2_e = get_h2e(sim)
-
-    goal = LightMatter.get_internalenergy(f, DOS, sim.structure.egrid)
-    find_relaxeddistribution(g_k, sim.structure.egrid, goal, n, DOS)
-    @inbounds @simd for i in eachindex(f)
-        g_k[i] = f[i] - g_k[i]  # g_k now holds f - f₀
-    end
-
-    df_dk!(dfdk, g_k, bandstructure, egrid)  # Compute derivative into dfdk (no aliasing)
-
-    v_g = sim.athermalelectrons.v_g
-    factor = Constants.q / (Constants.ħ * Constants.c) * B
-
-    @inbounds @simd for i in 1:h_2_e
-        Δf_mt[i] = -factor * v_g[i] * dfdk[i] * -1
-    end
-    @inbounds @simd for i in (h_2_e + 1):length(Δf_mt)
-        Δf_mt[i] = factor * v_g[i] * dfdk[i] * -1
-    end
-end
-
-function get_h2e(sim::Simulation)
-    egrid = sim.structure.egrid
-    h_2_e = 1
-    best = abs(egrid[1])
-    @inbounds for i in 2:length(egrid)
-        v = abs(egrid[i])
-        if v < best
-            best = v
-            h_2_e = i
-        end
-    end
-    return h_2_e
-end
-
-function delta_peak(val)
-    return isapprox(val, 0.0; rtol=1e-6, atol=1e-6)
 end
 
 function boltzmann_E_excitation(f, sim, E_mag, DOS)
@@ -126,7 +80,7 @@ function boltzmann_E_excitation(f, sim, E_mag, DOS)
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = pi / Constants.ħ / k
+        prefac = sim.electronicdistribution.Ω * pi / Constants.ħ / k
         for l in -3:3
             E1 = sim.structure.egrid[i] + l*sim.laser.hv
             k1 = sim.stucture.bandstructure[2](E1)
@@ -152,7 +106,7 @@ function boltzmann_E_momentumintegral(l, k, k1, κ, γ, sim)
 end
 
 function electron_electron_matrix(sim, Δk, κ)
-    frac1 = Constants.q^2 / Constants.ϵ0
+    frac1 = Constants.q^2 / Constants.ϵ0 / sim.electronicdistribution.Ω
     frac2 = 1/ (Δk^2 + κ^2)
     return (frac1*frac2)^2
 end
@@ -189,7 +143,7 @@ function boltzmann_E_electronelectron(f, sim, DOS)
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = pi^3 / Constants.ħ / k
+        prefac = sim.electronicdistribution.Ω^3 * pi^3 / Constants.ħ / k
         dfdt[i] = prefac * boltzmann_eescatter_int1(E, k, DOS, fspl, κ, sim)
     end
     return dfdt
@@ -245,8 +199,8 @@ function boltzmann_E_electronphonon()
     dfdt = zeros(length(f))
     for i in eachindex(f)
         k = kgrid[i]
-        prefac = 2 * pi^3 / Constants.ħ / k
-        int(u,p) = boltzmann_epscatter_int(u, sim, κ, DOS, fspl, gspl, γ)
+        prefac = 2 * sim.electronicdistribution.Ω * pi^3 / Constants.ħ / k
+        int(u,p) = boltzmann_epscatter_int(i, sim, κ, DOS, fspl, gspl, γ)
         prob = IntegralProblem(int, 0.0, sim.phononicdistribution.ED)
         sol = solve(prob, HCubatureJL(initdiv=10), abstol=1e-3, reltol=1e-3)
         dfdt[i] = sol.u * prefac
@@ -274,7 +228,7 @@ function boltzmann_epscatter_int(Eq, sim, κ, DOS, f, g, γ)
 end
 
 function electron_phonon_matrix(sim, Eq, q, κ)
-    frac1 = Constants.q^2 / (2*Constants.ϵ0)
+    frac1 = Constants.q^2 / (2*Constants.ϵ0 * sim.electronicdistribution.Ω)
     frac2 = Eq / (q^2 + κ^2)
     return frac1 * frac2
 end
