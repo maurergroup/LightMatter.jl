@@ -1,14 +1,11 @@
 ```@setup logging
-@info "Expanding src/units.md..."
+@info "Expanding src/Tutorials/surfaces.md..."
 start_time = time()
 ```
 
-# [Unit Handling](@id units)
-
-This page contains information on the units of the simulations.
+# [Surface-Dependent Electronic Structure Simulation](@id surface-dos)
 
 ```@setup logging
 runtime = round(time() - start_time; digits=2)
 @info "...done after $runtime s."
 ```
-

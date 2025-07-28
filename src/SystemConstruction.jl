@@ -346,7 +346,7 @@ function variable_renaming(sim::Simulation)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name,:(p.Tel))
             push!(new_name,:Tel)
-            push!(old_name, :(p.noe[i]))
+            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
@@ -359,7 +359,7 @@ function variable_renaming(sim::Simulation)
         push!(old_name,:(u.Tel[i]))
         push!(new_name,:Tel)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-            push!(old_name, :(p.noe[i]))
+            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
             push!(new_name, :n)
         end
         if sim.electronictemperature.Conductivity == true

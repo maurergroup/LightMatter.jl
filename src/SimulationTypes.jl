@@ -132,6 +132,12 @@ struct TotalFields <: SimulationTypes
     external::Fields # The external fields in the simulation, e.g. a magnetic field
 end
 """
+    spl=Interpolations.AbstractExtrapolation
+
+    A convenience type definition to make type specificity easier throughout the code
+"""
+global const spl=Interpolations.AbstractExtrapolation
+"""
     Structure <: SimulationTypes
         Spatial_DOS::Bool # Whether to vary the DOS with height - if so the DOS becomes a vector
 

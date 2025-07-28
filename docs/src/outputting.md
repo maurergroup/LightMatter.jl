@@ -1,9 +1,9 @@
 ```@setup logging
-@info "Expanding src/units.md..."
+@info "Expanding src/outputting.md..."
 start_time = time()
 ```
 
-# [Unit Handling](@id units)
+# [Post Processing](@id outputs)
 
 This page contains information on the units of the simulations.
 

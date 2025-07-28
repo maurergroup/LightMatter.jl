@@ -26,13 +26,11 @@ We encourage contributions and extensions of the current methods available
 #### Systems 
 
 - [Electronic Thermal Bath](@ref electron-temperature)
-- [Phononic Thermal Bath](@ref phonon-temeprature)
-- [Athermal Electron Subsystem](@ref athem)
+- [Phononic Thermal Bath](@ref phonon-temperature)
+- [Athermal Electron Subsystem](@ref athermal-electrons)
 - [Electronic Distribution](@ref electron-distribution)
 - [Phononic Distribution](@ref phonon-distribution)
 - [Density Matrix Dynamics](@ref density-matrix)
-- [Ring polymer surface hopping (RPSH)](@ref rpsh-dynamics)
-- [Ehrenfest molecular dynamics](@ref ehrenfest-dynamics)
 
 #### Spatial Features
 

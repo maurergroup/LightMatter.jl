@@ -50,3 +50,12 @@ global const Constants = (ħ = ustrip(convert_units(u"eV*fs",Unitful.ħ)), kB = 
                           ϵ0 = 8.854e-12 * BaseUnits.time^4 / BaseUnits.mass/ BaseUnits.length^3, q=ustrip(-Unitful.q)*BaseUnits.time)
 
 
+Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b
+
+"""
+    LightMatter_units
+
+    A list of the units used in LightMatter.jl: Please convert all units to this 
+"""
+global const LightMatter_units = [u"eV", u"nm", u"fs", u"K"] 
+
