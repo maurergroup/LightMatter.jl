@@ -60,6 +60,8 @@ function electrontemperature_heatcapacity(sim::Simulation)
         return :(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS))
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
         return :(sim.electronictemperature.γ * Tel)
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :constant
+        return :(sim.electronictemperature.γ)
     end
 end
 """

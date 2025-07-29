@@ -348,8 +348,8 @@ end
         Electron_PhononCoupling::Bool = false # Enables coupling to a phonon thermostat
         Conductivity::Bool = false # Provides diffusive thermal conductivity
 
-        ElectronicHeatCapacity::Symbol = :linear # Whether to use linear (:linear) or non-linear (:nonlinear) 
-                                                 # Electronic Heat Capacity
+        ElectronicHeatCapacity::Symbol = :linear # Whether to use linear (:linear), non-linear (:nonlinear) or constant :(constant)
+                                                 # electronic heat capacity
         ElectronPhononCouplingValue::Symbol = :constant # Whether to use constant (:constant) or variable (:variable)
                                                         # electron phonon coupling
 

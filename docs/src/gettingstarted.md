@@ -18,8 +18,8 @@ The 3 main systems that comprise a Two-Temperature Model are an electronic tempe
 a phononic temperature and a laser that drives the electronic system. The equation of motion
 for the TTM in 0D is given below:
 ```math
-C_\text{el}T_\text{el}(t) = -g(T_\text{el} + T_\text{ph}) + S(t) \\
-C_\text{ph}T_\text{ph}(t) = g(T_\text{el} + T_\text{ph})
+C_\text{el}\frac{\partial T_\text{el}(t)}{\partial t} = -g(T_\text{el} + T_\text{ph}) + S(t) \\
+C_\text{ph}\frac{\partial T_\text{ph}(t)}{\partial t} = g(T_\text{el} + T_\text{ph})
 ```
 Here, $S(t)$ is the equation for the laser, $C_\text{x}$ is the heatcapacity of the respective 
 thermal bath and g is the electron-phonon coupling parameter.
@@ -111,7 +111,9 @@ Now that we've covered the basics of performing a TTM, we're ready to explore al
 of LightMatter.jl
 All the systems follow the same patterns of enabling, defining approximations and adding parameters
 but with a couple of extra notes when you start to perform more complicated simulations. Feel free
-to check out the Tutorials or Systems sections to found out more.
+to check out the Tutorials or Systems sections to found out more. The tutorials have the structure as 
+follows: Theory of the method implemented, Approximations that you can use, Performing the method in 
+LightMatter.jl.
 
 ```@setup logging
 runtime = round(time() - start_time; digits=2)
