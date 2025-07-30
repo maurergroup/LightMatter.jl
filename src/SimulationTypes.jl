@@ -240,7 +240,7 @@ end
 
     Once implemented will build a density matrix and store Hamiltonian for propagation via the vonNeumann equation.
 """
-function build_DensityMatrix(; Enabled = false, las=build_Laser(), DipoleMatrix= Complex.(fill(zeros(2,2,),3)), H0=Complex.(zeros(2,2)), ext_fields = Fields(fill(:(0.0),3), fill(:(0.0),3)))
+function build_DensityMatrix(; Enabled = false, las=build_Laser(), DipoleMatrix= fill(Complex.(zeros(2,2,)),3), H0=Complex.(zeros(2,2)), ext_fields = Fields(fill(:(0.0),3), fill(:(0.0),3)))
     las_field = get_laser_fields(las)
     total_fields = Fields(Vector{Expr}(undef,3), Vector{Expr}(undef,3))
     for i in 1:3
