@@ -153,7 +153,7 @@ end
     # Returns
     - The integration value across the range
 """
-function Bode_rule(y::Vector{Float64}, x)
+function Bode_rule(y, x)
     N = length(x)
     n = (N-1) ÷   4
     h = x[2] - x[1]

@@ -191,11 +191,9 @@ function get_files_heights_forDOS(folder::String, geometry::String, tolerance::F
     files = Vector{String}(undef, size(layers, 1))
     heights = zeros(size(layers, 1))
     for i in eachindex(layers[:,1])
-        for j in eachindex(idxs)
-            if endswith(file_names[i],idxs[j])
-                files[i] = file_names[i] * extensions[j]
-                heights[i] = layers[j,4]
-            end
+        if endswith(file_names[i],"$i")
+            files[i] = file_names[i] * extensions[i]
+            heights[i] = layers[i,4]
         end
     end
     heights = (heights .- heights[1])./10 #Å to nm and sets the surface to 0.0
@@ -231,7 +229,6 @@ function get_slabgeometry(file_path::String)
     end
     stk_data = stack(atom_data, dims=1)
     stk_data[:,4] .-= stk_data[1,4]
-    println(stk_data[:,4])
     return stk_data
 end
 """
@@ -305,11 +302,11 @@ end
 function DOSScale!(Temp::Matrix{Float64}, bulk::Vector{Float64}, Energies::Vector{Float64})
     fd = FermiDirac(0.0,0.0, Energies)
     for i in eachindex(Temp[:,1])
-        f(u) = Bode_rule(u*fd.*Temp[i,:], Energies) - Bode_rule(fd.*bulk, Energies)
+        f(u,p) = Bode_rule(u*fd.*Temp[i,:], Energies) - Bode_rule(fd.*bulk, Energies)
         x0 = 1
-        prob = ZeroProblem(f,x0)
-        rescale = solve(prob, Order16(); atol=1e-12, rtol=1e-12)
-        Temp[i,:] = Temp[i,:] * rescale
+        prob = NonlinearProblem(f,x0)
+        rescale = solve(prob, SimpleNewtonRaphson(); atol=1e-12, rtol=1e-12)
+        Temp[i,:] = Temp[i,:] * rescale.u
     end
     return Temp
 end

@@ -101,7 +101,7 @@ end
 function electronphonon_coupling(sim::Simulation)
     if sim.electronictemperature.Electron_PhononCoupling == true
         if sim.electronictemperature.ElectronPhononCouplingValue == :variable
-            return :(LightMatter.nonlinear_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))
+            return :(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph))
         elseif sim.electronictemperature.ElectronPhononCouplingValue == :constant
             return :(-sim.electronictemperature.g*(Tel-Tph))
         end
@@ -110,7 +110,7 @@ function electronphonon_coupling(sim::Simulation)
     end
 end
 """
-    nonlinear_electronphononcoupling(λ::Float64, ω::Float64, DOS::spl, Tel::Float64, μ::Float64, Tph::Float64, egrid::Vector{Float64})
+    variable_electronphononcoupling(λ::Float64, ω::Float64, DOS::spl, Tel::Float64, μ::Float64, Tph::Float64, egrid::Vector{Float64})
     
     Calculates the non-linear electron phonon coupling parameter and subsequent energy flow from the density-of-states
     of the system. More accurate than a constant value. 
@@ -128,7 +128,7 @@ end
     # Returns
     - Energy flow between an electronic and phononic bath with a calculate g parameter
 """
-function nonlinear_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
+function variable_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
     int(u,p) = DOS(u)^2 *-dFDdE(Tel, μ, u) * prefac
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
