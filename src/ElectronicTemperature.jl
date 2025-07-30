@@ -133,7 +133,7 @@ function variable_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
     int(u,p) = DOS(u)^2 *-dFDdE(Tel, μ, u) * prefac
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
     sol = solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
-    return -sol.u * (Tel-Tph)
+    return -sol * (Tel-Tph)
 end
 """
     build_athemelectron(Δu::Expr)

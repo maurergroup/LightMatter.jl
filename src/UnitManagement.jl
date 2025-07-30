@@ -19,7 +19,7 @@ end
     # Returns
     - The Quantity converted into LightMatter.jl's preferred units, or the Float64 left as is
 """
-function convert_units(unit::Unitful.FreeUnits, value::Union{Quantity, AbstractArray{<:Quantity}, Float64, AbstractArray{Float64},Vector{Vector{Quantity}},Vector{Vector{Float64}}})
+function convert_units(unit::Unitful.FreeUnits, value)
     if typeof(value) <: Vector{Vector{Quantity}}
         val = fill(zeros(length(value[1])), length(value))
         for i in eachindex(val)
