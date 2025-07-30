@@ -132,7 +132,7 @@ function write_simulation(f,sim::Simulation)
 
     write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
 
-    write_densitymatrix(f, sim::Simulation)
+    #write_densitymatrix(f, sim::Simulation)
 
     laser = Dict{String,Any}(String(key)=>getfield(sim.laser, key) for key ∈ fieldnames(Laser))
     dict_to_hdf5(f["Laser"], convert_symbols_to_strings(laser))
@@ -152,7 +152,7 @@ function write_phononicdistribution(f, sim::Simulation)
     end
 end        
 
-function write_densitymatrix(f, sim::Simulation)
+#= function write_densitymatrix(f, sim::Simulation)
     density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
     density_m = convert_symbols_to_strings(density_m)
     for (key, value) in density_m
@@ -174,7 +174,7 @@ function write_densitymatrix(f, sim::Simulation)
             f[key] = value
         end
     end
-end    
+end   =#  
 """
     extract_structure(f, structure::Structure)
     
