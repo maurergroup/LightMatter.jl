@@ -85,6 +85,10 @@ function dict_to_hdf5(f, d)
         if typeof(value) <:Vector{<:AbstractArray}
             value = stack(value, dims=1)
         end
+        if eltype(value) == Complex
+            r = real(value)
+            i = imag(value)
+            value = 
         f[key] = value
     end
 end
