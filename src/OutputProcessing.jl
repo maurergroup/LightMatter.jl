@@ -383,10 +383,17 @@ function output_chemicalpotential(f, results, sim)
         cp = zeros(size(Tel))
         dos = sim.structure.DOS
         n = results["noe"]
-
-        Threads.@threads for i in eachindex([:,1])
-            DOS = get_DOS(dos, sim, i)
-            cp[i,:] .= find_chemicalpotential.(n[i,:],Tel[i,:],Ref(DOS),Ref(sim.structure.egrid))
+        if size(n) == 1
+            noe = n[1]
+            Threads.@threads for i in eachindex([:,1])
+                DOS = get_DOS(dos, sim, i)
+                cp[i,:] .= find_chemicalpotential.(noe,Tel[i,:],(DOS,),(sim.structure.egrid,))
+            end
+        else
+            Threads.@threads for i in eachindex([:,1])
+                DOS = get_DOS(dos, sim, i)
+                cp[i,:] .= find_chemicalpotential.(n[i,:],Tel[i,:],(DOS,),(sim.structure.egrid,))
+            end
         end
 
         write_dataset(f, "Chemical Potential", cp)
