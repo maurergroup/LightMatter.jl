@@ -130,10 +130,9 @@ function write_simulation(f,sim::Simulation)
     electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
     dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
 
-    phononic_d = write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
+    write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
 
-    density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
-    dict_to_hdf5(f["Density Matrix"], convert_symbols_to_strings(density_m))
+    write_densitymatrix(f, sim::Simulation)
 
     laser = Dict{String,Any}(String(key)=>getfield(sim.laser, key) for key ∈ fieldnames(Laser))
     dict_to_hdf5(f["Laser"], convert_symbols_to_strings(laser))
