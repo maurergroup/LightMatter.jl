@@ -154,6 +154,7 @@ end
 
 function write_densitymatrix(f, sim::Simulation)
     density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
+    density_m = convert_symbols_to_strings(density_m)
     for (key, value) in density_m
         if key == "DipoleMatrix"
             tmp = stack(value, dims=1)
