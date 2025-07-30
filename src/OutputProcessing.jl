@@ -101,7 +101,7 @@ end
 """
 function convert_symbols_to_strings(dict)
     return Dict(
-        k => (v isa Symbol ? String(v) : v) 
+        k => (v isa Symbol || v isa Expr ? string(v) : v)
         for (k, v) in dict
     )
 end
