@@ -167,6 +167,9 @@ function write_densitymatrix(f, sim::Simulation)
             i_tmp = imag(value)
             f[key*"_real"] = r_tmp
             f[key*"_imag"] = i_tmp
+        elseif typeof(value) <:Vector{<:AbstractArray}
+            value = stack(value, dims=1)
+            f[key] = value
         else
             f[key] = value
         end
