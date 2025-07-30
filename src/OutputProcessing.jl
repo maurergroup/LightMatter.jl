@@ -130,7 +130,7 @@ function write_simulation(f,sim::Simulation)
     electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
     dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
 
-    phononic_d = write_phononicdistribution(sim::Simulation) #COntains a spline so has to be treated differently
+    phononic_d = write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
 
     density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
     dict_to_hdf5(f["Density Matrix"], convert_symbols_to_strings(density_m))
@@ -141,7 +141,7 @@ function write_simulation(f,sim::Simulation)
     extract_structure(f, sim.structure)
 end
 
-function write_phononicdistribution(sim::Simulation)
+function write_phononicdistribution(f, sim::Simulation)
     phononic_d = Dict{String,Any}(String(key)=>getfield(sim.phononicdistribution, key) for key ∈ fieldnames(PhononicDistribution))
     for (key, value) in phononic_d
         if typeof(value) <: spl
