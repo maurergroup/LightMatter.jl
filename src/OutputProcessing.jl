@@ -82,7 +82,7 @@ end
 """
 function dict_to_hdf5(f, d)
     for (key, value) in d
-        if typeof(value) <:Vector{<:Vector}
+        if typeof(value) <:Vector{<:AbstractArray}
             value = stack(value, dims=1)
         end
         f[key] = value
