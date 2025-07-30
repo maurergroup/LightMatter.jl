@@ -109,15 +109,15 @@ function build_Dimension(grid::AbstractArray{Float64} = [0.0], cutoff::Union{Vec
 end
 """
     Fields <: SimulationTypes
-        electric::Expr # Expression for the magnitude of the electric field in the simulation
-        magnetic::Expr # Expression for the magnitude of the magnetic field in the simulation
+        Electric::Expr # Expression for the magnitude of the electric field in the simulation
+        Nagnetic::Expr # Expression for the magnitude of the magnetic field in the simulation
     end
 
     Struct that contains all information regarding electromagnetic fields in the simulation.
 """
 struct Fields <: SimulationTypes
-    electric::Union{Vector{Expr}, Vector{Float64}}
-    magnetic::Union{Vector{Expr}, Vector{Float64}}
+    Electric::Union{Vector{Expr}, Vector{Float64}}
+    Magnetic::Union{Vector{Expr}, Vector{Float64}}
 end
 """
     TotalFields <: SimulationTypes
@@ -244,8 +244,8 @@ function build_DensityMatrix(; Enabled = false, las=build_Laser(), DipoleMatrix=
     las_field = get_laser_fields(las)
     total_fields = Fields(Vector{Expr}(undef,3), Vector{Expr}(undef,3))
     for i in 1:3
-        total_fields.electric[i] = Expr(:call, :(.+), (las_field.electric[i], ext_fields.electric[i])...)
-        total_fields.magnetic[i] = Expr(:call, :(.+), (las_field.magnetic[i], ext_fields.magnetic[i])...)
+        total_fields.Electric[i] = Expr(:call, :(.+), (las_field.Electric[i], ext_fields.Electric[i])...)
+        total_fields.Magnetic[i] = Expr(:call, :(.+), (las_field.Magnetic[i], ext_fields.Magnetic[i])...)
     end
     return DensityMatrix(Enabled = Enabled, DipoleMatrix = DipoleMatrix, Fields=total_fields, H0=H0)
 end
@@ -285,7 +285,6 @@ end
     PhononicRelaxation::Symbol # Implementations are constant (:constant) or quasiparticle scattering (:quasi)
     ExcitationMatrixElements::Symbol # Implementation is only match internal energy (:unity)
     Conductive_Velocity::Symbol # Implementation of how group velocity is calculated, :constant, :fermigas or :effectiveoneband
-    MagnetoTransport::Bool # Whether to add magnetotransport to the problem 
     
     FE::Union{Float64,Vector{Float64}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
     τ::Union{Float64,Vector{Float64}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
@@ -325,8 +324,7 @@ end
 """
 function build_AthermalElectrons(; Enabled = false, structure::Structure = build_Structure(), AthermalElectron_ElectronCoupling = false, 
     AthermalElectron_PhononCoupling = false, Conductivity = false, ElectronicRelaxation = :FLT, PhononicRelaxation = :constant, 
-    ExcitationMatrixElements = :unity, FE = 0.0, τ = 0.0, τep = 0.0, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false,
-    MagnetoTransport = false)
+    ExcitationMatrixElements = :unity, FE = 0.0, τ = 0.0, τep = 0.0, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
 
     τ = convert_units(u"fs", τ)
     τep = convert_units(u"fs", τep)
@@ -338,7 +336,7 @@ function build_AthermalElectrons(; Enabled = false, structure::Structure = build
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
         ElectronicRelaxation=ElectronicRelaxation, PhononicRelaxation=PhononicRelaxation, 
         ExcitationMatrixElements=ExcitationMatrixElements, FE=FE, τ=τ, τep=τep, v_g=v_g,
-        Conductive_Velocity=Conductive_Velocity,EmbeddedAthEM=EmbeddedAthEM, MagnetoTransport = MagnetoTransport)
+        Conductive_Velocity=Conductive_Velocity,EmbeddedAthEM=EmbeddedAthEM)
 end
 """
     ElectronicTemperature <: SimulationTypes

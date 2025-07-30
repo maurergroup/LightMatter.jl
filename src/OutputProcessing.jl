@@ -409,7 +409,7 @@ function output_electronphononcoupling(f, results, sim)
         Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
             (omega, lambda) = get_parameterhvalue((ω, λ), sim, i)
-            @views eps[i,:] .= nonlinear_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i], Ref(sim.structure.egrid))
+            @views eps[i,:] .= variable_electronphononcoupling.(omega, lambda, Ref(DOS), Tel[:,i], μ[:,i], Tph[:,i])
         end
     else
         Threads.@threads for i in eachindex(Tel[1,:])
@@ -429,7 +429,7 @@ function output_electronheatcapacity(f, results, sim)
         dos = sim.structure.DOS
         Threads.@threads for i in eachindex(Tel[1,:])
             DOS = get_DOS(dos, sim, i)
-            @views hc[i,:] .= nonlinear_electronheatcapacity.(Tel[:,i], μ[:,i], Ref(DOS), Ref(sim.structure.egrid))
+            @views hc[i,:] .= nonlinear_electronheatcapacity.(Tel[:,i], μ[:,i], Ref(DOS))
         end
     else
         Threads.@threads for i in eachindex(Tel[:,1])
@@ -480,14 +480,14 @@ function output_athermalelectronelectronenergychange(f, results, sim)
 end
 
 function output_phononicheatcapacity(f, results, sim)
-    if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
+    if sim.phononictemperature.PhononicHeatCapacity == :variable
         tph = results["Tph"]
         cph = similar(tph)
         (; n, θ) = sim.phononictemperature
         Threads.@threads for i in eachindex(Tph[:,1])
             for j in eachindex(Tph[1,:])
                 (no_elec, θD) = get_parameterhvalue((n, θ), sim, j)
-                cph[i,j] .= nonlinear_phononheatcapacity(tph[i,j], no_elec, θD)
+                cph[i,j] .= variable_phononheatcapacity(tph[i,j], no_elec, θD)
             end
         end
         write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", cph)

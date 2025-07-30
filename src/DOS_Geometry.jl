@@ -111,12 +111,21 @@ end
 """
 function get_unitcellvolume(geometry_file::String)
     geometry = readdlm(geometry_file, comments=true)
-    #atoms = count(x->x=="atom", geometry[:,1])
     vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
     a = vectors[1,2:4]
     b = vectors[2,2:4]
     c = vectors[3,2:4]
     return (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
+end
+
+function get_atomicdensity(geometry_file::String)
+    geometry = readdlm(geometry_file, comments=true)
+    atoms = count(x->x=="atom", geometry[:,1])
+    vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
+    a = vectors[1,2:4]
+    b = vectors[2,2:4]
+    c = vectors[3,2:4]
+    return atoms / (abs(dot(a,cross(b,c)))/1000) # converts Å^3 to nm^3
 end
 """
     spatial_DOS(folder::String,geometry::String,bulk::String,Vbulk::Float64,dim::Dimension,tolerance::Float64)
@@ -178,10 +187,10 @@ function get_files_heights_forDOS(folder::String, geometry::String, tolerance::F
     file_names,extensions = [getindex.(split, i) for i in eachindex(first(split))] #Reformats split1
     atoms = get_slabgeometry(geometry) #Gets matrix of all atomic information, number and coordinate
     layers = get_atomiclayers(atoms, tolerance) #Removes all atoms other than 1 from each layer 
-    idxs = lpad.(convert.(Int,layers[:,1]),4,"0") #Pads values to same length
-    files = Vector{String}(undef, length(file_names))
-    heights = zeros(length(file_names))
-    for i in eachindex(file_names)
+
+    files = Vector{String}(undef, size(layers, 1))
+    heights = zeros(size(layers, 1))
+    for i in eachindex(layers[:,1])
         for j in eachindex(idxs)
             if endswith(file_names[i],idxs[j])
                 files[i] = file_names[i] * extensions[j]
@@ -213,16 +222,17 @@ function get_slabgeometry(file_path::String)
             if l != size(geom,1)
                 if geom[l+1,1] != "constrain_relaxation"
                     push!(atom_data, [i, geom[l,2], geom[l,3], geom[l,4]])
-                    i+=1
                 end
             else
                 push!(atom_data, [i, geom[l,2], geom[l,3], geom[l,4]])
-                i+=1
             end
         end
 
     end
-    return stack(atom_data, dims=1)
+    stk_data = stack(atom_data, dims=1)
+    stk_data[:,4] .-= stk_data[1,4]
+    println(stk_data[:,4])
+    return stk_data
 end
 """
     get_atomiclayers(atoms::Matrix{Float64},tolerance::Float64)

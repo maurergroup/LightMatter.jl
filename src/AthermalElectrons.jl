@@ -230,7 +230,7 @@ function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS
     goal = get_internalenergy(fdis, DOS, egrid)
     find_relaxeddistribution!(frel, egrid, goal, n, DOS)
     frel = get_tmp(frel, Tel)
-    @. fdis = (fneq+frel-fdis+fneq) ./ τee #fdis = feq + fneq so we need to subtract fneq twice to get feq - fneq
+    @. fdis = (fneq+frel-fdis+fneq) ./ τee #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
     return nothing
 end
 """

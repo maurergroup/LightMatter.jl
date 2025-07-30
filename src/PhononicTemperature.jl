@@ -41,7 +41,7 @@ end
     Determines the expression for the phononic temperature's heat capacity.
     Currently implemented:
     - :constant : Constant phonon heat capacity (Cph)
-    - :nonlinear : Calculated from Simpson's rule
+    - :variable : Calculated from Simpson's rule
 
     # Arguments
     - 'sim': Simulation settings and parameters
@@ -50,14 +50,14 @@ end
     - Expression for the phononic temperature's heat capacity
 """
 function phonontemperature_heatcapacity(sim::Simulation)
-    if sim.phononictemperature.PhononicHeatCapacity == :nonlinear
-        return :(LightMatter.nonlinear_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))
+    if sim.phononictemperature.PhononicHeatCapacity == :variable
+        return :(LightMatter.variable_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))
     elseif sim.phononictemperature.PhononicHeatCapacity == :constant
         return :(sim.phononictemperature.Cph)
     end
 end
 """
-    nonlinear_phononheatcapacity(Tph::Float64, n::Float64, θ::Float64)
+    variable_phononheatcapacity(Tph::Float64, n::Float64, θ::Float64)
     
     Calculates non-linear phononic bath heat capacity. A more accurate method than the
     constant form.
@@ -70,7 +70,7 @@ end
     # Returns
     - The current heat capacity of the phononic thermal bath
 """
-function nonlinear_phononheatcapacity(Tph, n, θ)
+function variable_phononheatcapacity(Tph, n, θ)
     int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
     prob = IntegralProblem(int, (0.0, θ/Tph))
     return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u

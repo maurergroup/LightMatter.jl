@@ -1,11 +1,10 @@
 ```@setup logging
-@info "Expanding src/references.md..."
+@info "Expanding src/Systems/structure.md..."
 start_time = time()
 ```
-# References
 
-```@bibliography
-```
+# [Structure](@id structure)
+
 ```@setup logging
 runtime = round(time() - start_time; digits=2)
 @info "...done after $runtime s."
