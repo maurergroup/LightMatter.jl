@@ -151,7 +151,6 @@ function write_phononicdistribution(f, sim::Simulation)
             f[key] = value
         end
     end
-    dict_to_hdf5(f["Phononic Distribution"], convert_symbols_to_strings(phononic_d))
 end        
 """
     extract_structure(f, structure::Structure)
