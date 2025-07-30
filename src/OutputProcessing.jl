@@ -152,6 +152,26 @@ function write_phononicdistribution(f, sim::Simulation)
         end
     end
 end        
+
+function write_densitymatrix(f, sim::Simulation)
+    density_m = Dict{String,Any}(String(key)=>getfield(sim.densitymatrix, key) for key ∈ fieldnames(DensityMatrix))
+    for (key, value) in density_m
+        if key == "DipoleMatrix"
+            tmp = stack(value, dims=1)
+            r_tmp = real(tmp)
+            i_tmp = imag(tmp)
+            f[key*"_real"] = r_tmp
+            f[key*"_imag"] = i_tmp
+        elseif key == "H0"
+            r_tmp = real(value)
+            i_tmp = imag(value)
+            f[key*"_real"] = r_tmp
+            f[key*"_imag"] = i_tmp
+        else
+            f[key] = value
+        end
+    end
+end    
 """
     extract_structure(f, structure::Structure)
     
