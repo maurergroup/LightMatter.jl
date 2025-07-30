@@ -143,7 +143,7 @@ end
 
 function write_phononicdistribution(sim::Simulation)
     phononic_d = Dict{String,Any}(String(key)=>getfield(sim.phononicdistribution, key) for key ∈ fieldnames(PhononicDistribution))
-    for (key, value) in d
+    for (key, value) in phononic_d
         if typeof(value) <: spl
             tmp = value(collect(-10.0:0.1:10.0))
             f[key] = tmp
