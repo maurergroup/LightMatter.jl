@@ -340,7 +340,7 @@ function variable_renaming(sim::Simulation)
         push!(old_name, :(p.Δfexcite[i]))
         push!(new_name, :Δfexcite)
         if sim.athermalelectrons.Conductivity == true
-            push!(old_name,:(@view p.f_cond[i,:]))
+            push!(old_name,:(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
             push!(new_name,:f_cond)
         end
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
@@ -363,7 +363,7 @@ function variable_renaming(sim::Simulation)
             push!(new_name, :n)
         end
         if sim.electronictemperature.Conductivity == true
-            push!(old_name,:(p.Tel_cond[i]))
+            push!(old_name,:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
             push!(new_name,:Tel_cond)
         end
     end
@@ -371,7 +371,7 @@ function variable_renaming(sim::Simulation)
         push!(old_name,:(u.Tph[i]))
         push!(new_name,:Tph)
         if sim.phononictemperature.Conductivity == true
-            push!(old_name,:(p.Tph_cond[i]))
+            push!(old_name,:(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
             push!(new_name,:Tph_cond)
         end
     end
