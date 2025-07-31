@@ -494,7 +494,7 @@ end
 
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
     if bandstructure == :effectiveoneband
-        if DOS isa AbstractArray
+        if !(DOS<:spl)
             E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
             for i in eachindex(DOS)
                 if length(DOS) == length(FE)
