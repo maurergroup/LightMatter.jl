@@ -208,6 +208,7 @@ end
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
 function electrontemperature_conductivity!(Tel, κ, dz, Tph, cond)
+    cond = get_tmp(cond, Tel[1])
     K = κ.*Tel./Tph
 
     for i in 2:length(K)-1

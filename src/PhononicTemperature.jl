@@ -128,6 +128,7 @@ end
     - Updates cond with the change in temperature at each z-grid point
 """
 function phonontemperature_conductivity!(Tph, κ, dz, cond)
+    cond = get_tmp(cond, Tph[1])
     depthderivative!(Tph, dz, cond)
     cond[1] = 0.0
     cond[end] = 0.0

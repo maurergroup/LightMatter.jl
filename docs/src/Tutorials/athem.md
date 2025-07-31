@@ -50,6 +50,36 @@ athermal system to 0 (the first component) and the second component drives the e
 towards the state with the same internal energy as equilbrium and athermal combined ($f^\text{rlx}$). This
 additional effect could be considered as generating the generation of secondary athermal electrons. 
 
+The relaxation time itself has a couple of options for electrons. Either a constant (`:constant`) or Fermi-
+Liquid Theory (`:FLT`) relaxation time can be used. The Fermi-Liquid time is considered more acurrate due
+to the presence of the energy-dependence on the relaxation time. 
+Both are given below
+`:constant` -> `:(sim.athermalelectrons.τ)`
+`:FLT` -> `:(sim.athermalelectrons.τ * (μ+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))`
+       -> $\tau\frac{\mu^2}{(E-\mu)^2+(\pi k_B T_\text{el})^2}
+In the FLT there is a new variable, `FE`, which isn't in the equation. This
+variable is the Fermi energy and is defined as the difference between the bottom and top of the 
+valence band. This can be calculated in LightMatter via `FE = FE_initialization(bulk_DOS)` where 
+`bulk_DOS` is the same string you provided to `build_Structure` assuming that the DOS Fermi
+energy is at 0.0 eV. This variable corrects for the the fact that in LightMatter.jl we treat the
+0 K $μ$ at 0.0 eV rather than FE. Also, in the case of the FLT, `τ` now is a material-
+dependent parameter calculated from, $τ = 128 / \sqrt{3}\pi\omega_p$ where $\omega_p$ is the
+plasmon-frequency of the material. This you must provide yourselves. 
+
+For the interaction with the phonon system we have,
+```math
+\left.\frac{\partial f^*}{\partial t}\right|_\text{e^*ph} = - \frac{f^*}{\tau_\text{ep}}
+```
+This is similar to the electron-electron relaxation time approach but the difference is there
+is no driving force on the phonons unlike the thermal electrons. The electron-phonon 
+relaxation time can only be treated as (`:constant`). We typically use a relaxation-time
+derived from, $\tau_text{ep} = \tau_\text{fft}hv/k_B \theta_D$ where $\tau_\text{fft}$
+is the free-flight time of electrons and $\theta_D$ is the Debye temperature.
+
+Now that we have constructed the athermal-electron system let us define how it couples
+to both of the thermal baths. 
+
+
 ### Thermal Baths
 
 $T_\text{el}$ & $T_\text{ph}$ are the electronic and phononic thermal baths respectively. 
@@ -61,6 +91,8 @@ approximations that can be used when modelling both of these in LightMatter.jl. 
 we have a constant (`:constant`), linear (`:linear`) and non-linear (`:nonlinear`) heat capacities, which increase
 in accuracy in that order. For a phonon heat capacity we have a constant (`:constant`) and non-linear (`:variable`)
 form only. The equations & expressions for all these functions are given below.
+
+
 *Electronic Heat Capacities*
 `:constant` -> `:(sim.electronictemperature.γ)`
 `:linear` -> `:(sim.electronictemperature.γ * T_\text{el})`
