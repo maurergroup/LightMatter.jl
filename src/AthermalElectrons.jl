@@ -249,7 +249,7 @@ end
 """
 function find_relaxeddistribution!(out, egrid, goal, n, DOS)
     prob = NonlinearProblem(find_temperatureandμ!, SA[1000.0,0.0], (out, n, DOS, egrid, goal))
-    sol = solve(prob, SimpleNewtonRaphson(); abstol=1e-10, reltol=1e-10).u
+    sol = solve(prob, SimpleKlement(); abstol=1e-8, reltol=1e-8).u
     out = get_tmp(out, n)
     FermiDirac!(out, sol[1], sol[2], egrid)
     return nothing

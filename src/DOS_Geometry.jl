@@ -197,7 +197,8 @@ function get_files_heights_forDOS(folder::String, geometry::String, tolerance::F
         end
     end
     heights = (heights .- heights[1])./10 #Å to nm and sets the surface to 0.0
-    return files, heights
+    perm = sortperm(heights)
+    return files[perm], heights[perm]
 end
 """
     get_slabgeometry(file_path::String)
@@ -494,7 +495,7 @@ end
 
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
     if bandstructure == :effectiveoneband
-        if !(typeof(DOS)<:spl)
+        if !(typeof(DOS) <: spl)
             E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
             for i in eachindex(DOS)
                 if length(DOS) == length(FE)
