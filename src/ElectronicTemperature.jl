@@ -80,6 +80,8 @@ end
     - The current heat capacity of the electronic thermal bath
 """
 function nonlinear_electronheatcapacity(Tel, μ, DOS)
+    Tel = ForwardDiff.value(Tel)
+    μ = ForwardDiff.value(μ)
     int(u,p) = dFDdT(Tel, μ, u) * DOS(u) * u
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
     return solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
@@ -129,6 +131,9 @@ end
     - Energy flow between an electronic and phononic bath with a calculate g parameter
 """
 function variable_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
+    Tel = ForwardDiff.value(Tel)
+    Tph = ForwardDiff.value(Tph)
+    μ = ForwardDiff.value(μ)
     prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
     int(u,p) = DOS(u)^2 *-dFDdE(Tel, μ, u) * prefac
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)

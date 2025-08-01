@@ -17,10 +17,12 @@ the [Surface DOS](@ref surface-dos) or [Antenna-Reactor](@ref antenna-reactor) t
 
 ## Theory of AthEM
 
+### Athermal Electrons 
+
 The athermal electron subsystem of AthEM, is described in a similar way to the Boltzmann equation for
 a distribution. In AthEM's case it is written as follows:
 ```math
-    \frac{\partial f^*}{\partial t} = \left.\frac{\partial f^*}{\partial t}\right|_\text{absorb} + \left.\frac{\partial f^*}{\partial t}\right|_\text{e^*e} + \left.\frac{\partial f^*}{\partial t}\right|_\text{e^*ph}
+    \frac{\partial f^*(E, t)}{\partial t} = \left.\frac{\partial f^*}{\partial t}\right|_\text{absorb} + \left.\frac{\partial f^*}{\partial t}\right|_\text{el^*el} + \left.\frac{\partial f^*}{\partial t}\right|_\text{el^*ph}
 ```
 
 Each of the partial differential's on the right-hand side denotes a scattering term with photons, thermal electrons,
@@ -32,7 +34,7 @@ One for the hole generation and the other for the electron generation.
 ```math
     \left.\frac{\partial f^*}{\partial t}\right|_\text{absorb} = \left.\frac{\partial f^*}{\partial t}\right|_\text{h^+} + \left.\frac{\partial f^*}{\partial t}\right|_\text{e^-}  \\
     \left.\frac{\partial f^*}{\partial t}\right|_\text{h^+} = \frac{2\pi V}{\hbar}\text{DOS}(E+hv)|M_{E,E_+}|^2 f(E)[1-f(E+hv)] \\ 
-    \left.\frac{\partial f^*}{\partial t}\right|_\text{h^+} = \frac{2\pi V}{\hbar}\text{DOS}(E-hv)|M_{E,E_-}|^2 f(E-hv)[1-f(E)] \\ 
+    \left.\frac{\partial f^*}{\partial t}\right|_\text{e^-} = \frac{2\pi V}{\hbar}\text{DOS}(E-hv)|M_{E,E_-}|^2 f(E-hv)[1-f(E)] \\ 
 ```
 Here $V$ is the volume of the cell, everything in LightMatter.jl is per $nm^3$ so this is one in the code's implementation.
 $f(E)$ is the current total electronic distribution, $\text{DOS}$ is the electronic density-of-states (DOS), $hv$ is the 
@@ -43,9 +45,9 @@ there is an explicit and unescapable dependence on the DOS. This is unlike the T
 that escape this. Currently there are no keyword arguments that can interact with this component.
 
 ```math
-\left.\frac{\partial f^*}{\partial t}\right|_\text{e^*e} = - \frac{f^*}{\tau_\text{ee}} + \frac{f^\text{eq} - f^\text{rlx}}{\tau_\text{ee}}
+\left.\frac{\partial f^*}{\partial t}\right|_\text{el^*el} = - \frac{f^*}{\tau_\text{ee}} + \frac{f^\text{eq} - f^\text{rlx}}{\tau_\text{ee}}
 ```
-Here we have a relaxation time approximation in two parts. Firstly, there is the compoionent that sends the 
+Here we have a relaxation time approximation (RTA) in two parts. Firstly, there is the component that sends the 
 athermal system to 0 (the first component) and the second component drives the equilibrium distribution
 towards the state with the same internal energy as equilbrium and athermal combined ($f^\text{rlx}$). This
 additional effect could be considered as generating the generation of secondary athermal electrons. 
@@ -68,10 +70,10 @@ plasmon-frequency of the material. This you must provide yourselves.
 
 For the interaction with the phonon system we have,
 ```math
-\left.\frac{\partial f^*}{\partial t}\right|_\text{e^*ph} = - \frac{f^*}{\tau_\text{ep}}
+\left.\frac{\partial f^*}{\partial t}\right|_\text{el^*ph} = - \frac{f^*}{\tau_\text{ep}}
 ```
-This is similar to the electron-electron relaxation time approach but the difference is there
-is no driving force on the phonons unlike the thermal electrons. The electron-phonon 
+This is similar to the electron-electron RTA but the difference is there is no 
+driving force on the phonons unlike the thermal electrons. The electron-phonon 
 relaxation time can only be treated as (`:constant`). We typically use a relaxation-time
 derived from, $\tau_text{ep} = \tau_\text{fft}hv/k_B \theta_D$ where $\tau_\text{fft}$
 is the free-flight time of electrons and $\theta_D$ is the Debye temperature.
@@ -79,10 +81,21 @@ is the free-flight time of electrons and $\theta_D$ is the Debye temperature.
 Now that we have constructed the athermal-electron system let us define how it couples
 to both of the thermal baths. 
 
-
 ### Thermal Baths
 
-$T_\text{el}$ & $T_\text{ph}$ are the electronic and phononic thermal baths respectively. 
+The equations for how the internal energy of the electronic and phononic thermal systems
+are very similar between AthEM and the TTM. In 0D they are 
+
+```math
+    \frac{\partial u_\text{el}(t)}{\partial t} = - g(T_\text{el} + T_\text{ph}) + \left.\frac{\partial u_\text{el}}{\partial t}\right|_\text{el-el^*} \\
+    \frac{\partial u_\text{ph}(t)}{\partial t} = g(T_\text{el} + T_\text{ph}) + \left.\frac{\partial u_\text{ph}}{\partial t}\right|_\text{ph-el^*} 
+```
+
+We have an extra term on the right-hand side which denotes the change in energy from the
+relaxation with the athermal electrons. The equation for these extra terms are,
+```math
+    \left.\frac{\partial u_\text{x}}{\partial t}\right|_\text{x-el^*} = -\int \left.\frac{\partial f^*}{\partial t}\right|_\text{el^*-x} \text{DOS}(E) E dE
+```
 
 ### Heat Capacities
 
