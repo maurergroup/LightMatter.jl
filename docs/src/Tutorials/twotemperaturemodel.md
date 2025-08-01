@@ -63,7 +63,7 @@ during construction or a non-linear parameter (`:variable`) calculated each time
             -> `:(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))`
 
 The new parameters in the `:variable` approximation are the electron-phonon mass enhancement factor ($λ$) and
-the second moment of the phonon spectrum ($ω$). To found out more check out [Lin2008](@cite).
+the second moment of the phonon spectrum ($ω$). To found out more check out [lin2008](@cite).
 
 ### Laser
 

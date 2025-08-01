@@ -81,10 +81,10 @@ pkg> test LightMatter
 
 ### How to use this documentation
 
-The first page to read is the [Getting started](@ref) section which walks through all the ingredients
+The first page to read is the [Getting started](@ref getting-started) section which walks through all the ingredients
 needed to perform a classical Two-Tempreature Model simulation. 
 After this, the reader is free to explore at their leisure since everything else builds directly
-upon sections from the [Getting started](@ref) page.
+upon sections from the [Getting started](@ref getting-started) page.
 ```@setup logging
 runtime = round(time() - start_time; digits=2)
 @info "...done after $runtime s."

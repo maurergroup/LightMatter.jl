@@ -335,20 +335,21 @@ end
 function particlenumber_values(sim::Simulation)
     L = sim.structure.dimension.length
     if typeof(sim.structure.DOS) == Vector{spl} && length(sim.structure.DOS) == L #DOS per z point
-        no_part = zeros(L)
+        no_part = zeros(1, L)
         for j in eachindex(sim.structure.dimension.grid)
-            no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
+            no_part[1, j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
         end
     elseif typeof(sim.structure.DOS) == Vector{spl} #DOS for each material rather than heights
-        no_part = zeros(L)
+        no_part = zeros(1, L)
         for j in eachindex(sim.structure.dimension.grid)
             mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-            no_part[j] = get_thermalparticles(0.0,1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+            no_part[1, j] = get_thermalparticles(0.0,1e-32, sim.structure.DOS[mat], sim.structure.egrid)
         end
     else #One DOS
-        no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS,sim.structure.egrid), L)
+        no_part = zeros(1, L)
+        no_part[1,:] .= get_thermalparticles(0.0, 1e-32, sim.structure.DOS,sim.structure.egrid)
     end
-    return no_part'
+    return no_part
 end
 
 function write_dynamicalvariables(f, results)

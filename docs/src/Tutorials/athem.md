@@ -6,7 +6,7 @@ start_time = time()
 # [AthEM Simulation](@id athem)
 
 In this tutorial we will discuss the theory of the Athermal Electron Model (AthEM). To see more 
-check out [Uehlein2025](@cite). This model takes the computational efficiency of the TTM but adds a 
+check out [uehlein2025](@cite). This model takes the computational efficiency of the TTM but adds a 
 athermal electron subsystem to simulate electron-hole pairs. The source of the efficiency compared
 to the Boltzmann equation is the use of the relaxation-time approximation without the lack of
 energy and particle conservation. This gain in efficiency allows users to do more complex simulations
@@ -133,7 +133,7 @@ during construction or a non-linear parameter (`:variable`) calculated each time
             -> `:(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))`
 
 The new parameters in the `:variable` approximation are the electron-phonon mass enhancement factor ($λ$) and
-the second moment of the phonon spectrum ($ω$). To found out more check out [Lin2008](@cite).
+the second moment of the phonon spectrum ($ω$). To found out more check out [lin2008](@cite).
 
 ### Laser
 
