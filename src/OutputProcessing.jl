@@ -21,7 +21,7 @@
     - Nothing is returned but a file is created
 """
 function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, output::Vector{Symbol}, sim::Simulation)
-    temp_name = "temp_"*file_name[1:end-5]*".jld2" 
+    temp_name = file_name[1:end-5]*"_temp.jld2" 
     @save temp_name sol
     fid = create_datafile_and_structure(file_name)
     write_simulation(fid,sim::Simulation)
