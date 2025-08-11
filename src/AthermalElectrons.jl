@@ -346,7 +346,7 @@ end
     # Returns
     - In-place change to Δf
 """
-function electron_distribution_transport!(v_g::Vector{Float64}, f::Matrix{Float64}, Δf::Matrix{Float64}, dz::Real)
+function electron_distribution_transport!(v_g::Vector{Float64}, f, Δf, dz)
     Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
         @. Δf[i, :] = ((f[i-1, :] - 2 * f[i, :] + f[i+1, :]) / dz) * v_g
