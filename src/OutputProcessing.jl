@@ -130,7 +130,7 @@ function write_simulation(f,sim::Simulation)
     electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
     dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
 
-    write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
+    write_phononicdistribution(f["Phononic Distribution"], sim::Simulation) #COntains a spline so has to be treated differently
 
     #write_densitymatrix(f, sim::Simulation)
 
