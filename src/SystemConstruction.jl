@@ -67,7 +67,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         merge!(exprs,Dict("fneq" => LightMatter.athemdistribution_factory(sim, laser)))
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
-            τee = electron_relaxationtime(sim::Simulation)
+            τee = electron_relaxationtime(sim)
             merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, n, $τee))))
         end
     end
@@ -139,12 +139,12 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64
     p = parameter_conductivity(p, sim)
     p = parameter_particle(p, sim)
     if sim.athermalelectrons.Enabled
-        p =(; p..., Δfexcite = fill(DiffCache(zeros(length(sim.structure.egrid)),sim.structure.dimension.length)),
-                    tmp = fill(DiffCache(zeros(length(sim.structure.egrid)),sim.structure.dimension.length)))
+        p =(; p..., Δfexcite = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length],
+                    tmp = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length])
         if !sim.electronictemperature.Enabled
             p = (; p..., Tel = initialtemps["Tel"])
         else
-            p = (; p..., relax_dis = fill(DiffCache(zeros(length(sim.structure.egrid)),sim.structure.dimension.length)))
+            p = (; p..., relax_dis = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length])
         end
     end
 

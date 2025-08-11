@@ -365,6 +365,7 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Flo
                     for i in 1:structure.dimension.length
                         v_g[i,:] = effective_one_band_velocity(structure.bandstructure[i][1], structure.DOS[i], structure.egrid, FE)
                     end
+                    return v_g
                 elseif structure.Elemental_System != 1
                     v_g = zeros(structure.dimension.length,length(structure.egrid))
                     Threads.@threads for i in eachindex(v_g[:,1])
