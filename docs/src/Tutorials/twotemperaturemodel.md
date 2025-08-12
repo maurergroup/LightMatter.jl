@@ -15,8 +15,10 @@ is designed to simulate so we can treat all points in this plane as equal.
 
 The equations of motion for the 1D TTM are as follows:
 ```math
-    C_\text{el}\frac{\partial T_\text{el}(z, t)}{\partial t} = \nabla(\kappa_\text{el}\nabla T_\text{el}) - g(T_\text{el} + T_\text{ph}) + S(t) \\
-    C_\text{ph}\frac{\partial T_\text{ph}(z, t)}{\partial t} = \nabla(\kappa_\text{ph}\nabla T_\text{ph}) + g(T_\text{el} + T_\text{ph})
+\begin{aligned}
+C_\text{el}\frac{\partial T_\text{el}(z, t)}{\partial t} &= \nabla(\kappa_\text{el}\nabla T_\text{el}) - g(T_\text{el} + T_\text{ph}) + S(t) \\
+C_\text{ph}\frac{\partial T_\text{ph}(z, t)}{\partial t} &= \nabla(\kappa_\text{ph}\nabla T_\text{ph}) + g(T_\text{el} + T_\text{ph})
+\end{aligned}
 ```
 
 The aim of this method is to treat the two systems as thermal baths rather than electronic distributions. This has the advantage
@@ -27,43 +29,57 @@ level of theory to [AthEM](@ref athem) or the [Boltzmann equation](@ref boltzman
 
 ### Thermal Baths
 
-$T_\text{el}$ & $T_\text{ph}$ are the electronic and phononic thermal baths respectively. 
+``T_\text{el}`` & ``T_\text{ph}`` are the electronic and phononic thermal baths respectively. 
 
 ### Heat Capacities
 
-$C_\text{el}$ & $C_\text{ph}$ are the heat capacities of the electronic and phononic systems. There is a couple of 
+``C_\text{el}`` & ``C_\text{ph}`` are the heat capacities of the electronic and phononic systems. There is a couple of 
 approximations that can be used when modelling both of these in LightMatter.jl. For the electronic heat capacity,
 we have a constant (`:constant`), linear (`:linear`) and non-linear (`:nonlinear`) heat capacities, which increase
 in accuracy in that order. For a phonon heat capacity we have a constant (`:constant`) and non-linear (`:variable`)
-form only. The equations & expressions for all these functions are given below.
-*Electronic Heat Capacities*
-`:constant` -> `:(sim.electronictemperature.γ)`
-`:linear` -> `:(sim.electronictemperature.γ * T_\text{el})`
-`:nonlinear` -> $\int\frac{\partial f(T\text_{el},μ,ϵ)}{\partial T} \text{DOS}(ϵ)ϵ dϵ$ 
-            -> `:(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS))`
+form only. The equations & expressions for all these functions are given below. \
+
+**Electronic Heat Capacities**
+
+| KWARG | Expression/Equation |        
+| -----  | ------------------ |
+|`:constant` | `:(sim.electronictemperature.γ)` |
+|`:linear` | `:(sim.electronictemperature.γ * T_\text{el})` |
+|`:nonlinear` | ``\int\frac{\partial f(T\text_{el},μ,ϵ)}{\partial T} \text{DOS}(ϵ)ϵ dϵ`` |
+|            | `:(LightMatter.nonlinear_electronheatcapacity(Tel, μ, DOS))` |
 
 Both the constant and linear approximations depend on the γ parameter within the electronic temperature whereas the non-linear
-approximation depends on a density-of-states (DOS) and the chemical potential ($μ$). To found out more about DOS in LightMatter.jl
-see the [AthEM](@ref athem). μ can be made temperature-dependent by setting `ChemicalPotential` to `true` within `Structure`.
-*Phononic Heat Capacities*
-`:constant` -> `:(sim.phononictemperature.Cph)`
-`:variable` -> $9nk_B(\frac{Tph}{θ})^3 *\int\limits_0^{\theta_D} x^4 \frac{e^x}{(e^x-1)^2} dx$
-             -> `:(LightMatter.variable_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))`
-The constant approximation depends on the parameter `Cph` the user defines when constructing the phononic thermal bath.
-In the non-linear case, we use Simpson's rule to determine the heat capacity and this depends on the Debye temperature ($θ$)
-and the number of atoms per nm^3 ($n$). The Boltzmann constant is a constant within LightMatter.jl so is handled for you.
+approximation depends on a density-of-states (DOS) and the chemical potential (``μ``). To found out more about DOS in LightMatter.jl
+see the [AthEM](@ref athem). μ can be made temperature-dependent by setting `ChemicalPotential` to `true` within `build_Structure`. \
+
+**Phononic Heat Capacities**
+
+| KWARG | Expression/Equation |        
+| -----  | ------------------ |
+|`:constant` | `:(sim.phononictemperature.Cph)` |
+|`:variable` | ``9nk_B(\frac{Tph}{θ})^3 *\int\limits_0^{\theta_D} x^4 \frac{e^x}{(e^x-1)^2} dx`` |
+|             | `:(LightMatter.variable_phononheatcapacity(Tph, sim.phononictemperature.n, sim.phononictemperature.θ))` |
+
+The constant approximation depends on the parameter ``Cph`` the user defines when constructing the phononic thermal bath.
+In the non-linear case, we use Simpson's rule to determine the heat capacity and this depends on the Debye temperature (``θ``)
+and the number of atoms per nm^3 (``n``). The Boltzmann constant is a constant within LightMatter.jl so is handled for you.
 To see more check out [Unit Handling](@ref units).
 
 ### Electron-Phonon Coupling
 
-$g$ is the electorn-phonon coupling constant in the TTM. This parameter can be either a constant(`:constant`) provided 
-during construction or a non-linear parameter (`:variable`) calculated each time-step. 
-`:constant` -> `:(sim.electronictemperature.g)`
-`:variable` -> $\frac{k_Bλω}{\text{DOS}(μ)ħ}\int \text{DOS}(ϵ)^2 \frac{\partial f(T_\text{el}, μ, ϵ)}{\partial E} dϵ
-            -> `:(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))`
+``g`` is the electorn-phonon coupling constant in the TTM. This parameter can be either a constant(`:constant`) provided 
+during construction or a non-linear parameter (`:variable`) calculated each time-step. \
 
-The new parameters in the `:variable` approximation are the electron-phonon mass enhancement factor ($λ$) and
-the second moment of the phonon spectrum ($ω$). To found out more check out [lin2008](@cite).
+**Electron-Phonon Coupling Constant**
+
+| KWARG | Expression/Equation |        
+| -----  | ------------------ |
+|`:constant` | `:(sim.electronictemperature.g)` |
+|`:variable` | ``\frac{k_Bλω}{\text{DOS}(μ)ħ}\int \text{DOS}(ϵ)^2 \frac{\partial f(T_\text{el}, μ, ϵ)}{\partial E} dϵ`` |
+|            | `:(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph, sim.structure.egrid))`|
+
+The new parameters in the `:variable` approximation are the electron-phonon mass enhancement factor (``λ``) and
+the second moment of the phonon spectrum (``ω``). To found out more check out [lin2008](@cite).
 
 ### Laser
 
@@ -73,16 +89,18 @@ To find out about the possible lasers see, [Lasers](@ref lasers).
 ### Thermal Conductivity
 
 The thermal conductivity in LightMatter.jl is restricted to only the z-axis as currently 2/3D models are not possible.
-This means that $\nabla$ represents $\frac{\partial}{\partial z}$. The gradients are calculated via finite difference,
-primarily central difference except at the edges. The thermal conductivity ($κ$) for electrons and phonons is treated
-differently.
-*Electrons*
-$\kappa$ or `sim.electronictemperature.κ` represents the room temperature thermal conductivity of the electrons and 
-is scaled temperature dependetly during the simulation via $κ_\text{final} = \kappa_\text{rt}\frac{T_\text{el}}{T_\text{ph}}$.
+This means that ``\nabla`` represents ``\frac{\partial}{\partial z}``. The gradients are calculated via finite difference,
+primarily central difference except at the edges. The thermal conductivity (``κ``) for electrons and phonons is treated
+differently. \
+*Electrons* \
+``\kappa`` or `sim.electronictemperature.κ` represents the room temperature thermal conductivity of the electrons and 
+is scaled temperature dependetly during the simulation via ``κ_\text{final} = \kappa_\text{rt}\frac{T_\text{el}}{T_\text{ph}}``.
 The phonon thermal conductivity however is treated as a constant. Currently there are no other options but in the future this
 may change. 
 
-##Example Simulation
+---
+
+## Example Simulation
 
 Now that all the theory and approximations of the TTM have been discussed, at least in the context of LightMatter.jl, we
 will perform a couple of example simulations to show how to run a 1D simulation, the effect this has on temperatures
@@ -117,7 +135,7 @@ as the one used in [Getting Started](@ref getting-started).
     All automatic implementations of DOS assembly (interpolation) assume that the DOS and geometry are in
     the FHI-AIMS format. There is an aim to make an automatic conversion in the future but if this is not
     the case then you can supply your own spline fit to the `DOS` KWARG in `build_Structure`. To ensure
-    type stability use $LightMatter.get_interpolant(energy, states)$ to create the spline and make sure
+    type stability use ``LightMatter.get_interpolant(energy, states)`` to create the spline and make sure
     that the units of your DOS are states/eVnm³.
 
 Next let's build our thermal baths.
@@ -143,5 +161,5 @@ And finally, after defining some initial conditions we can run the simulation
 
 ```@setup logging
 runtime = round(time() - start_time; digits=2)
-@info "...done after $runtime s."
+@info "...done after ``runtime s."
 ```
