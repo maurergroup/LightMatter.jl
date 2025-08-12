@@ -21,7 +21,7 @@
     - Nothing is returned but a file is created
 """
 function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, output::Vector{Symbol}, sim::Simulation)
-    temp_name = "temp_"*file_name[1:end-5]*".jld2" 
+    temp_name = file_name[1:end-5]*"_temp.jld2" 
     @save temp_name sol
     fid = create_datafile_and_structure(file_name)
     write_simulation(fid,sim::Simulation)
@@ -130,7 +130,7 @@ function write_simulation(f,sim::Simulation)
     electronic_d = Dict{String,Any}(String(key)=>getfield(sim.electronicdistribution, key) for key ∈ fieldnames(ElectronicDistribution))
     dict_to_hdf5(f["Electronic Distribution"], convert_symbols_to_strings(electronic_d))
 
-    write_phononicdistribution(f, sim::Simulation) #COntains a spline so has to be treated differently
+    write_phononicdistribution(f["Phononic Distribution"], sim::Simulation) #COntains a spline so has to be treated differently
 
     #write_densitymatrix(f, sim::Simulation)
 
