@@ -62,8 +62,8 @@ end
     - An expression block assigning simulation-specific variable names.
 """
 function ar_variable_renaming(sim::Simulation)
-    old_name = [:(p.matsim[X]), :(p.sim.structure.tmp[i,:])]
-    new_name = [:sim, :tmp]
+    old_name = [:(p.matsim[X])]
+    new_name = [:sim]
     if typeof(sim.structure.DOS) == Vector{Vector{spl}}
         push!(old_name, :(p.matsim[X].structure.DOS[i]))
         push!(new_name, :DOS)
@@ -79,13 +79,13 @@ function ar_variable_renaming(sim::Simulation)
         push!(old_name, :(p.Δfexcite[i]))
         push!(new_name, :Δfexcite)
         if sim.athermalelectrons.Conductivity == true
-            push!(old_name, :(p.f_cond[i,:]))
+            push!(old_name, :(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
             push!(new_name, :f_cond)
         end
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name, :(p.Tel))
             push!(new_name, :Tel)
-            push!(old_name, :(p.noe[i]))
+            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
@@ -98,11 +98,11 @@ function ar_variable_renaming(sim::Simulation)
         push!(old_name, :(u.Tel[i]))
         push!(new_name, :Tel)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-            push!(old_name, :(p.noe[i]))
+            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
             push!(new_name, :n)
         end
         if sim.electronictemperature.Conductivity == true
-            push!(old_name,:(p.Tel_cond[i]))
+            push!(old_name,:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
             push!(new_name,:Tel_cond)
         end
     end
@@ -110,7 +110,7 @@ function ar_variable_renaming(sim::Simulation)
         push!(old_name, :(u.Tph[i]))
         push!(new_name, :Tph)
         if sim.phononictemperature.Conductivity == true
-            push!(old_name, :(p.Tph_cond[i]))
+            push!(old_name, :(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
             push!(new_name, :Tph_cond)
         end
     end
@@ -138,7 +138,7 @@ function sim_seperation(sim::Simulation)
         enabled ? split_struct(field, sim.structure.Elemental_System) :
                   fill(field, sim.structure.Elemental_System)
     end
-    lasers = split_struct(sim.laser, sim.structure.Elemental_System) #Will always be enabled so doesn't need checking
+    lasers = fill(sim.laser, sim.structure.Elemental_System) #Will always be enabled so doesn't need checking
     tels   = conditional_split(sim.electronictemperature, sim.electronictemperature.Enabled)
     tphs   = conditional_split(sim.phononictemperature, sim.phononictemperature.Enabled)
     neqs   = conditional_split(sim.athermalelectrons, sim.athermalelectrons.Enabled)

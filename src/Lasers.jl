@@ -59,6 +59,11 @@ function spatial_laser(sim::Simulation)
     z_laser = spatial_z_laser(sim)
     return z_laser
 end
+
+function heaviside(t)
+   return 0.5 * (sign(t) + 1)
+end
+
 """
     spatial_z_laser(sim::Simulation)
     
@@ -74,28 +79,53 @@ end
     # Returns
     - Expression for the spatial shape of the laser
 """
+#= function spatial_z_laser(sim::Simulation)
+    decay = spatial_laser_decay(sim)
+    if sim.structure.dimension.length == 1
+        return :(1 ./ $decay)
+    else
+        return :(1 ./ $decay .* exp.(-sim.structure.dimension.grid[i]./$decay))
+    end
+end =#
+
 function spatial_z_laser(sim::Simulation)
+    decay = spatial_laser_decay(sim)
+    const_expr = :(1 ./ $decay)
+    if sim.structure.Elemental_System != 1
+        exprs = antennareactor_laserdecay(sim)
+        return Expr(:call, :+, exprs...)
+    else
+        return :($const_expr .* exp.(-sim.structure.dimension.grid[i]./$decay))
+    end 
+end
+
+function antennareactor_laserdecay(sim::Simulation)
+    depths = vcat(sim.structure.dimension.InterfaceHeight, sim.structure.dimension.grid[end])
+
+    layer_exprs = Expr[]
+    for i in 1:sim.structure.Elemental_System
+        ϵ = sim.laser.ϵ[i]
+        z0 = (i == 1) ? 0.0 : depths[i-1]   # start of layer
+        zend = depths[i]                     # end of layer
+
+        # attenuation from all previous layers
+        atten_prev = exp(-sum(diff([0.0; depths[1:i-1]] ./ sim.laser.ϵ[1:i-1])))
+        
+        expr = :( (1 / $ϵ) * $atten_prev * exp(-(sim.structure.dimension.grid[i] - $z0) / $ϵ) *
+                  (heaviside(sim.structure.dimension.grid[i] - $z0) * heaviside($zend - sim.structure.dimension.grid[i])) )
+        push!(layer_exprs, expr)
+    end
+    
+    return layer_exprs
+end
+
+function spatial_laser_decay(sim::Simulation)
     if sim.laser.Transport == :ballistic
-        if sim.structure.dimension.length == 1
-            return :(1 ./ sim.laser.δb)
-        else
-            l = sim.structure.dimension.grid[end]
-            return :(1 ./ (sim.laser.δb.*(1 .-exp.(-$l./sim.laser.δb))) .* exp.(-sim.structure.dimension.grid[i]./sim.laser.δb))
-        end
+        return :(sim.laser.δb)
     elseif sim.laser.Transport == :optical
-        if sim.structure.dimension.length == 1
-            return :(1 ./ sim.laser.ϵ)
-        else
-            l = sim.structure.dimension.grid[end]
-            return :(1 ./(sim.laser.ϵ .* (1 .-exp.(-$l./sim.laser.ϵ))) .* exp.(-sim.structure.dimension.grid[i]./sim.laser.ϵ))
-        end
+        return :(sim.laser.ϵ)
     elseif sim.laser.Transport == :combined
-        if sim.structure.dimension.length == 1
-            return :(1 ./ (sim.laser.δb .+ sim.laser.ϵ))
-        else
-            l = sim.structure.dimension.grid[end]
-            return :(1 ./ ((sim.laser.δb.+sim.laser.ϵ) * (1 .-exp.(-$l./(sim.laser.δb.+sim.laser.ϵ)))) .* exp.(-sim.structure.dimension.grid[i]./(sim.laser.δb.+sim.laser.ϵ)))
-        end
+        return  :(sim.laser.δb .+ sim.laser.ϵ)
     end
 end
 """

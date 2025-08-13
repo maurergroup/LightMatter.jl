@@ -267,10 +267,11 @@ end
 """
 function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
-    push!(exprs,variable_renaming(sim))
     if sim.structure.Elemental_System > 1
         push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
         push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl
+    else
+        push!(exprs,variable_renaming(sim))
     end
     if sim.structure.ChemicalPotential
         push!(exprs, :(μ = LightMatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
