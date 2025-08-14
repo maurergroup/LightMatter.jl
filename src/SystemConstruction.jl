@@ -199,11 +199,11 @@ end
     # Returns
     - Quote block for the entire ODE problem
 """
-function simulation_construction(sys, sim::Simulation)
+function simulation_construction(sys, sim::Simulation, print_time)
     if sim.structure.Elemental_System == 1
-        return monometallic_system(sys, sim)
+        return monometallic_system(sys, sim, print_time)
     else
-        return antenna_reactor_system(sys, sim)
+        return antenna_reactor_system(sys, sim, print_time)
     end
 end
 """
@@ -219,11 +219,16 @@ end
     # Returns
     - Quote block for the monometallic problem
 """
-function monometallic_system(sys, sim::Simulation)
+function monometallic_system(sys, sim::Simulation, print_time)
     expr_cond = conductivity_expressions(sim)
     loop_body = build_loopbody(sys, sim)
+    if print_time
+        t_expr = :(println(t))
+    else
+        t_expr = :()
+    end
     return quote
-        println(t)
+        $t_expr
         $expr_cond
         Threads.@threads for i in 1:p.sim.structure.dimension.length
             $loop_body

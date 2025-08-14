@@ -19,12 +19,12 @@
     - The solution of the dynamics calculation
 """
 function run_simulation(sim::Simulation, initialtemps::Dict{String, Float64},
-    tspan::Tuple{Float64,Float64}; alg=Tsit5(), kwargs...)
+    tspan::Tuple{Float64,Float64}; alg=Tsit5(), print_time=false, kwargs...)
     
     sys = function_builder(sim)
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
-    simulation_expr = simulation_construction(sys,sim)
+    simulation_expr = simulation_construction(sys,sim, print_time)
     simulation_problem! = mk_function((:du,:u,:p,:t),(),simulation_expr)
     println("Precompiling") 
     simulation_problem!(similar(u0),u0,p,0.0)

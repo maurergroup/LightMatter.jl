@@ -12,11 +12,16 @@
     # Returns
     - An expression block containing the time output, conductivity expressions, and a threaded simulation loop.
 """
-function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation)
+function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation, print_time)
     expr_cond = conductivity_expressions(sim) # Expr block for the conductivity of each system
     loop_body = build_loopbody(sys, sim) # Expr block for the body of a threaded for loop over the systems and depth
+    if print_time
+        t_expr = :(println(t))
+    else
+        t_expr = :()
+    end
     return quote 
-        println(t)
+       $t_expr
         $expr_cond
         Threads.@threads for i in 1:p.sim.structure.dimension.length
             $loop_body
