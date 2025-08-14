@@ -57,7 +57,12 @@ end
 """
 function spatial_laser(sim::Simulation)
     z_laser = spatial_z_laser(sim)
-    return z_laser
+    if ndims(sim.structure.dimension.grid) == 3
+        xylaser = spatial_xy_laser(sim) 
+        return :(z_laser * xylaser)
+    else
+        return z_laser
+    end
 end
 
 function heaviside(t)
@@ -145,7 +150,7 @@ end
     - Expression for the spatial shape of the laser in the xy plane
 """
 function spatial_xy_laser(sim::Simulation)
-    if typeof(slab) == Cylindrical
+    if sim.structure.dimension.grid
         return 1/(pi*R^2).*exp.(-xygrid.^2 ./X^2)
     elseif typeof(slab) == Cubic
         return 1/(pi^2*X^2*Y^2).*exp.((-xgrid.^2 ./X^2)+(-ygrid.^2 ./Y^2))

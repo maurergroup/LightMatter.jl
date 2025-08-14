@@ -31,6 +31,7 @@ abstract type SimulationTypes end
     ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} # The inverse of the absorption coefficient
     R::Float64 # The reflectivity of the sample
     δb::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} # The ballistic length of electrons
+    radius::Float64 # The radius of the laser pulse at the surface
 end
 """
     build_laser(;envelope=:Gaussian, FWHM=10.0, ϕ=10.0, hv=5.0, Transport=:optical, ϵ=1.0, R=0.0, δb=1.0)
@@ -53,7 +54,7 @@ end
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
 function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = 0.0, Transport::Symbol = :optical,
-                      ϵ = 0.0, R::Float64 = 0.0, δb = 0.0, n = 0.0)
+                      ϵ = 0.0, R::Float64 = 0.0, δb = 0.0, n = 0.0, radius = 0.0)
     
     FWHM = convert_units(u"fs", FWHM)
     Power = convert_units(u"eV/nm^2", ϕ)
@@ -64,6 +65,7 @@ function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = 0
     end
     ϵ = convert_units(u"nm", ϵ)
     δb = convert_units(u"nm", δb)
+    radius = convert_units(u"nm", radius)
     return Laser(envelope=envelope, FWHM=FWHM, ϕ=Power, hv=hv, Transport=Transport, ϵ=ϵ, R=R, δb=δb, n=n)
 end
 """
