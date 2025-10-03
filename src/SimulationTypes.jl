@@ -66,7 +66,7 @@ function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = 0
     ϵ = convert_units(u"nm", ϵ)
     δb = convert_units(u"nm", δb)
     radius = convert_units(u"nm", radius)
-    return Laser(envelope=envelope, FWHM=FWHM, ϕ=Power, hv=hv, Transport=Transport, ϵ=ϵ, R=R, δb=δb, n=n)
+    return Laser(envelope=envelope, FWHM=FWHM, ϕ=Power, hv=hv, Transport=Transport, ϵ=ϵ, R=R, δb=δb, n=n, radius=radius)
 end
 """
     Dimension <: SimulationTypes

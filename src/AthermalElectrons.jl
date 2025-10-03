@@ -29,7 +29,8 @@ function athemdistribution_factory(sim::Simulation, laser_expr::Expr)
         athemexcite = quote
                         LightMatter.athemexcitation!(Δfexcite, tmp, $ftot, sim.structure.egrid, DOS, sim.laser.hv, $M)
                         Δfexcite = LightMatter.access_DiffCache(Δfexcite, fneq[1])
-                        $laser_expr .* Δfexcite
+                        las = $laser_expr
+                        las .* Δfexcite
                       end
     end
     return build_athemdistribution(sim, athemexcite, Elecelec, Elecphon)
@@ -86,7 +87,9 @@ function athemexcitation!(Δfneqe, Δfneqh, ftot, egrid, DOS, hv::Float64, M)
     athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv, M)
     pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
     Δfneqe .-= (pc_sf * Δfneqh)
-    Δfneqe ./= get_internalenergy(Δfneqe, DOS, egrid) # Scales the shape of the change by the internal energy to later match with the laser
+    tot_en = get_internalenergy(Δfneqe, DOS, egrid)
+    Δfneqe ./= ifelse(tot_en == 0, 1.0, tot_en)
+
     return nothing
 end
 
@@ -98,7 +101,8 @@ function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Matrix{Float64
         athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv[i,1], M)
         pc_sf = get_noparticles(Δfneqe, DOS, egrid) / get_noparticles(Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
         Δfneqe .-= (pc_sf * Δfneqh)
-        Δneqs[i,:] .= Δfneqe .* hv[i,2] ./ get_internalenergy(Δfneqe, DOS, egrid) # Scales by internal energy and fraction of fluence at given frequency (hv[i][2])
+        tot_en = get_internalenergy(Δfneqe, DOS, egrid)
+        Δneqs[i,:] .=  ifelse(tot_en == 0, Δfneqe .* hv[i,2], Δfneqe .* hv[i,2] ./ get_internalenergy(Δfneqe, DOS, egrid))
     end
     return Δneqs # Returns the different frequency changes
 end

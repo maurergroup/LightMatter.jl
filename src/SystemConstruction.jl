@@ -167,7 +167,7 @@ end
 function parameter_particle(p, sim)
     if (sim.athermalelectrons.Enabled || sim.electronictemperature.Enabled) && !sim.athermalelectrons.AthermalElectron_ElectronCoupling
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
-            no_part=DiffCache(zeros(sim.structure.dimension.length))
+            no_part=zeros(sim.structure.dimension.length)
             noe = get_tmp(no_part, 0.0)
             for j in eachindex(sim.structure.dimension.grid)
                 noe[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)

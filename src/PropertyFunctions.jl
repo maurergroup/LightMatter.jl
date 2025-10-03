@@ -189,6 +189,5 @@ function Bode_rule(y::Function, x)
             7y(idx + 4)
         )
     end
-
     return integral
 end
