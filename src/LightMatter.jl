@@ -1,7 +1,7 @@
 module LightMatter
 
 using DelimitedFiles, Integrals, NonlinearSolve, RecursiveArrayTools, OrdinaryDiffEq, HDF5, LinearAlgebra, GeneralizedGenerated, Unitful, JLD2, ForwardDiff
-using Bessels, FillArrays, ArrayInterface, Interpolations, DataInterpolations, PreallocationTools, StaticArrays, SimpleNonlinearSolve
+using Bessels, FillArrays, ArrayInterface, Interpolations, DataInterpolations, PreallocationTools, StaticArrays, SimpleNonlinearSolve, Dierckx
 
 export build_Simulation, run_simulation, post_production, Constants, DensityMatrix, build_DensityMatrix, build_Dimension, FE_initialization
 export ElectronicTemperature, build_ElectronicTemperature, PhononicTemperature, build_PhononicTemperature, function_builder
@@ -19,7 +19,7 @@ include("Lasers.jl")
 include("ElectronicTemperature.jl")
 include("PhononicTemperature.jl")
 include("PropertyFunctions.jl")
-include("DOS_Geometry.jl")
+include("ElectronicStructure.jl")
 include("ElectronicDistribution.jl")
 include("AthermalElectrons.jl")
 include("PhononicDistribution.jl")

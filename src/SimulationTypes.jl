@@ -26,11 +26,11 @@ abstract type SimulationTypes end
 
     FWHM::Float64 # The Full-Width Half-Maximum of the laser, for rectnagular half the length
     ϕ::Float64 # The unabsorbed fluence of the laser
-    n::Union{Float64, Vector{Float64}, Vector{Vector{Float64}}}# The real part of the refractive index of the material
-    hv::Union{Float64, Matrix{Float64}} # The photon frequency of the laser
-    ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} # The inverse of the absorption coefficient
+    n::Union{Float64, Vector{Float64}, Vector{Vector{Float64}}, Missing} = missing # The real part of the refractive index of the material
+    hv::Union{Float64, Matrix{Float64}, Missing} = missing # The photon frequency of the laser
+    ϵ::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}, Missing} = missing # The inverse of the absorption coefficient
     R::Float64 # The reflectivity of the sample
-    δb::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}} # The ballistic length of electrons
+    δb::Union{Float64, Vector{Float64}, Vector{<:Vector{Float64}}, Missing} = missing # The ballistic length of electrons
     radius::Float64 # The radius of the laser pulse at the surface
 end
 """
@@ -53,18 +53,27 @@ end
     # Returns
     - The Laser struct with the user settings and neccessary values converted to the correct units
 """
-function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = 0.0, Transport::Symbol = :optical,
-                      ϵ = 0.0, R::Float64 = 0.0, δb = 0.0, n = 0.0, radius = 0.0)
+function build_Laser(;envelope::Symbol = :Gaussian, FWHM = 0.0, ϕ = 0.0, hv = missing, Transport::Symbol = :optical,
+                      ϵ = missing, R::Float64 = 0.0, δb = missing, n = missing, radius = 0.0)
     
     FWHM = convert_units(u"fs", FWHM)
     Power = convert_units(u"eV/nm^2", ϕ)
-    if hv isa AbstractMatrix
-        hv[:,1] = convert_units(u"eV", hv[:,1])
-    else
-        hv = convert_units(u"eV", hv)
+    if !ismissing(hv)
+        if hv isa AbstractMatrix
+            hv[:,1] = convert_units(u"eV", hv[:,1])
+        else
+            hv = convert_units(u"eV", hv)
+        end
     end
-    ϵ = convert_units(u"nm", ϵ)
-    δb = convert_units(u"nm", δb)
+    if !ismissing(ϵ)
+        ϵ = convert_units(u"nm", ϵ)
+    end
+    if !ismissing(δb)
+        δb = convert_units(u"nm", δb)
+    end
+    if !ismissing(n)
+        # n doesn't need unit conversion
+    end
     radius = convert_units(u"nm", radius)
     return Laser(envelope=envelope, FWHM=FWHM, ϕ=Power, hv=hv, Transport=Transport, ϵ=ϵ, R=R, δb=δb, n=n, radius=radius)
 end
@@ -164,8 +173,8 @@ global const spl=Interpolations.AbstractExtrapolation
     Elemental_System::Int # The number of elemental systems, if > 1 then each constant and vector
                           # of material parameters needs to become a vector of length=Elemental_System
 
-    DOS::Union{spl, Vector{spl}} # The density of states of the simulation
-    bandstructure::Union{Vector{<:DataInterpolations.AkimaInterpolation}, Vector{<:Vector{DataInterpolations.AkimaInterpolation}},Nothing} # The band structure of the simulation
+    DOS::Union{spl, Vector{spl}, Missing} = missing # The density of states of the simulation
+    bandstructure::Union{Vector{<:Dierckx.Spline1D}, Vector{<:Vector{<:Dierckx.Spline1D}}, Nothing, Missing} = missing # The band structure of the simulation
     egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
 
     dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
@@ -205,9 +214,10 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
-    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false)
+    ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
+    μ_offset::Union{Float64, Vector{Float64}} = 0.0)
 
-    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
+    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields
@@ -288,10 +298,10 @@ end
     ExcitationMatrixElements::Symbol # Implementation is only match internal energy (:unity)
     Conductive_Velocity::Symbol # Implementation of how group velocity is calculated, :constant, :fermigas or :effectiveoneband
     
-    FE::Union{Float64,Vector{Float64}} # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
-    τ::Union{Float64,Vector{Float64}} # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
-    τep::Union{Float64,Vector{Float64}} # Constant relaxation time for phonons
-    v_g::Union{Vector{Float64},Matrix{Float64}} # Group velocity of electrons in v(k) calculated assuming a Fermi liquid with μ = FE
+    FE::Union{Float64,Vector{Float64}, Missing} = missing # Shifted Fermi energy to the bottom of the valence band for FLT relaxation and group velocity
+    τ::Union{Float64,Vector{Float64}, Missing} = missing # Material dependent scale-factor for :FLT relaxation time or the constant value for :constant
+    τep::Union{Float64,Vector{Float64}, Missing} = missing # Constant relaxation time for phonons
+    v_g::Union{Vector{Float64},Matrix{Float64}, Missing} = missing # Group velocity of electrons in v(k) calculated assuming a Fermi liquid with μ = FE
 end
 """
     build_AthermalElectrons(;structure::Structure, Enabled = false, AthermalElectron_ElectronCoupling = false, 
@@ -326,13 +336,25 @@ end
 """
 function build_AthermalElectrons(; Enabled = false, structure::Structure = build_Structure(), AthermalElectron_ElectronCoupling = false, 
     AthermalElectron_PhononCoupling = false, Conductivity = false, ElectronicRelaxation = :FLT, PhononicRelaxation = :constant, 
-    ExcitationMatrixElements = :unity, FE = 0.0, τ = 0.0, τep = 0.0, v_g = nothing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
+    ExcitationMatrixElements = :unity, FE = missing, τ = missing, τep = missing, v_g = missing, Conductive_Velocity = :constant, EmbeddedAthEM = false)
 
-    τ = convert_units(u"fs", τ)
-    τep = convert_units(u"fs", τep)
-    FE = convert_units(u"eV", FE)
+    if !ismissing(τ)
+        τ = convert_units(u"fs", τ)
+    end
+    if !ismissing(τep)
+        τep = convert_units(u"fs", τep)
+    end
+    if !ismissing(FE)
+        FE = convert_units(u"eV", FE)
+    end
 
-    v_g = build_group_velocity(v_g,FE,Conductivity,Conductive_Velocity,structure)
+    if !ismissing(v_g)
+        # v_g is provided, no need to build it
+    elseif Conductivity && Enabled
+        v_g = build_group_velocity(missing, FE, Conductivity, Conductive_Velocity, structure)
+    else
+        v_g = missing
+    end
 
     return AthermalElectrons(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
@@ -376,11 +398,11 @@ end
     ElectronPhononCouplingValue::Symbol # Whether to use constant (:constant) or variable (:variable)
                                         # electron phonon coupling
 
-    γ::Union{Float64,Vector{Float64}} # Specific heat capacity of electrons at room temperature for linear heat capacity
-    κ::Union{Float64,Vector{Float64}} # Thermal conductivity of electrons at room temperature
-    λ::Union{Float64,Vector{Float64}} # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
-    ω::Union{Float64,Vector{Float64}} # Second moment of phonon spectral function for non-linear electron-phonon coupling
-    g::Union{Float64,Vector{Float64}} # Constant electron-phonon coupling value 
+    γ::Union{Float64,Vector{Float64}, Missing} = missing # Specific heat capacity of electrons at room temperature for linear heat capacity
+    κ::Union{Float64,Vector{Float64}, Missing} = missing # Thermal conductivity of electrons at room temperature
+    λ::Union{Float64,Vector{Float64}, Missing} = missing # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
+    ω::Union{Float64,Vector{Float64}, Missing} = missing # Second moment of phonon spectral function for non-linear electron-phonon coupling
+    g::Union{Float64,Vector{Float64}, Missing} = missing # Constant electron-phonon coupling value 
 end
 """
     build_ElectronicTemperature(; Enabled = false, AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
@@ -406,22 +428,30 @@ end
     - The ElectronicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_ElectronicTemperature(; Enabled = false, structure=build_Structure(), AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
-                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = 0.0, κ = 0.0, λ = 0.0, ω = 0.0, g = 0.0)
+                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = missing, κ = missing, λ = missing, ω = missing, g = missing)
 
-    γ = convert_units(u"eV/nm^3/K^2", γ)
-    if structure.Elemental_System == 1
-        κ = convert_units(u"eV/fs/nm/K", κ)
-    else
-        new_κ = zeros(structure.dimension.length)
-        κ = convert_units(u"eV/fs/nm/K", κ)
-        for i in eachindex(new_κ)
-            X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
-            new_κ[i] = κ[X]
-        end
-        κ = new_κ
+    if !ismissing(γ)
+        γ = convert_units(u"eV/nm^3/K^2", γ)
     end
-    ω = convert_units(u"eV^2", ω)
-    g = convert_units(u"eV/fs/nm^3/K", g)
+    if !ismissing(κ)
+        if structure.Elemental_System == 1
+            κ = convert_units(u"eV/fs/nm/K", κ)
+        else
+            new_κ = zeros(structure.dimension.length)
+            κ = convert_units(u"eV/fs/nm/K", κ)
+            for i in eachindex(new_κ)
+                X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
+                new_κ[i] = κ[X]
+            end
+            κ = new_κ
+        end
+    end
+    if !ismissing(ω)
+        ω = convert_units(u"eV^2", ω)
+    end
+    if !ismissing(g)
+        g = convert_units(u"eV/fs/nm^3/K", g)
+    end
     return ElectronicTemperature(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
                                  Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
                                  ElectronicHeatCapacity=ElectronicHeatCapacity, ElectronPhononCouplingValue=ElectronPhononCouplingValue,
@@ -457,10 +487,10 @@ end
     PhononicHeatCapacity::Symbol # Whether to use constant (:constant) or non-linear/Simpson's Rule (:nonlinear) 
                                  # Phononic Heat Capacity
     
-    θ::Union{Float64,Vector{Float64}} # Debye temperature for non-linear phonon heat capacity
-    n::Union{Float64,Vector{Float64}} # Atomic density for non-linear phonon heat capacity
-    Cph::Union{Float64,Vector{Float64}} # Constant phonon heat capacity
-    κ::Union{Float64,Vector{Float64}} # Constant phonon thermal conductivity
+    θ::Union{Float64,Vector{Float64}, Missing} = missing # Debye temperature for non-linear phonon heat capacity
+    n::Union{Float64,Vector{Float64}, Missing} = missing # Atomic density for non-linear phonon heat capacity
+    Cph::Union{Float64,Vector{Float64}, Missing} = missing # Constant phonon heat capacity
+    κ::Union{Float64,Vector{Float64}, Missing} = missing # Constant phonon thermal conductivity
 end
 """
     build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoupling = false, Electron_PhononCoupling = false, 
@@ -484,12 +514,20 @@ end
     - The PhononicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoupling = false, Electron_PhononCoupling = false, 
-                                    Conductivity = false, PhononicHeatCapacity = :linear, θ = 0.0, n = 0.0, Cph = 0.0, κ = 0.0)
+                                    Conductivity = false, PhononicHeatCapacity = :linear, θ = missing, n = missing, Cph = missing, κ = missing)
 
-    θ = convert_units(u"K", θ)
-    n = convert_units(u"nm^-3", n)
-    Cph = convert_units(u"eV/nm^3/K", Cph)
-    κ = convert_units(u"eV/nm", κ)
+    if !ismissing(θ)
+        θ = convert_units(u"K", θ)
+    end
+    if !ismissing(n)
+        n = convert_units(u"nm^-3", n)
+    end
+    if !ismissing(Cph)
+        Cph = convert_units(u"eV/nm^3/K", Cph)
+    end
+    if !ismissing(κ)
+        κ = convert_units(u"eV/nm", κ)
+    end
     return PhononicTemperature(Enabled=Enabled, AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, 
                                Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
                                PhononicHeatCapacity=PhononicHeatCapacity, θ=θ, n=n, Cph=Cph, κ=κ)
@@ -507,8 +545,8 @@ end
 
     Electron_PhononCoupling::Bool
 
-    Ω::Real
-    me::Real
+    Ω::Union{Real, Missing} = missing
+    me::Union{Real, Missing} = missing
 end
 """
     build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, Ω=1.0, me = Constants.me)
@@ -526,12 +564,16 @@ end
     # Returns
     - The ElectronicDistribution struct with the users settings and parameters with any neccessary unit conversion.
 """
-function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, me = Constants.me, Ω=1.0)
+function build_ElectronicDistribution(;Enabled = false, Electron_PhononCoupling = false, me = missing, Ω=missing)
 
-    Ω = convert_units(u"nm^3", Ω)
-    if me == Quantity
-        me = convert_units(u"kg", me)
-        me = me*BaseUnits.mass
+    if !ismissing(Ω)
+        Ω = convert_units(u"nm^3", Ω)
+    end
+    if !ismissing(me)
+        if me == Quantity
+            me = convert_units(u"kg", me)
+            me = me*BaseUnits.mass
+        end
     end
     return ElectronicDistribution(Enabled=Enabled, Electron_PhononCoupling=Electron_PhononCoupling,
                                   Ω=Ω, me=me)
@@ -550,9 +592,9 @@ end
 
     Electron_PhononCoupling::Bool
 
-    cs::Real
-    DOS_ph::spl
-    ED::Real
+    cs::Union{Real, Missing} = missing
+    DOS_ph::Union{spl, Missing} = missing
+    ED::Union{Real, Missing} = missing
 end
 """
     build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false, Ω=1.0, me = Constants.me)
@@ -572,10 +614,14 @@ end
     - The PhononicDistribution struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = false,
-                                     cs = 0.0, DOS_ph = get_interpolant([1,2,3], [4,5,6]), ED=0.0)
+                                     cs = missing, DOS_ph = missing, ED=missing)
 
-    ED = convert_units(u"eV", ED)
-    cs = convert_units(u"nm/fs", cs)
+    if !ismissing(ED)
+        ED = convert_units(u"eV", ED)
+    end
+    if !ismissing(cs)
+        cs = convert_units(u"nm/fs", cs)
+    end
     return PhononicDistribution(Enabled=Enabled, Electron_PhononCoupling=Electron_PhononCoupling,
                                   ED=ED, cs=cs, DOS_ph = DOS_ph)
 end

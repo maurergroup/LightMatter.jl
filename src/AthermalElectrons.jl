@@ -251,8 +251,8 @@ end
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
 function find_relaxeddistribution!(out, egrid, goal, n, DOS)
-    prob = NonlinearProblem(find_temperatureandμ!, SA[1000.0,0.0], (out, n, DOS, egrid, goal))
-    sol = solve(prob, SimpleKlement(); abstol=1e-8, reltol=1e-8).u
+    prob = NonlinearProblem(find_temperatureandμ!, [1000.0,0.0], (out, n, DOS, egrid, goal))
+    sol = solve(prob; abstol=1e-12, reltol=1e-12).u
     out = get_tmp(out, n)
     FermiDirac!(out, sol[1], sol[2], egrid)
     return nothing

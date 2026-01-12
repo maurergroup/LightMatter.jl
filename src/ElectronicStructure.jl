@@ -2,7 +2,7 @@
     DOS_initialization(bulk_DOS::Union{String,Vector{String}}, bulk_geometry::String, DOS_folder::String, slab_geometry::String,
                        atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     
-    Determines the desired DOS configuration and assembles it accordingly
+    Determines the desired DOS configuration and assembles it accordingly. Returns missing if no DOS files are provided.
 
     # Arguments
     - 'bulk_DOS': The bulk DOS file location
@@ -15,17 +15,20 @@
     ' 'DOS': Allows the user to use their own splined DOS, for other regions of the code it must be the same type as normal DOS
     
     # Returns
-    - A spline or vector of splines for the desired DOS structure
+    - A spline or vector of splines for the desired DOS structure, or missing if no files are provided
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
+                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, μ_offset::Union{Float64, Vector{Float64}})
     if DOS !== nothing
         return DOS
     else
         if bulk_DOS isa Nothing
-            return get_interpolant([1,2,3], [4,5,6])
+            return missing
         elseif bulk_DOS isa String
+            if bulk_geometry isa Nothing
+                return missing
+            end
             Vbulk = get_unitcellvolume(bulk_geometry)
             if zDOS == true 
                 DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
@@ -33,14 +36,23 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
                 DOS = generate_DOS(bulk_DOS, 1/Vbulk) 
             end
         else
+            if μ_offset == 0.0
+                offset = fill(0.0, length(bulk_DOS))
+            else
+                offset = μ_offset
+            end
+
             Vbulk = zeros(length(bulk_DOS))
             DOS = Vector{spl}(undef, length(bulk_DOS))
             for i in eachindex(bulk_DOS)
+                if bulk_geometry isa Nothing
+                    return missing
+                end
                 Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
                 if zDOS == true 
                     DOS[i] = spatial_DOS(DOS_folder[i], slab_geometry[i], bulk_DOS[i], Vbulk[i],dimension, atomic_layer_tolerance)
                 else
-                    DOS[i] = generate_DOS(bulk_DOS[i], 1/Vbulk[i])
+                    DOS[i] = generate_DOS(bulk_DOS[i], 1/Vbulk[i]; offset=offset[i])
                 end
             end
         end
@@ -50,15 +62,13 @@ end
 """
     get_FermiEnergy(File::String)
     
-    Calculates the Fermi energy defined as the difference between 0.0 and the
-    bottom of the valence band. Assumes the DOS provided has the Fermi energy
-    set to 0.0.
+    Extracts the Fermi energy from a DOS file, finding the first non-zero DOS value
 
     # Arguments
-    - 'File': Path to a file containing the density of states data.
+    - 'File': Path to the total DOS file in eV format
 
     # Returns
-    - The Fermi energy calculated at the bottom of the valence band.
+    - The Fermi energy in eV
 """
 function get_FermiEnergy(File::String)
     TotalDOS = readdlm(File, comments=true)
@@ -73,14 +83,14 @@ end
 
     # Arguments
     - 'File': Path to the total DOS file.
-    - 'unit_scalar': Scalar to convert the units (1/V in nm⁻³).
+    - 'units_scalar': Scalar to convert the units (1/V in nm⁻³).
 
     # Returns
     - An interpolation object representing the DOS.
 """
-function generate_DOS(File::String, unit_scalar::Float64)
+function generate_DOS(File::String, units_scalar::Float64;offset=0.0)
     TotalDOS = readdlm(File,comments=true)
-    return get_interpolant(TotalDOS[:,1], TotalDOS[:,2] * unit_scalar)
+    return get_interpolant(TotalDOS[:,1].+offset, TotalDOS[:,2] * units_scalar)
 end
 """
     build_DOS(dos_file::String, geometry_file::String)
@@ -120,7 +130,7 @@ end
 
 function get_atomicdensity(geometry_file::String)
     geometry = readdlm(geometry_file, comments=true)
-    atoms = count(x->x=="atom", geometry[:,1])
+    atoms = count(x->contains(x, "atom"), geometry[:,1])
     vectors = geometry[geometry[:,1] .== "lattice_vector",:] #Assumes FHI-aims geometry file
     a = vectors[1,2:4]
     b = vectors[2,2:4]
@@ -329,6 +339,7 @@ end
     
     Creates a vector or array of vectors (spatial DOS) for the group veolcity for ballistic electron transport. Users can also provide a constant value in the form
     of v_g, they must also set conductive_veolcity to constant.
+    Returns missing if DOS is missing or if conductivity is disabled.
     Currently Implemented:
     - :fermigas : Assumes a free electron gas solution therefore is an analytical form of the group velocity
     - :effectiveoneband : Uses the effective one band model to convert a DOS into a group velocity, for more details see Mueller & Rethfeld, Phys. Rev. B 87, 035139.
@@ -342,20 +353,27 @@ end
     - 'structure': Contains all structural information including DOS and number of elemental systems
 
     # Returns
-    - The group velocity vector or array of vectors as requested by the user for ballistic electron transport
+    - The group velocity vector or array of vectors as requested by the user for ballistic electron transport, or missing if not applicable
 """
-function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
-    if isnothing(v_g)
+function build_group_velocity(v_g::Union{Vector{Float64},Nothing,Missing}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
+    if isnothing(v_g) || ismissing(v_g)
         if Conductivity == true
+            if ismissing(structure.DOS) || ismissing(FE)
+                return missing
+            end
             if conductive_velocity == :fermigas
                 if structure.Elemental_System > 1
                     elements = structure.Elemental_System
                     v_g = Vector{Vector{Float64}}(undef,elements)
                     grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in 1:Elemental_System
-                        length = length(grids[i])
-                        v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE),length)
+                    for i in eachindex(grids)
+                        if isa(FE, Vector) && length(FE) == elements
+                            v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE[i]),length(grids[i]))
+                        else
+                            v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE),length(grids[i]))
+                        end
                     end
+                    return v_g
                 else
                     return get_fermigas_velocity(Ref(structure.egrid),FE)
                 end
@@ -370,7 +388,11 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Flo
                     v_g = zeros(structure.dimension.length,length(structure.egrid))
                     Threads.@threads for i in eachindex(v_g[:,1])
                         j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
-                        v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j], structure.egrid, FE[j])
+                        if isa(FE, Vector)
+                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j], structure.egrid, FE[j])
+                        else
+                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j], structure.egrid, FE)
+                        end
                     end
                     return v_g
                 else
@@ -378,7 +400,7 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Flo
                 end
             end
         else 
-            return [NaN]
+            return missing
         end
     else
         if Conductivity == true
@@ -387,16 +409,16 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Flo
                     elements = structure.Elemental_System
                     V_g = Vector{Vector{Float64}}(undef,elements)
                     grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in 1:Elemental_System
-                        length = length(grids[i])
-                        V_g[i] = fill(convert_units(u"nm/fs", v_g),length)
+                    for i in eachindex(grids)
+                        V_g[i] = fill(convert_units(u"nm/fs", v_g),length(grids[i]))
                     end
+                    return V_g
                 else
                     return convert_units(u"nm/fs", v_g)
                 end
             end
         else 
-            return [NaN]
+            return missing
         end
     end
 end
@@ -448,18 +470,18 @@ end
     - The effective one band model group velocity as a vector or vector of vectors depending on the structure
     of the system
 """
-function effective_one_band_velocity(bandstructure::AkimaInterpolation, DOS::spl, egrid::Vector{Float64}, FE::Float64)
+function effective_one_band_velocity(bandstructure::Spline1D, DOS::spl, egrid::Vector{Float64}, FE::Float64)
     k_E = effective_onebandmodel(DOS,egrid,FE)
     v_g = similar(k_E)
     if eltype(v_g) <: AbstractVector
         for j in eachindex(v_g)
-            dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
+            dE_dk = Dierckx.derivative.(Ref(bandstructure),k_E)
             kE_spl = LightMatter.get_interpolant(egrid,k_E)
             dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
             v_g[j] = dEdk_spl(kE_spl(egrid))./ Constants.ħ
         end
     else
-        dE_dk = DataInterpolations.derivative.(Ref(bandstructure),k_E)
+        dE_dk = Dierckx.derivative.(Ref(bandstructure),k_E)
         kE_spl = LightMatter.get_interpolant(egrid,k_E)
         dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
         v_g = dEdk_spl(kE_spl(egrid))./ Constants.ħ
@@ -494,8 +516,26 @@ function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     return k_E
 end
 
+"""
+    bandstructure_initialization(bandstructure, DOS, egrid, FE)
+    
+    Initializes the band+
+     structure interpolation objects for the effective one band model
+
+    # Arguments
+    - 'bandstructure': Type of band structure model (:effectiveoneband or other)
+    - 'DOS': Density of states (can be spl or Vector of spl)
+    - 'egrid': Energy grid
+    - 'FE': Fermi energy (can be Float64 or Vector for multi-element systems)
+
+    # Returns
+    - Spline objects for band structure interpolation, or missing if not applicable
+"""
 function bandstructure_initialization(bandstructure, DOS, egrid, FE)
-    if bandstructure == :effectiveoneband
+    if bandstructure == nothing
+        if ismissing(DOS)
+            return missing
+        end
         if !(typeof(DOS) <: spl)
             E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
             for i in eachindex(DOS)
@@ -505,18 +545,16 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                     fe = FE
                 end
                 temp_k = effective_onebandmodel(DOS[i], egrid, fe)
-
-                E_k[i] = [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
-                          DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
+                E_k[i] = [Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
+                          Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest")]
             end
             return E_k
         else
             temp_k = effective_onebandmodel(DOS, egrid, FE)
-            return [DataInterpolations.AkimaInterpolation(egrid,temp_k,extrapolation = ExtrapolationType.Constant),
-                    DataInterpolations.AkimaInterpolation(temp_k, egrid,extrapolation = ExtrapolationType.Constant)]
+            return [Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
+                    Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest")]
         end
     else
-        return [DataInterpolations.AkimaInterpolation([1,2,3],[4,5,6],extrapolation = ExtrapolationType.Constant),
-                DataInterpolations.AkimaInterpolation([1,2,3],[4,5,6],extrapolation = ExtrapolationType.Constant)]
+        return bandstructure
     end
 end

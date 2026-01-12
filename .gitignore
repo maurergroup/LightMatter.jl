@@ -1,9 +1,7 @@
-/AthEM Data/*
-/Posters/*
-/Temporary/*
 *.jld2
 *.mp4
 *.nxs
 *.pdf
 *.ipynb
 *.zip
+Manifest.toml

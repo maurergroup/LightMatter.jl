@@ -65,6 +65,17 @@ function spatial_laser(sim::Simulation)
     end
 end
 
+"""
+    heaviside(t)
+    
+    Computes the Heaviside step function (unit step function)
+
+    # Arguments
+    - 't': Input value
+
+    # Returns
+    - 0.5 if t=0, 0 if t<0, 1 if t>0
+"""
 function heaviside(t)
    return 0.5 * (sign(t) + 1)
 end
@@ -84,15 +95,6 @@ end
     # Returns
     - Expression for the spatial shape of the laser
 """
-#= function spatial_z_laser(sim::Simulation)
-    decay = spatial_laser_decay(sim)
-    if sim.structure.dimension.length == 1
-        return :(1 ./ $decay)
-    else
-        return :(1 ./ $decay .* exp.(-sim.structure.dimension.grid[i]./$decay))
-    end
-end =#
-
 function spatial_z_laser(sim::Simulation)
     decay = spatial_laser_decay(sim)
     const_expr = :(1 ./ $decay)
@@ -104,6 +106,17 @@ function spatial_z_laser(sim::Simulation)
     end 
 end
 
+"""
+    antennareactor_laserdecay(sim::Simulation)
+    
+    Generates layer-by-layer laser decay expressions for multi-element antenna reactor systems
+
+    # Arguments
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Array of expressions for laser decay through each material layer
+"""
 function antennareactor_laserdecay(sim::Simulation)
     depths = vcat(sim.structure.dimension.InterfaceHeight, sim.structure.dimension.grid[end])
 
@@ -124,6 +137,17 @@ function antennareactor_laserdecay(sim::Simulation)
     return layer_exprs
 end
 
+"""
+    spatial_laser_decay(sim::Simulation)
+    
+    Determines the characteristic decay length for laser penetration into the sample
+
+    # Arguments
+    - 'sim': Simulation settings and parameters including transport type
+
+    # Returns
+    - Expression for the decay length (ballistic depth, optical depth, or combined)
+"""
 function spatial_laser_decay(sim::Simulation)
     if sim.laser.Transport == :ballistic
         return :(sim.laser.δb)

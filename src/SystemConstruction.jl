@@ -272,6 +272,7 @@ end
 """
 function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
+    push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end)) # Error checking for missing parameters
     if sim.structure.Elemental_System > 1
         push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
         push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl

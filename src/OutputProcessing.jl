@@ -20,7 +20,7 @@
     # Returns
     - Nothing is returned but a file is created
 """
-function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, output::Vector{Symbol}, sim::Simulation)
+function post_production(sol, file_name::String, initial_temps::Dict{String,Float64}, sim::Simulation, output::Vector{Symbol}=Vector{Symbol}(undef, 0))
     temp_name = file_name[1:end-5]*"_temp.jld2" 
     @save temp_name sol
     fid = create_datafile_and_structure(file_name)
@@ -83,9 +83,12 @@ end
 function dict_to_hdf5(f, d)
     for (key, value) in d
         if typeof(value) <:Vector{<:AbstractArray}
-            value = stack(value, dims=1)
+            f[key] = stack(value, dims=1)
+        elseif ismissing(value)
+            f[key] = "Parameter not specified"
+        else
+            f[key] = value
         end
-        f[key] = value
     end
 end
 """
@@ -140,12 +143,26 @@ function write_simulation(f,sim::Simulation)
     extract_structure(f, sim.structure)
 end
 
+"""
+    write_phononicdistribution(f, sim::Simulation)
+    
+    Writes phononic distribution parameters to HDF5, converting spline objects to sampled values
+
+    # Arguments
+    - 'f': HDF5 file location to write to
+    - 'sim': Simulation object containing phononic distribution data
+
+    # Returns
+    - Nothing, but phononic distribution data is written to file
+"""
 function write_phononicdistribution(f, sim::Simulation)
     phononic_d = Dict{String,Any}(String(key)=>getfield(sim.phononicdistribution, key) for key ∈ fieldnames(PhononicDistribution))
     for (key, value) in phononic_d
         if typeof(value) <: spl
             tmp = value(collect(-10.0:0.1:10.0))
             f[key] = tmp
+        elseif ismissing(value)
+            f[key] = "Parameter not specified"
         else
             f[key] = value
         end
@@ -311,10 +328,10 @@ end
 """
 function populate_unpropagatedvalues!(initial_temps::Dict{String,Float64}, fields, sim::Simulation, vals)
     if :Tel ∉ fields
-        merge!(vals, Dict("Tel" => fill(initial_temps["Tel"], sim.structure.dimension.length)'))
+        merge!(vals, Dict("Tel" => Array(fill(initial_temps["Tel"], sim.structure.dimension.length)')))
     end
     if :Tph ∉ fields
-        merge!(vals, Dict("Tph" => fill(initial_temps["Tph"], sim.structure.dimension.length)'))
+        merge!(vals, Dict("Tph" => Array(fill(initial_temps["Tph"], sim.structure.dimension.length)')))
     end
     if :noe ∉ fields
         merge!(vals, Dict("noe" => particlenumber_values(sim)))
@@ -352,6 +369,18 @@ function particlenumber_values(sim::Simulation)
     return no_part
 end
 
+"""
+    write_dynamicalvariables(f, results)
+    
+    Writes all dynamical variables from the simulation results to their respective locations in the HDF5 file
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of results containing Tel, Tph, fneq, and noe
+
+    # Returns
+    - Nothing, but datasets are written to the file
+"""
 function write_dynamicalvariables(f, results)
     for (name, result) in results
         if name == "Tel"
@@ -366,6 +395,20 @@ function write_dynamicalvariables(f, results)
     end
 end
 
+"""
+    selected_output_functions(f, results, sim, output)
+    
+    Executes user-selected output functions to compute and save additional derived quantities
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results
+    - 'sim': Simulation settings and parameters
+    - 'output': Vector of symbols indicating which output functions to execute
+
+    # Returns
+    - Nothing, but results are written to the file
+"""
 function selected_output_functions(f, results, sim, output)
     for sym in output
         func_name = Symbol("output_", sym)
@@ -378,6 +421,19 @@ function selected_output_functions(f, results, sim, output)
     end
 end
 
+"""
+    output_chemicalpotential(f, results, sim)
+    
+    Calculates and writes the chemical potential as a function of time and space to the output file
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel and noe
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but chemical potential is written to file and added to results dictionary
+"""
 function output_chemicalpotential(f, results, sim)
     if !haskey(results, "μ")
         Tel = results["Tel"]
@@ -402,6 +458,19 @@ function output_chemicalpotential(f, results, sim)
     end
 end
 
+"""
+    output_ThermalFermiDistribution(f, results, sim)
+    
+    Calculates and writes the thermal Fermi-Dirac distribution as a function of energy, time, and space
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but thermal Fermi-Dirac distribution is written to file
+"""
 function output_ThermalFermiDistribution(f, results, sim)
     Tel = results["Tel"]
     FD=zeros(length(Tel[:,1]), sim.structure.dimension.length, length(sim.structure.egrid))
@@ -416,6 +485,19 @@ function output_ThermalFermiDistribution(f, results, sim)
     merge!(results, Dict("TFD" => FD))
 end 
 
+"""
+    output_dTeldt(f, results, sim)
+    
+    Calculates and writes the time derivative of electronic temperature
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but temperature derivative is written to file
+"""
 function output_dTeldt(f, results, sim)
     Tel = results["Tel"]
     dTemp = similar(Tel)
@@ -429,6 +511,19 @@ function output_dTeldt(f, results, sim)
     write_dataset(f["Electronic Temperature"], "Temperature Derivative", dTemp)
 end
 
+"""
+    output_TelConductivity(f, results, sim)
+    
+    Calculates and writes the thermal conductivity contribution to heat flow in the electronic system
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel and Tph
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but thermal conductivity is written to file
+"""
 function output_TelConductivity(f, results, sim)
     Tel = results["Tel"]
     Tph = results["Tph"]
@@ -439,6 +534,19 @@ function output_TelConductivity(f, results, sim)
     write_dataset(f["Electronic Temperature"], "Thermal Conductivity", spat)
 end
 
+"""
+    output_electronphononcoupling(f, results, sim)
+    
+    Calculates and writes the electron-phonon coupling strength as a function of time and space
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel and Tph
+    - 'sim': Simulation settings and parameters with electron-phonon coupling specifications
+
+    # Returns
+    - Nothing, but electron-phonon coupling is written to file
+"""
 function output_electronphononcoupling(f, results, sim)
     Tel = results["Tel"]
     Tph = results["Tph"]
@@ -462,6 +570,19 @@ function output_electronphononcoupling(f, results, sim)
     write_dataset(f["Electronic Temperature"], "Electron-Phonon Coupling", eps)
 end     
 
+"""
+    output_electronheatcapacity(f, results, sim)
+    
+    Calculates and writes the electronic heat capacity as a function of time and space
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tel
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but electronic heat capacity is written to file
+"""
 function output_electronheatcapacity(f, results, sim)
     Tel = results["Tel"]
     hc = similar(Tel)
@@ -482,6 +603,19 @@ function output_electronheatcapacity(f, results, sim)
     write_dataset(f["Electronic Temperature"], "Electronic Heat Capacity", hc)
 end
 
+"""
+    output_athermalelectronelectronscattering(f, results, sim)
+    
+    Calculates and writes the athermal electron-electron scattering relaxation rate
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing fneq, Tel, and noe
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but electron-electron scattering is written to file and added to results
+"""
 function output_athermalelectronelectronscattering(f, results, sim)
     if !haskey(results, "e*erelax")
         fneq = results["fneq"]
@@ -507,6 +641,19 @@ function output_athermalelectronelectronscattering(f, results, sim)
     end
 end
 
+"""
+    output_athermalelectronelectronenergychange(f, results, sim)
+    
+    Calculates and writes the energy change in the thermal system due to athermal electron-electron scattering
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but energy change is written to file
+"""
 function output_athermalelectronelectronenergychange(f, results, sim)
     output_athermalelectronelectronscattering(f, results, sim)
     relax = results["e*erelax"]
@@ -521,6 +668,19 @@ function output_athermalelectronelectronenergychange(f, results, sim)
     write_dataset(f["Electronic Temperature"], "Athermal Electron-Electron Energy Flow", uee)
 end
 
+"""
+    output_phononicheatcapacity(f, results, sim)
+    
+    Calculates and writes the phononic heat capacity as a function of time and space
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing Tph
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but phononic heat capacity is written to file
+"""
 function output_phononicheatcapacity(f, results, sim)
     if sim.phononictemperature.PhononicHeatCapacity == :variable
         tph = results["Tph"]
@@ -538,6 +698,19 @@ function output_phononicheatcapacity(f, results, sim)
     end
 end
 
+"""
+    output_athemelectronphononscattering(f, results, sim)
+    
+    Calculates and writes the athermal electron-phonon scattering relaxation rate
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing fneq, Tel, and Tph
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but electron-phonon scattering is written to file and added to results
+"""
 function output_athemelectronphononscattering(f, results, sim)
     if !haskey(results, "e*phrelax")
         fneq = results["fneq"]
@@ -560,6 +733,19 @@ function output_athemelectronphononscattering(f, results, sim)
     end
 end
 
+"""
+    output_athermalelectronphononenergychange(f, results, sim)
+    
+    Calculates and writes the energy change in the thermal system due to athermal electron-phonon scattering
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but energy change is written to file
+"""
 function output_athermalelectronphononenergychange(f, results, sim)
     output_athermalelectronphononscattering(f, results, sim)
     relax = results["e*phrelax"]
@@ -574,6 +760,19 @@ function output_athermalelectronphononenergychange(f, results, sim)
     write_dataset(f["Phononic Temperature"], "Athermal Electron-Phonon Energy Flow", uee)
 end
 
+"""
+    output_dndt(f, results, sim)
+    
+    Calculates and writes the time derivative of particle number
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing noe
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but particle number change is written to file
+"""
 function output_dndt(f, results, sim)
     n = results["n"]
     δn = similar(n)
@@ -584,6 +783,19 @@ function output_dndt(f, results, sim)
     write_dataset(f["Electronic Temeprature"], "Change in Thermal Particle Number", δn)
 end
 
+"""
+    output_dfneqdt(f, results, sim)
+    
+    Calculates and writes the time derivative of the athermal electron distribution
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing fneq
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but distribution change is written to file
+"""
 function output_dfneqdt(f, results, sim)
     fneq = results["fneq"]
     dfneq = zeros(size(fneq))
@@ -594,7 +806,20 @@ function output_dfneqdt(f, results, sim)
     write_dataset(f["Athermal Electrons"], "Change in fneq", dfneq)
 end
 
-function output_athemexcitation(f, results, sim) #Currently working on this and below
+"""
+    output_athemexcitation(f, results, sim)
+    
+    Calculates and writes the athermal electron excitation rate due to laser absorption
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing fneq and Tel
+    - 'sim': Simulation settings and parameters
+
+    # Returns
+    - Nothing, but excitation rate is written to file
+"""
+function output_athemexcitation(f, results, sim)
     fneq = results["fneq"]
     Tel = results["Tel"]
     output_chemicalpotential(f, results, sim)
@@ -617,6 +842,19 @@ function output_athemexcitation(f, results, sim) #Currently working on this and 
     write_dataset(f["Athermal Electrons"], "Excitation", excite)
 end 
 
+"""
+    output_laserprofile(f, results, sim)
+    
+    Calculates and writes the temporal and spatial laser intensity profile throughout the simulation
+
+    # Arguments
+    - 'f': HDF5 file to be written to
+    - 'results': Dictionary of simulation results containing time points
+    - 'sim': Simulation settings and parameters including laser specifications
+
+    # Returns
+    - Nothing, but laser profile is written to file
+"""
 function output_laserprofile(f, results, sim)
     time = results["times"]
     grid = sim.structure.dimension.grid
@@ -634,7 +872,22 @@ function output_laserprofile(f, results, sim)
     write_dataset(f["Laser"], "Temporal Profile", temp_prof)
 end
 
+"""
+    write_dataset(file, dataset, data)
+    
+    Writes data to HDF5 file, ensuring proper memory layout for arrays
+
+    # Arguments
+    - 'file': HDF5 file location to write to
+    - 'dataset': Name of dataset within file
+    - 'data': Data to write (converted to contiguous Array if needed)
+
+    # Returns
+    - Nothing, but data is written to the HDF5 file
+"""
 function write_dataset(file,dataset,data)
+    # Convert adjoint/transposed arrays to contiguous arrays for HDF5 compatibility
+    data = Array(data)
     dims = size(data)
 
     if ndims(data) == 1
@@ -650,6 +903,19 @@ function write_dataset(file,dataset,data)
     HDF5.write_dataset(file, dataset, data, chunk=chunk_size, shuffle=true, deflate=3)
 end
 
+"""
+    get_DOS(DOS, sim, i)
+    
+    Retrieves the density of states at a specific spatial point, handling both bulk and spatially-resolved DOS
+
+    # Arguments
+    - 'DOS': Density of states (either single spline, vector of splines, or vector of vectors of splines)
+    - 'sim': Simulation settings and parameters
+    - 'i': Spatial index
+
+    # Returns
+    - The DOS spline at the specified spatial point
+"""
 function get_DOS(DOS, sim, i)
     if !(typeof(DOS) <: spl)
         if length(DOS) == sim.structure.dimension.length
@@ -663,6 +929,19 @@ function get_DOS(DOS, sim, i)
     end
 end   
 
+"""
+    get_parameterhvalue(val, sim, i)
+    
+    Retrieves parameter value at spatial position, handling multi-element systems
+
+    # Arguments
+    - 'val': Parameter value(s) for system
+    - 'sim': Simulation object
+    - 'i': Spatial index
+
+    # Returns
+    - Parameter value at the spatial position, or array of values for multi-element system
+"""
 function get_parameterhvalue(val, sim, i)
     if sim.structure.Elemental_System > 1
         X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
@@ -672,6 +951,19 @@ function get_parameterhvalue(val, sim, i)
     end
 end
 
+"""
+    get_parameterhvalue(tup::Tuple, sim, i)
+    
+    Retrieves tuple of parameter values at spatial position for multi-element systems
+
+    # Arguments
+    - 'tup': Tuple of parameter values for system
+    - 'sim': Simulation object
+    - 'i': Spatial index
+
+    # Returns
+    - Tuple of parameter values at the spatial position
+"""
 function get_parameterhvalue(tup::Tuple, sim, i)
     if sim.structure.Elemental_System > 1
         X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
@@ -681,6 +973,17 @@ function get_parameterhvalue(tup::Tuple, sim, i)
     end
 end
 
+"""
+    vec_simulation(sim::Simulation)
+    
+    Separates multi-element simulation into individual element simulations or returns single simulation as-is
+
+    # Arguments
+    - 'sim': Simulation object potentially containing multiple elemental systems
+
+    # Returns
+    - Single Simulation object or array of Simulation objects, one per elemental system
+"""
 function vec_simulation(sim::Simulation)
     if sim.structure.Elemental_System > 1
         sims = sim_seperation(sim)
@@ -690,11 +993,23 @@ function vec_simulation(sim::Simulation)
     return sims
 end
 
+"""
+    output_functions(f, sim)
+    
+    Populates dictionary with string representations of system functions and complete simulation expression
+
+    # Arguments
+    - 'f': Dictionary to populate with function representations
+    - 'sim': Simulation object
+
+    # Returns
+    - Nothing, but f is modified to contain string versions of functions and equations
+"""
 function output_functions(f,sim)
     sys = function_builder(sim)
     for i in keys(sys)
         f[i] = string(sys[i])
     end
-    simulation_expr = simulation_construction(sys,sim)
+    simulation_expr = simulation_construction(sys,sim, false)
     f["Total Equation Block"] = string(simulation_expr)
 end

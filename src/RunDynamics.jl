@@ -19,7 +19,7 @@
     - The solution of the dynamics calculation
 """
 function run_simulation(sim::Simulation, initialtemps::Dict{String, Float64},
-    tspan::Tuple{Float64,Float64}; alg=Tsit5(), print_time=false, kwargs...)
+    tspan::Tuple{<:Real,<:Real}; alg=Tsit5(), print_time=false, kwargs...)
     
     sys = function_builder(sim)
     u0 = generate_initialconditions(sim,initialtemps)
@@ -36,10 +36,10 @@ end
 
 # Temporary function overloading to work with stiff integrators such as Trapezoid()
 
-using ArrayInterface
+#= using ArrayInterface
 
 function ArrayInterface.zeromatrix(A::NamedArrayPartition)
-   B = ArrayPartition(A)
+    B = ArrayPartition(A)
     x = reduce(vcat,vec.(B.x))
     x .* x' .* false
-end
+end =#
