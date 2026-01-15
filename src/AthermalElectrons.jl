@@ -251,12 +251,11 @@ end
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
 function find_relaxeddistribution!(out, egrid, goal, n, DOS)
-    #prob = IntervalNonlinearProblem(find_relaxedtemp, (50.0, 1e5), (out, n, DOS, egrid, goal))
-    prob = NonlinearProblem(find_relaxedtemp, [1000.0, 0.0], (out, n, DOS, egrid, goal))
-    sol = solve(prob; abstol=1e-3, reltol=1e-3).u
-    #μ = find_chemicalpotential(n, sol, DOS, egrid)
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (50.0, 1e5), (out, n, DOS, egrid, goal))
+    sol = solve(prob; alg=Brent(),abstol=1e-7, reltol=1e-7).u
+    μ = find_chemicalpotential(n, sol, DOS, egrid)
     out = get_tmp(out, sol)
-    FermiDirac!(out, sol[1], sol[2], egrid)
+    FermiDirac!(out, sol, μ, egrid)
     return nothing
 end
 """
@@ -273,20 +272,16 @@ end
     # Returns
     - Internal energy of the current temperature guess.
 """
-function find_relaxedtemp(du, u, (out, n, DOS, egrid, goal))
-    #= Tel = ForwardDiff.value(u[1])
-    μ = ForwardDiff.value(u[2]) =#
-    #u_val = ForwardDiff.value(u)  # Extract value for nested solver
+function find_relaxedtemp(u, (out, n, DOS, egrid, goal))
+    u_val = ForwardDiff.value(u)  # Extract value for nested solver
     #println("Trying temperature: ", u)
     n = ForwardDiff.value(n)
     goal = ForwardDiff.value(goal)
-    out_tmp = get_tmp(out, u[1])
-    #μ = find_chemicalpotential(n, u_val, DOS, egrid)
-    FermiDirac!(out_tmp, Tel, μ, egrid)
-    du[1] = goal - get_internalenergy(out_tmp, DOS, egrid)
-    du[2] = n - get_noparticles(out_tmp, DOS, egrid)
-    return nothing
-    #return goal - get_internalenergy(out_tmp, DOS, egrid)
+    
+    out_tmp = get_tmp(out, u_val)
+    μ = find_chemicalpotential(n, u_val, DOS, egrid)
+    FermiDirac!(out_tmp, u_val, μ, egrid)
+    return goal - get_internalenergy(out_tmp, DOS, egrid)
 end 
 """
     athem_electronelectroninteraction(sim::Simulation)
