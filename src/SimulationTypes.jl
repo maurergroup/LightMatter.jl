@@ -173,11 +173,11 @@ global const spl=Interpolations.AbstractExtrapolation
     Elemental_System::Int # The number of elemental systems, if > 1 then each constant and vector
                           # of material parameters needs to become a vector of length=Elemental_System
 
-    DOS::Union{spl, Vector{spl}, Missing} = missing # The density of states of the simulation
-    bandstructure::Union{Vector{<:Dierckx.Spline1D}, Vector{<:Vector{<:Dierckx.Spline1D}}, Nothing, Missing} = missing # The band structure of the simulation
+    DOS::Union{spl, Vector{spl}, Missing} # The density of states of the simulation
+    bandstructure::Union{Vector{<:Dierckx.Spline1D}, Vector{<:Vector{<:Dierckx.Spline1D}}, Missing}# The band structure of the simulation
     egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
 
-    dimension::Union{Dimension} # A struct holding all spatial grid structure (0D or 1D)
+    dimension::Dimension # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
 end
 """
@@ -215,7 +215,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    μ_offset::Union{Float64, Vector{Float64}} = 0.0)
+    μ_offset::Union{Float64, Vector{Float64}} = 0.0, calculate_bandstructure::Bool = true)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset)
     egrid = build_egrid(egrid)
@@ -226,7 +226,11 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         total_field = TotalFields(Fields(fill(0.0, 3), fill(0.0, 3)), Fields(fill(0.0, 3), fill(0.0, 3)))
     end
-    bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
+    if calculate_bandstructure
+        bandstructure = bandstructure_initialization(bandstructure, DOS, egrid, FE)
+    else
+        bandstructure = missing
+    end
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
                     bandstructure = bandstructure, ChemicalPotential=chemicalpotential)
 end
@@ -744,7 +748,7 @@ end
 function build_egrid(egrid)
     side = 1
     dE = egrid[2] - egrid[1]
-    while length(egrid) % 4 != 1
+    while length(egrid) % 8 != 1
         if side == 1
             push!(egrid,egrid[end]+dE)
             side = -1

@@ -133,7 +133,7 @@ end
 
 function boltzmann_screening(f, kgrid, sim)
     prefac = Constants.q^2 * sim.electronicdistribution.me /(pi^2*Constants.ħ^2*Constants.ϵ0)
-    return prefac * Bode_rule(f, kgrid)
+    return prefac * integration_algorithm(f, kgrid)
 end
 
 function boltzmann_E_electronelectron(f, sim, DOS)
