@@ -68,7 +68,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim)
-            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, n, $τee))))
+            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee))))
         end
     end
     return exprs
@@ -280,7 +280,7 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,variable_renaming(sim))
     end
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(n, Tel, DOS, sim.structure.egrid)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(sim.structure.particle_number, Tel, DOS, sim.structure.egrid)))
     else
         push!(exprs, :(μ = 0.0))
     end

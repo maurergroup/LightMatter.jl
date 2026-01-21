@@ -176,6 +176,7 @@ global const spl=Interpolations.AbstractExtrapolation
     DOS::Union{spl, Vector{spl}, Missing} # The density of states of the simulation
     bandstructure::Union{Vector{<:Dierckx.Spline1D}, Vector{<:Vector{<:Dierckx.Spline1D}}, Missing}# The band structure of the simulation
     egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
+    particle_number::Union{Float64, Vector{Float64}, Missing} # The total number of particles in the system
 
     dimension::Dimension # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
@@ -215,7 +216,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    μ_offset::Union{Float64, Vector{Float64}} = 0.0, calculate_bandstructure::Bool = true)
+    μ_offset::Union{Float64, Vector{Float64}} = 0.0, calculate_bandstructure::Bool = false)
 
     DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset)
     egrid = build_egrid(egrid)
@@ -231,8 +232,9 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         bandstructure = missing
     end
+    pn = get_particlenumber(DOS, egrid)
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential)
+                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential,particle_number = pn)
 end
 """
     WIP!!!

@@ -183,7 +183,7 @@ function athem_electronelectroninteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
         expr = quote
             relax_dis = LightMatter.access_DiffCache(relax_dis, fneq[1])
-            -1 * relax_dis
+            relax_dis
         end
         return expr # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system
     else
@@ -230,11 +230,10 @@ end
 function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS, n, τee)
     fdis = get_tmp(fdis, Tel)
     LightMatter.FermiDirac!(fdis, Tel, μ, egrid)
-    fdis .+= fneq
     goal = get_internalenergy(fdis, DOS, egrid)
     find_relaxeddistribution!(frel, egrid, goal, n, DOS)
     frel = get_tmp(frel, Tel)
-    fdis .= (fneq+frel-fdis+fneq) ./ τee #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
+    fdis .= -(fneq ./τee) .+ ((fdis-frel) ./ τee) #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
 end
 """
     find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64)
@@ -383,15 +382,15 @@ end
     # Returns
     - Fermi energy/energies for each DOS input.
 """
-function FE_initialization(bulk_DOS::Union{String, Vector{String}})
-    if bulk_DOS isa String
-        FE = get_FermiEnergy(bulk_DOS)
-        return FE
-    else
-        FE = zeros(length(bulk_DOS))
-        for i in eachindex(bulk_DOS)
-            FE[i] = get_FermiEnergy(bulk_DOS[i])
-        end
-        return FE
+function FE_initialization(bulk_DOS::String)
+    FE = get_FermiEnergy(bulk_DOS)
+    return FE
+end
+
+function FE_initialization(bulk_DOS::Vector{String})
+    FE = zeros(length(bulk_DOS))
+    for i in eachindex(bulk_DOS)
+        FE[i] = get_FermiEnergy(bulk_DOS[i])
     end
+    return FE
 end

@@ -226,20 +226,19 @@ end
 """
 function write_DOS(structure::Structure)
     
-    egrid = collect(range(-20,20, step=0.01))
     if typeof(structure.DOS) == Vector{spl} && structure.Elemental_System == 1
-        DOS = zeros(length(structure.DOS), length(egrid))
+        DOS = zeros(length(structure.DOS), length(structure.egrid))
         for i in eachindex(structure.DOS)
-            DOS[i,:] = structure.DOS[i](egrid)
+            DOS[i,:] = structure.DOS[i](structure.egrid)
         end
     elseif structure.Elemental_System > 1 && structure.DOS isa Vector
-        DOS = zeros(length(structure.DOS), length(egrid))
+        DOS = zeros(length(structure.DOS), length(structure.egrid))
         for i in eachindex(structure.DOS)
-            DOS[i,:] = structure.DOS[i](egrid)
+            DOS[i,:] = structure.DOS[i](structure.egrid)
         end
     else
-        DOS = zeros(length(egrid))
-        DOS[:] = structure.DOS(egrid)
+        DOS = zeros(length(structure.egrid))
+        DOS[:] = structure.DOS(structure.egrid)
     end
     return Dict("DOS" => DOS)
 end

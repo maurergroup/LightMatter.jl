@@ -182,7 +182,7 @@ end
 """
     split_structure(structure)
 
-    Splits a `Structure` object into multiple structures if `DOS` is a vector. Different to split_struct due to the possibility 
+    Splits a `Structure` object into multiple structures if `DOS` or `particlenumber` is a vector. Different to split_struct due to the possibility 
     of spatially resolved DOS' though currently that isn't implemented
 
     # Arguments
@@ -195,15 +195,24 @@ end
 function split_structure(structure::Structure)
     field_values = Dict(f => getfield(structure, f) for f in fieldnames(typeof(structure))) #Extracts all values from fields of subssytem into dict
     
-    if !(:DOS in keys(field_values) && field_values[:DOS] isa Vector)
-        return fill(structure, structure.Elemental_System)  # Return as-is if the specified field is not a vector
+    # Check if DOS or particlenumber are vectors
+    dos_is_vector = :DOS in keys(field_values) && field_values[:DOS] isa Vector
+    pn_is_vector = :particlenumber in keys(field_values) && field_values[:particlenumber] isa Vector
+    
+    if !dos_is_vector && !pn_is_vector
+        return fill(structure, structure.Elemental_System)  # Return as-is if neither field is a vector
     end
+    
+    # Determine the number of structures to create
+    n_structures = dos_is_vector ? length(field_values[:DOS]) : length(field_values[:particlenumber])
     
     return [
         typeof(structure)(
-            (f == :DOS ? field_values[f][i] : field_values[f] for f in fieldnames(typeof(structure)))...
-        ) for i in 1:length(field_values[:DOS])
-    ] # Creates a vector of the Structure struct with the DOS split into their seperate materials
+            (f == :DOS ? (dos_is_vector ? field_values[f][i] : field_values[f]) : 
+             f == :particlenumber ? (pn_is_vector ? field_values[f][i] : field_values[f]) :
+             field_values[f] for f in fieldnames(typeof(structure)))...
+        ) for i in 1:n_structures
+    ] # Creates a vector of the Structure struct with the DOS and particlenumber split into their seperate materials
 end
 """
     split_grid(grid, cutoffs)
