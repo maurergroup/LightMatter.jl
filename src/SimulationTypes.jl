@@ -216,9 +216,9 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    μ_offset::Union{Float64, Vector{Float64}} = 0.0, calculate_bandstructure::Bool = false)
+    calculate_bandstructure::Bool = false, μ_offset::Bool = true, μ_offset_reference::Int=1)
 
-    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset)
+    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset, μ_offset_reference)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields

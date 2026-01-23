@@ -130,7 +130,7 @@ function antennareactor_laserdecay(sim::Simulation)
         atten_prev = exp(-sum(diff([0.0; depths[1:i-1]] ./ sim.laser.ϵ[1:i-1])))
         
         expr = :( (1 / $ϵ) * $atten_prev * exp(-(sim.structure.dimension.grid[i] - $z0) / $ϵ) *
-                  (heaviside(sim.structure.dimension.grid[i] - $z0) * heaviside($zend - sim.structure.dimension.grid[i])) )
+                  (LightMatter.heaviside(sim.structure.dimension.grid[i] - $z0) * LightMatter.heaviside($zend - sim.structure.dimension.grid[i])) )
         push!(layer_exprs, expr)
     end
     

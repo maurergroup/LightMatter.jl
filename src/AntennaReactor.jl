@@ -197,19 +197,19 @@ function split_structure(structure::Structure)
     
     # Check if DOS or particlenumber are vectors
     dos_is_vector = :DOS in keys(field_values) && field_values[:DOS] isa Vector
-    pn_is_vector = :particlenumber in keys(field_values) && field_values[:particlenumber] isa Vector
+    pn_is_vector = :particle_number in keys(field_values) && field_values[:particle_number] isa Vector
     
     if !dos_is_vector && !pn_is_vector
         return fill(structure, structure.Elemental_System)  # Return as-is if neither field is a vector
     end
     
     # Determine the number of structures to create
-    n_structures = dos_is_vector ? length(field_values[:DOS]) : length(field_values[:particlenumber])
+    n_structures = dos_is_vector ? length(field_values[:DOS]) : length(field_values[:particle_number])
     
     return [
         typeof(structure)(
             (f == :DOS ? (dos_is_vector ? field_values[f][i] : field_values[f]) : 
-             f == :particlenumber ? (pn_is_vector ? field_values[f][i] : field_values[f]) :
+             f == :particle_number ? (pn_is_vector ? field_values[f][i] : field_values[f]) :
              field_values[f] for f in fieldnames(typeof(structure)))...
         ) for i in 1:n_structures
     ] # Creates a vector of the Structure struct with the DOS and particlenumber split into their seperate materials

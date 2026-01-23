@@ -3,6 +3,7 @@
                        atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     
     Determines the desired DOS configuration and assembles it accordingly. Returns missing if no DOS files are provided.
+    Spatial DOS with a μ offset for antenna-reactor complexes is currently not supported.
 
     # Arguments
     - 'bulk_DOS': The bulk DOS file location
@@ -19,7 +20,7 @@
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, μ_offset::Union{Float64, Vector{Float64}})
+                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, μ_offset=true, DOS_reference=1)
     if DOS !== nothing
         return DOS
     else
@@ -36,10 +37,10 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
                 DOS = generate_DOS(bulk_DOS, 1/Vbulk) 
             end
         else
-            if μ_offset == 0.0
-                offset = fill(0.0, length(bulk_DOS))
+            if μ_offset 
+                offset = calculate_μoffset(bulk_DOS, DOS_reference)
             else
-                offset = μ_offset
+                offset = zeros(length(bulk_DOS))
             end
 
             Vbulk = zeros(length(bulk_DOS))
@@ -50,7 +51,7 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
                 end
                 Vbulk[i] = get_unitcellvolume(bulk_geometry[i])
                 if zDOS == true 
-                    DOS[i] = spatial_DOS(DOS_folder[i], slab_geometry[i], bulk_DOS[i], Vbulk[i],dimension, atomic_layer_tolerance)
+                    DOS[i] = spatial_DOS(DOS_folder[i], slab_geometry[i], bulk_DOS[i], Vbulk[i], dimension, atomic_layer_tolerance)
                 else
                     DOS[i] = generate_DOS(bulk_DOS[i], 1/Vbulk[i]; offset=offset[i])
                 end
@@ -537,7 +538,7 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
             return missing
         end
         if !(typeof(DOS) <: spl)
-            E_k = Vector{Vector{AkimaInterpolation}}(undef, length(DOS))
+            E_k = Vector{Vector{Dierckx.Spline1D}}(undef, length(DOS))
             for i in eachindex(DOS)
                 if length(DOS) == length(FE)
                     fe = FE[i]
@@ -557,4 +558,21 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
     else
         return bandstructure
     end
+end
+
+function calculate_μoffset(DOS::Vector{String}, primary=1)
+    μ_offset = zeros(length(DOS))
+    reference = readdlm(DOS[primary])
+    ref_line = findall(x->x[13] == "mu", eachrow(reference))
+    μ_ref = reference[ref_line[1],15]
+    for i in eachindex(DOS)
+        if i != primary
+            current = readdlm(DOS[i])
+            cur_line = findall(x->x[13] == "mu", eachrow(current))
+            μ_cur = current[cur_line[1],15]
+            μ_off = μ_cur - μ_ref
+            μ_offset[i] = μ_off
+        end
+    end
+    return μ_offset
 end

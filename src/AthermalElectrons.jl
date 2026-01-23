@@ -387,10 +387,17 @@ function FE_initialization(bulk_DOS::String)
     return FE
 end
 
-function FE_initialization(bulk_DOS::Vector{String})
+function FE_initialization(bulk_DOS::Vector{String}, μ_offset::Bool=true, reference=1)
     FE = zeros(length(bulk_DOS))
-    for i in eachindex(bulk_DOS)
-        FE[i] = get_FermiEnergy(bulk_DOS[i])
+    if μ_offset
+        offset = calculate_μoffset(bulk_DOS, reference)
+        for i in eachindex(bulk_DOS)
+            FE[i] = get_FermiEnergy(bulk_DOS[i]) + offset[i]
+        end
+    else
+        for i in eachindex(bulk_DOS)
+            FE[i] = get_FermiEnergy(bulk_DOS[i])
+        end
     end
     return FE
 end
