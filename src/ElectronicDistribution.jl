@@ -18,9 +18,7 @@ function FermiDirac(Tel, μ, E)
 end
 
 function FermiDirac!(dis, Tel, μ, E)
-    @inbounds for i in eachindex(dis)
-        dis[i] = 1 / (exp((E[i]-μ) / (Constants.kB*Tel))+1)
-    end
+    @. dis = 1 / (exp((E-μ) / (Constants.kB*Tel))+1)
 end
 """
     dFDdE(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})

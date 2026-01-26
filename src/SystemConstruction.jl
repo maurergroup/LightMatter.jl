@@ -139,12 +139,12 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64
     p = parameter_conductivity(p, sim)
     p = parameter_particle(p, sim)
     if sim.athermalelectrons.Enabled
-        p =(; p..., Δfexcite = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length],
-                    tmp = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length])
+        p =(; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)),
+                    tmp = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         if !sim.electronictemperature.Enabled
             p = (; p..., Tel = initialtemps["Tel"])
         else
-            p = (; p..., relax_dis = [DiffCache(zeros(length(sim.structure.egrid))) for _ in 1:sim.structure.dimension.length])
+            p = (; p..., relax_dis = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         end
     end
 
@@ -153,13 +153,13 @@ end
 
 function parameter_conductivity(p, sim)
     if sim.electronictemperature.Conductivity
-        p = (; p..., Tel_cond = DiffCache(zeros(sim.structure.dimension.length)))
+        p = (; p..., Tel_cond = zeros(sim.structure.dimension.length))
     end
     if sim.athermalelectrons.Conductivity
-        p = (; p..., f_cond = DiffCache(zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
+        p = (; p..., f_cond = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
     end
     if sim.phononictemperature.Conductivity
-        p = (; p..., Tph_cond = DiffCache(zeros(sim.structure.dimension.length)))
+        p = (; p..., Tph_cond = zeros(sim.structure.dimension.length))
     end
     return p
 end
@@ -168,19 +168,19 @@ function parameter_particle(p, sim)
     if (sim.athermalelectrons.Enabled || sim.electronictemperature.Enabled) && !sim.athermalelectrons.AthermalElectron_ElectronCoupling
         if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
             no_part=zeros(sim.structure.dimension.length)
-            noe = get_tmp(no_part, 0.0)
+            #noe = get_tmp(no_part, 0.0)
             for j in eachindex(sim.structure.dimension.grid)
                 noe[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
             end
         elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
-            no_part=DiffCache(zeros(sim.structure.dimension.length))
-            noe = get_tmp(no_part, 0.0)
+            no_part=zeros(sim.structure.dimension.length)
+            #noe = get_tmp(no_part, 0.0)
             for j in eachindex(sim.structure.dimension.grid)
                 mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
                 noe[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
             end
         else
-            no_part = DiffCache(fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length))
+            no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
         end
         p = (; p..., noe = no_part)
     end
@@ -342,44 +342,44 @@ function variable_renaming(sim::Simulation)
     if sim.athermalelectrons.Enabled == true
         push!(old_name,:(@view u.fneq[i,:]))
         push!(new_name,:fneq)
-        push!(old_name, :(p.tmp[i]))
+        push!(old_name, :(@view p.tmp[i,:]))#:(@view LightMatter.access_DiffCache(p.tmp, u.fneq[i,1])[i,:]))
         push!(new_name, :tmp)
-        push!(old_name, :(p.Δfexcite[i]))
+        push!(old_name, :(@view p.Δfexcite[i,:]))#:(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
         push!(new_name, :Δfexcite)
         if sim.athermalelectrons.Conductivity == true
-            push!(old_name,:(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
-            push!(new_name,:f_cond)
+            push!(old_name, :(@view p.f_cond[i,:]))#:(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
+            push!(new_name, :f_cond)
         end
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-            push!(old_name,:(p.Tel))
-            push!(new_name,:Tel)
-            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
+            push!(old_name, :(p.Tel))
+            push!(new_name, :Tel)
+            push!(old_name, :(@view p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
-            push!(old_name, :(p.relax_dis[i]))
+            push!(old_name, :(@view p.relax_dis[i,:]))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
             push!(new_name, :relax_dis)
         end
     end
     if sim.electronictemperature.Enabled == true
-        push!(old_name,:(u.Tel[i]))
-        push!(new_name,:Tel)
+        push!(old_name, :(u.Tel[i]))
+        push!(new_name, :Tel)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-            push!(old_name, :(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
+            push!(old_name, :(@view p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
             push!(new_name, :n)
         end
         if sim.electronictemperature.Conductivity == true
-            push!(old_name,:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
+            push!(old_name,:(@view p.Tel_cond[i]))#:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
             push!(new_name,:Tel_cond)
         end
     end
     if sim.phononictemperature.Enabled == true
-        push!(old_name,:(u.Tph[i]))
-        push!(new_name,:Tph)
+        push!(old_name, :(u.Tph[i]))
+        push!(new_name, :Tph)
         if sim.phononictemperature.Conductivity == true
-            push!(old_name,:(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
-            push!(new_name,:Tph_cond)
+            push!(old_name, :(@view p.Tph_cond[i]))#:(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
+            push!(new_name, :Tph_cond)
         end
     end
     old_name = Tuple(old_name)

@@ -80,8 +80,8 @@ end
       full excitation shape change
 """
 function athemexcitation!(Δfneqe, Δfneqh, ftot, egrid, DOS, hv::Float64, M)
-    Δfneqh = get_tmp(Δfneqh, ftot)
-    Δfneqe = get_tmp(Δfneqe, ftot)
+    #Δfneqh = get_tmp(Δfneqh, ftot)
+    #Δfneqe = get_tmp(Δfneqe, ftot)
     ftotspl = get_interpolant(egrid, ftot)
     athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv, M)
     athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv, M)
@@ -228,11 +228,11 @@ end
     - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
 """
 function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS, n, τee)
-    fdis = get_tmp(fdis, Tel)
+    #fdis = get_tmp(fdis, Tel)
     LightMatter.FermiDirac!(fdis, Tel, μ, egrid)
     goal = get_internalenergy(fdis, DOS, egrid)
     find_relaxeddistribution!(frel, egrid, goal, n, DOS)
-    frel = get_tmp(frel, Tel)
+    #frel = get_tmp(frel, Tel)
     fdis .= -(fneq ./τee) .+ ((fdis-frel) ./ τee) #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
 end
 """
@@ -253,7 +253,7 @@ function find_relaxeddistribution!(out, egrid, goal, n, DOS)
     prob = IntervalNonlinearProblem(find_relaxedtemp, (50.0, 1e5), (out, n, DOS, egrid, goal))
     sol = solve(prob; alg=Brent(),abstol=1e-7, reltol=1e-7).u
     μ = find_chemicalpotential(n, sol, DOS, egrid)
-    out = get_tmp(out, sol)
+    #out = get_tmp(out, sol)
     FermiDirac!(out, sol, μ, egrid)
     return nothing
 end
@@ -272,15 +272,15 @@ end
     - Internal energy of the current temperature guess.
 """
 function find_relaxedtemp(u, (out, n, DOS, egrid, goal))
-    u_val = ForwardDiff.value(u)  # Extract value for nested solver
+    #u_val = ForwardDiff.value(u)  # Extract value for nested solver
     #println("Trying temperature: ", u)
-    n = ForwardDiff.value(n)
-    goal = ForwardDiff.value(goal)
+    #n = ForwardDiff.value(n)
+    #goal = ForwardDiff.value(goal)
     
-    out_tmp = get_tmp(out, u_val)
-    μ = find_chemicalpotential(n, u_val, DOS, egrid)
-    FermiDirac!(out_tmp, u_val, μ, egrid)
-    return goal - get_internalenergy(out_tmp, DOS, egrid)
+    #out_tmp = get_tmp(out, u_val)
+    μ = find_chemicalpotential(n, u, DOS, egrid)
+    FermiDirac!(out, u, μ, egrid)
+    return goal - get_internalenergy(out, DOS, egrid)
 end 
 """
     athem_electronelectroninteraction(sim::Simulation)
@@ -352,7 +352,7 @@ end
     - In-place change to Δf
 """
 function electron_distribution_transport!(v_g::Vector{Float64}, f, Δf, dz)
-    Δf = get_tmp(Δf, f[1,1])
+    #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
         @. Δf[i, :] = ((f[i-1, :] - 2 * f[i, :] + f[i+1, :]) / dz) * v_g
     end
@@ -362,7 +362,7 @@ function electron_distribution_transport!(v_g::Vector{Float64}, f, Δf, dz)
 end
 
 function electron_distribution_transport!(v_g::Matrix{Float64}, f, Δf, dz)
-    Δf = get_tmp(Δf, f[1,1])
+    #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
         @. Δf[i,:] = (f[i-1,:] - 2*f[i,:] + f[i+1,:]) / dz * v_g[i,:]
     end

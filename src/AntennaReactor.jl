@@ -79,9 +79,9 @@ function ar_variable_renaming(sim::Simulation)
     if sim.athermalelectrons.Enabled == true
         push!(old_name,:(@view u.fneq[i,:]))
         push!(new_name,:fneq)
-        push!(old_name, :(p.tmp[i]))
+        push!(old_name, :(@view LightMatter.access_DiffCache(p.tmp, u.fneq[i,1])[i,:]))
         push!(new_name, :tmp)
-        push!(old_name, :(p.Δfexcite[i]))
+        push!(old_name, :(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
         push!(new_name, :Δfexcite)
         if sim.athermalelectrons.Conductivity == true
             push!(old_name, :(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
@@ -95,7 +95,7 @@ function ar_variable_renaming(sim::Simulation)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
-            push!(old_name, :(p.relax_dis[i]))
+            push!(old_name, :(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
             push!(new_name, :relax_dis)
         end
     end
