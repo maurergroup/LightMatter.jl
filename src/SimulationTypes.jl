@@ -357,15 +357,15 @@ function build_AthermalElectrons(; Enabled = false, structure::Structure = build
     if !ismissing(v_g)
         # v_g is provided, no need to build it
     elseif Conductivity && Enabled
-        v_g = build_group_velocity(missing, FE, Conductivity, Conductive_Velocity, structure)
+        tmp_v = build_group_velocity(v_g, FE, Conductivity, Conductive_Velocity, structure)
     else
-        v_g = missing
+        tmp_v  = missing
     end
 
     return AthermalElectrons(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
         AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, Conductivity=Conductivity, 
         ElectronicRelaxation=ElectronicRelaxation, PhononicRelaxation=PhononicRelaxation, 
-        ExcitationMatrixElements=ExcitationMatrixElements, FE=FE, τ=τ, τep=τep, v_g=v_g,
+        ExcitationMatrixElements=ExcitationMatrixElements, FE=FE, τ=τ, τep=τep, v_g=tmp_v,
         Conductive_Velocity=Conductive_Velocity,EmbeddedAthEM=EmbeddedAthEM)
 end
 """
