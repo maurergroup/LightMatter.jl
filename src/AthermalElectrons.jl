@@ -228,11 +228,9 @@ end
     - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
 """
 function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS, n, τee)
-    #fdis = get_tmp(fdis, Tel)
     LightMatter.FermiDirac!(fdis, Tel, μ, egrid)
     goal = get_internalenergy(fdis, DOS, egrid)
-    find_relaxeddistribution!(frel, egrid, goal, n, DOS)
-    #frel = get_tmp(frel, Tel)
+    find_relaxeddistribution(frel, egrid, goal, n, DOS)
     fdis .= -(fneq ./τee) .+ ((fdis-frel) ./ τee) #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
 end
 """
@@ -249,16 +247,16 @@ end
     # Returns
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
-function find_relaxeddistribution!(out, egrid, goal, n, DOS)
-    prob = IntervalNonlinearProblem(find_relaxedtemp, (50.0, 1e5), (out, n, DOS, egrid, goal))
-    sol = solve(prob; alg=Brent(),abstol=1e-7, reltol=1e-7).u
+function find_relaxeddistribution(out, egrid, goal, n, DOS)
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (1.0, 1e4), (out, n, DOS, egrid, goal))
+    sol = solve(prob; alg=Brent(),abstol=1e-2, reltol=1e-2).u
     μ = find_chemicalpotential(n, sol, DOS, egrid)
     #out = get_tmp(out, sol)
     FermiDirac!(out, sol, μ, egrid)
     return nothing
 end
 """
-    find_relaxedtemp!(Tel::Float64,n::Float64,DOS::spl,egrid::Vector{Float64})
+    find_relaxedtemp(Tel::Float64,n::Float64,DOS::spl,egrid::Vector{Float64})
 
     Given a temperature guess, computes chemical potential and internal energy.
 
@@ -272,12 +270,6 @@ end
     - Internal energy of the current temperature guess.
 """
 function find_relaxedtemp(u, (out, n, DOS, egrid, goal))
-    #u_val = ForwardDiff.value(u)  # Extract value for nested solver
-    #println("Trying temperature: ", u)
-    #n = ForwardDiff.value(n)
-    #goal = ForwardDiff.value(goal)
-    
-    #out_tmp = get_tmp(out, u_val)
     μ = find_chemicalpotential(n, u, DOS, egrid)
     FermiDirac!(out, u, μ, egrid)
     return goal - get_internalenergy(out, DOS, egrid)

@@ -131,10 +131,11 @@ end
     - NamedTuple containing the parameters of the simulation
 """
 function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
+    int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
     if sim.structure.Elemental_System > 1
-        p = (sim=sim,matsim=sim_seperation(sim))
+        p = (sim=sim,matsim=sim_seperation(sim), int_mtx = int_mtx)
     else
-        p = (sim=sim,)
+        p = (sim=sim, int_mtx = int_mtx)
     end
     p = parameter_conductivity(p, sim)
     p = parameter_particle(p, sim)
@@ -330,8 +331,8 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim)]
-    new_name = [:sim]
+    old_name = [:(p.sim), :(@view p.int_mtx[i,:])]
+    new_name = [:sim, :int_vec]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)

@@ -37,6 +37,9 @@ function dFDdE(Tel, μ, E)
     return -exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
 
+function dFDdE!(tmp, Tel, μ, E)
+    @. tmp = -exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)/(Constants.kB*Tel))+1)^2)
+end
 """
     dFDdT(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -53,6 +56,10 @@ end
 function dFDdT(Tel, μ, E)
     return (E.-μ) .* exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel^2 * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
 end
+
+function dFDdT!(tmp, Tel, μ, E)
+    @. tmp = (E-μ) * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel^2 * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+end
 """
     dFDdμ(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -68,6 +75,10 @@ end
 """
 function dFDdμ(Tel, μ, E)
     return exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
+end
+
+function dFDdμ!(tmp, Tel, μ, E)
+    @. tmp = exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
 end
 
 function boltzmann_E_excitation(f, sim, E_mag, DOS)
