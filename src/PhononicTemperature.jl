@@ -30,9 +30,9 @@ end
 """
 function build_phonontemperature(sim::Simulation, Source::Union{Expr,Float64}, ElecPhon::Expr, HeatCapacity::Expr)
     args = Union{Expr,Symbol,Float64}[Source,ElecPhon]
-    if sim.phononictemperature.Conductivity == true
+    #= if sim.phononictemperature.Conductivity == true
         push!(args,:Tph_cond)
-    end
+    end =#
     return Expr(:call,:./,Expr(:call,:+,args...),HeatCapacity)
 end
 """
@@ -128,7 +128,7 @@ end
     # Returns
     - Updates cond with the change in temperature at each z-grid point
 """
-function phonontemperature_conductivity!(Tph, κ, dz, cond)
+function phonontemperature_conductivity!(cond, Tph, κ, dz)
     #cond = get_tmp(cond, Tph[1])
     depthderivative!(Tph, dz, cond)
     cond[1] = 0.0

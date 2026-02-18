@@ -36,9 +36,9 @@ end
 """
 function build_electronTTM(sim::Simulation, Source::Expr, ElecPhon::Expr, HeatCapacity::Expr)
     args = Union{Expr, Symbol, Float64}[Source, ElecPhon]
-    if sim.electronictemperature.Conductivity == true
+    #= if sim.electronictemperature.Conductivity == true
         push!(args, :Tel_cond)
-    end
+    end =#
     return Expr(:call, :/, Expr(:call, :+, args...), HeatCapacity)
 end
 """
@@ -174,9 +174,9 @@ function athem_electempenergychange(sim::Simulation)
     if sim.phononictemperature.Enabled == true
        push!(args, electronphonon_coupling(sim::Simulation))
     end
-    if sim.electronictemperature.Conductivity == true
+    #= if sim.electronictemperature.Conductivity == true
         push!(args, :(Tel_cond))
-    end
+    end =#
     return Expr(:call, :+, args...)
 end
 """
@@ -212,7 +212,7 @@ end
     # Returns
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
-function electrontemperature_conductivity!(Tel, κ, dz, Tph, cond)
+function electrontemperature_conductivity!(cond, Tel, κ, dz, Tph)
     #cond = get_tmp(cond, Tel[1])
     K = κ.*Tel./Tph
 

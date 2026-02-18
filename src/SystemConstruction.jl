@@ -137,7 +137,6 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64
     else
         p = (sim=sim, int_mtx = int_mtx)
     end
-    p = parameter_conductivity(p, sim)
     p = parameter_particle(p, sim)
     if sim.athermalelectrons.Enabled
         p =(; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)),
@@ -150,19 +149,6 @@ function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64
     end
 
     return p 
-end
-
-function parameter_conductivity(p, sim)
-    if sim.electronictemperature.Conductivity
-        p = (; p..., Tel_cond = zeros(sim.structure.dimension.length))
-    end
-    if sim.athermalelectrons.Conductivity
-        p = (; p..., f_cond = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
-    end
-    if sim.phononictemperature.Conductivity
-        p = (; p..., Tph_cond = zeros(sim.structure.dimension.length))
-    end
-    return p
 end
 
 function parameter_particle(p, sim)
@@ -221,7 +207,6 @@ end
     - Quote block for the monometallic problem
 """
 function monometallic_system(sys, sim::Simulation, print_time)
-    expr_cond = conductivity_expressions(sim)
     loop_body = build_loopbody(sys, sim)
     if print_time
         t_expr = :(println(t))
@@ -230,7 +215,6 @@ function monometallic_system(sys, sim::Simulation, print_time)
     end
     return quote
         $t_expr
-        $expr_cond
         Threads.@threads for i in 1:p.sim.structure.dimension.length
             $loop_body
         end
@@ -248,16 +232,18 @@ end
     - Vector of expression for the conductivity of each subsytem if they are enabled
 """
 function conductivity_expressions(sim::Simulation)
-    cond_exprs = []
+    cond_exprs = [:(du .= 0.0)]
+    
     if sim.electronictemperature.Conductivity == true
-        push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph, p.Tel_cond)))
+        push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(du.Tel, u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph)))
     end
     if sim.phononictemperature.Conductivity == true
-        push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing, p.Tph_cond)))
+        push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing)))
     end
     if sim.athermalelectrons.Conductivity == true
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(p.sim.athermalelectrons.v_g, u.fneq, p.f_cond, p.sim.structure.dimension.spacing)))
-    end 
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing)))
+    end
+
     return Expr(:block,cond_exprs...)
 end
 """
@@ -347,10 +333,10 @@ function variable_renaming(sim::Simulation)
         push!(new_name, :tmp)
         push!(old_name, :(@view p.Δfexcite[i,:]))#:(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
         push!(new_name, :Δfexcite)
-        if sim.athermalelectrons.Conductivity == true
+        #= if sim.athermalelectrons.Conductivity == true
             push!(old_name, :(@view p.f_cond[i,:]))#:(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
             push!(new_name, :f_cond)
-        end
+        end =#
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name, :(p.Tel))
             push!(new_name, :Tel)
@@ -370,18 +356,18 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
             push!(new_name, :n)
         end
-        if sim.electronictemperature.Conductivity == true
+        #= if sim.electronictemperature.Conductivity == true
             push!(old_name,:(p.Tel_cond[i]))#:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
             push!(new_name,:Tel_cond)
-        end
+        end =#
     end
     if sim.phononictemperature.Enabled == true
         push!(old_name, :(u.Tph[i]))
         push!(new_name, :Tph)
-        if sim.phononictemperature.Conductivity == true
+        #= if sim.phononictemperature.Conductivity == true
             push!(old_name, :(p.Tph_cond[i]))#:(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
             push!(new_name, :Tph_cond)
-        end
+        end =#
     end
     old_name = Tuple(old_name)
     new_name = Tuple(new_name)

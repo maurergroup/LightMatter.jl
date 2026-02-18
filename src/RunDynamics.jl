@@ -19,16 +19,22 @@
     - The solution of the dynamics calculation
 """
 function run_simulation(sim::Simulation, initialtemps::Dict{String, Float64},
-    tspan::Tuple{<:Real,<:Real}; alg=Tsit5(), print_time=false, kwargs...)
+    tspan::Tuple{<:Real,<:Real}; alg=KenCarp3(), print_time=false, kwargs...)
     
     sys = function_builder(sim)
     u0 = generate_initialconditions(sim,initialtemps)
     p = generate_parameters(sim,initialtemps)
-    simulation_expr = simulation_construction(sys,sim, print_time)
-    simulation_problem! = mk_function((:du,:u,:p,:t),(),simulation_expr)
+
+    conductivity_expr = conductivity_expressions(sim)
+    f1! = mk_function((:du,:u,:p,:t),(), conductivity_expr)
+
+    singlepoint_expr = simulation_construction(sys,sim, print_time)
+    f2! = mk_function((:du,:u,:p,:t),(), singlepoint_expr)
+
     println("Precompiling") 
-    simulation_problem!(similar(u0),u0,p,0.0)
-    prob=ODEProblem(simulation_problem!,u0,tspan,p)
+    f1!(similar(u0),u0,p,0.0)
+    f2!(similar(u0),u0,p,0.0)
+    prob=SplitODEProblem(f1!,f2!,u0,tspan,p)
     println("Running Script")
     sol = solve(prob, alg; kwargs...)
     return sol

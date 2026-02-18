@@ -55,9 +55,9 @@ end
 """
 function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Float64}, Elecphon::Union{Expr,Float64})
     args = Union{Expr, Symbol, Float64}[athemexcite, Elecelec, Elecphon]
-    if sim.athermalelectrons.Conductivity == true
+    #= if sim.athermalelectrons.Conductivity == true
         push!(args, :f_cond)
-    end
+    end =#
     return Expr(:call, :(.+), (args)...)
 end
 """
@@ -343,7 +343,7 @@ end
     # Returns
     - In-place change to Δf
 """
-function electron_distribution_transport!(v_g::Vector{Float64}, f, Δf, dz)
+function electron_distribution_transport!(Δf, v_g::Vector{Float64}, f, dz)
     #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
         @. Δf[i, :] = ((f[i-1, :] - 2 * f[i, :] + f[i+1, :]) / dz) * v_g
@@ -353,7 +353,7 @@ function electron_distribution_transport!(v_g::Vector{Float64}, f, Δf, dz)
     @views @. Δf[end, :] = ((f[end-1, :] - f[end, :]) / dz) * v_g
 end
 
-function electron_distribution_transport!(v_g::Matrix{Float64}, f, Δf, dz)
+function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz)
     #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
         @. Δf[i,:] = (f[i-1,:] - 2*f[i,:] + f[i+1,:]) / dz * v_g[i,:]
