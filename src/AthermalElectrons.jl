@@ -182,7 +182,6 @@ end
 function athem_electronelectroninteraction(sim::Simulation)
     if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
         expr = quote
-            relax_dis = LightMatter.access_DiffCache(relax_dis, fneq[1])
             relax_dis
         end
         return expr # Uses relax_dis as a temp variable due to it being required here and in the electronic temperature system

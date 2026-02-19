@@ -146,10 +146,10 @@ function sim_seperation(sim::Simulation)
     tphs   = conditional_split(sim.phononictemperature, sim.phononictemperature.Enabled)
     neqs   = conditional_split(sim.athermalelectrons, sim.athermalelectrons.Enabled)
     structs = split_structure(sim.structure)
-    new_sim = Vector{SimulationTypes}(undef, sim.structure.Elemental_System) #Build and fill vector of simulation objects
+    new_sim = ()#Build and fill vector of simulation objects
     for i in 1:sim.structure.Elemental_System 
-        new_sim[i] = build_Simulation(laser=lasers[i], electronictemperature=tels[i], phononictemperature=tphs[i],
-                                    athermalelectrons=neqs[i], structure=structs[i])
+        new_sim = (new_sim..., build_Simulation(laser=lasers[i], electronictemperature=tels[i], phononictemperature=tphs[i],
+                                    athermalelectrons=neqs[i], structure=structs[i]))
     end
     return new_sim
 end

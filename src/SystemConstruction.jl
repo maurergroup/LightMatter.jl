@@ -131,11 +131,11 @@ end
     - NamedTuple containing the parameters of the simulation
 """
 function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
-    int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
+    #int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
     if sim.structure.Elemental_System > 1
-        p = (sim=sim,matsim=sim_seperation(sim), int_mtx = int_mtx)
+        p = (sim=sim, matsim=sim_seperation(sim))
     else
-        p = (sim=sim, int_mtx = int_mtx)
+        p = (sim=sim)
     end
     p = parameter_particle(p, sim)
     if sim.athermalelectrons.Enabled
@@ -243,7 +243,7 @@ function conductivity_expressions(sim::Simulation)
     if sim.athermalelectrons.Conductivity == true
         push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing)))
     end
-
+    push!(cond_exprs, :(return nothing))
     return Expr(:block,cond_exprs...)
 end
 """
