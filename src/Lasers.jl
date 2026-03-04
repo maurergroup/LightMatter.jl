@@ -74,10 +74,10 @@ end
     - 't': Input value
 
     # Returns
-    - 0.5 if t=0, 0 if t<0, 1 if t>0
+    - 1 if t>=0, 0 if t<0
 """
 function heaviside(t)
-   return 0.5 * (sign(t) + 1)
+   return t >= 0 ? 1.0 : 0.0
 end
 
 """
@@ -100,7 +100,12 @@ function spatial_z_laser(sim::Simulation)
     const_expr = :(1 ./ $decay)
     if sim.structure.Elemental_System != 1
         exprs = antennareactor_laserdecay(sim)
-        return Expr(:call, :+, exprs...)
+        # Select the appropriate layer expression based on material index X
+        layer_selection = Expr(:call, :ifelse, :(X == 1), exprs[1], exprs[2])
+        for j in 3:length(exprs)
+            layer_selection = Expr(:call, :ifelse, :(X == $j), exprs[j], layer_selection)
+        end
+        return layer_selection
     else
         return :($const_expr .* exp.(-sim.structure.dimension.grid[i]./$decay))
     end 
@@ -118,7 +123,7 @@ end
     - Array of expressions for laser decay through each material layer
 """
 function antennareactor_laserdecay(sim::Simulation)
-    depths = vcat(sim.structure.dimension.InterfaceHeight, sim.structure.dimension.grid[end])
+    depths = sort(vcat(sim.structure.dimension.InterfaceHeight, sim.structure.dimension.grid[end]))
 
     layer_exprs = Expr[]
     for i in 1:sim.structure.Elemental_System
@@ -129,8 +134,8 @@ function antennareactor_laserdecay(sim::Simulation)
         # attenuation from all previous layers
         atten_prev = exp(-sum(diff([0.0; depths[1:i-1]] ./ sim.laser.ϵ[1:i-1])))
         
-        expr = :( (1 / $ϵ) * $atten_prev * exp(-(sim.structure.dimension.grid[i] - $z0) / $ϵ) *
-                  (LightMatter.heaviside(sim.structure.dimension.grid[i] - $z0) * LightMatter.heaviside($zend - sim.structure.dimension.grid[i])) )
+        expr = :( ((1 / $ϵ) * $atten_prev * exp(-(sim.structure.dimension.grid[i] - $z0) / $ϵ) *
+                  (LightMatter.heaviside(sim.structure.dimension.grid[i] - $z0) * LightMatter.heaviside($zend - sim.structure.dimension.grid[i]))) )
         push!(layer_exprs, expr)
     end
     

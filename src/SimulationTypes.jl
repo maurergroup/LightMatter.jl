@@ -108,7 +108,7 @@ end
     # Returns
     - The Dimension struct with the users grid and interface heights
 """
-function build_Dimension(grid::AbstractArray{Float64} = [0.0], cutoff::Union{Vector{Float64},Float64} = 0.0)
+function build_Dimension(grid::AbstractArray{Float64} = [0.0], cutoff::Union{Vector{Float64},Float64} = Inf)
     L = length(grid)
     grid = convert_units(u"nm", grid)
     if L > 1
@@ -148,6 +148,11 @@ end
     A convenience type definition to make type specificity easier throughout the code
 """
 global const spl=Interpolations.AbstractExtrapolation
+
+struct bandstructure
+    k_to_E::Spline1D
+    E_to_k::Spline1D
+end
 """
     Structure <: SimulationTypes
         Spatial_DOS::Bool # Whether to vary the DOS with height - if so the DOS becomes a vector
@@ -174,16 +179,17 @@ global const spl=Interpolations.AbstractExtrapolation
                           # of material parameters needs to become a vector of length=Elemental_System
 
     DOS::Union{spl, Vector{spl}, Missing} # The density of states of the simulation
-    bandstructure::Union{Vector{<:Dierckx.Spline1D}, Vector{<:Vector{<:Dierckx.Spline1D}}, Missing}# The band structure of the simulation
+    bandstructure::Union{bandstructure, Vector{<:bandstructure}, Missing}# The band structure of the simulation
     egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
     particle_number::Union{Float64, Vector{Float64}, Missing} # The total number of particles in the system
 
     dimension::Dimension # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
+    μ_offset::Vector{Float64}
 end
 """
     build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
-                    bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
+                    DOS_file::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
                     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
                     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, 
                     egrid::Union{Vector{Float64},Nothing} = nothing)
@@ -197,7 +203,7 @@ end
     - 'Spatial_DOS': Bool for determening whether the DOS is spatially resolved or bulk
     - 'Elemental_System': Float64 of different crystal systems in the structure
     - 'dimension': Dimension struct, provide if not wanting a 0D calculation
-    - 'bulk_DOS': File location of the bulk DOS file
+    - 'DOS_file': File location of the bulk DOS file
     - 'DOS_folder': Location of a folder containing atom projected DOS. These must be in units of (eV⁻¹atom⁻¹) and be .dat files
     - 'bulk_geometry': File location of the bulk DOS' geometry.in file
     - 'slab_geometry': File location of the geometry.in to create the atom projected DOS' found in DOS_folder
@@ -212,13 +218,24 @@ end
     - The Structure struct with the DOS and egrid assembled or provided by the user
 """
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
-    bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
-    bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
+    DOS_file::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
+    DOS_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    calculate_bandstructure::Bool = false, μ_offset::Bool = true, μ_offset_reference::Int=1)
+    calculate_bandstructure::Bool = false, μ_offset::Bool = false, μ_offset_reference::Int=1)
 
-    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset, μ_offset_reference)
+
+    if μ_offset
+        offset = calculate_μoffset(DOS_file, μ_offset_reference)
+    else
+        if DOS_file != nothing
+            offset = zeros(length(DOS_file))
+        else
+            offset = zeros(1)
+        end
+    end
+
+    DOS = DOS_initialization(DOS_file, DOS_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset, μ_offset_reference)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields
@@ -232,9 +249,9 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         bandstructure = missing
     end
-    pn = get_particlenumber(DOS, egrid)
+    pn = get_particlenumber(DOS, DOS_file, egrid, μ_offset, μ_offset_reference)
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential,particle_number = pn)
+                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential,particle_number = pn, μ_offset = offset)
 end
 """
     WIP!!!
@@ -631,6 +648,12 @@ function build_PhononicDistribution(;Enabled = false, Electron_PhononCoupling = 
     return PhononicDistribution(Enabled=Enabled, Electron_PhononCoupling=Electron_PhononCoupling,
                                   ED=ED, cs=cs, DOS_ph = DOS_ph)
 end
+
+#= struct cache
+    Δfneqe
+    Δfneqh
+    int_vec
+end =#
 """
     struct Simulation <: SimulationTypes
         densitymatrix::DensityMatrix
@@ -653,6 +676,7 @@ end
     structure::Structure
     laser::Laser
     densitymatrix::DensityMatrix
+    #cache::Cache
 end
 """
     build_Simulation(;densitymatrix::Union{DensityMatrix,NamedTuple,Nothing}=nothing, electronictemperature::Union{ElectronicTemperature,NamedTuple,Nothing}=nothing,

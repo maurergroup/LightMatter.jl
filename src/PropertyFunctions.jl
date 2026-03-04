@@ -12,15 +12,10 @@
     # Returns
     - The value of the chemical potential
 """
-function find_chemicalpotential(no_part, Tel, DOS, egrid)
+function find_chemicalpotential(no_part, Tel, DOS, egrid, μ0)
     f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, 0.0);alg=SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
+    return solve(NonlinearProblem(f, μ0);alg=SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
 end 
-
-#= function find_chemicalpotential!(tmp, no_part, Tel, DOS, egrid)
-    f(u,p) = no_part - LightMatter.get_thermalparticles!(tmp, u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, 0.0);alg=SimpleNewtonRaphson(), abstol=1e-8, reltol=1e-8).u
-end  =#
 """
     get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -40,11 +35,11 @@ function get_thermalparticles(μ, Tel, DOS, egrid)
     return integration_algorithm(f, egrid)
 end
 
-#= function get_thermalparticles!(tmp, μ, Tel, DOS, egrid)
-    FermiDirac!(tmp,Tel,ForwardDiff.value(μ),egrid)
-    tmp .*= DOS(egrid)
+function get_thermalparticles(tmp, μ, Tel, DOS, egrid)
+    @. tmp = DOS(egrid)
+    FermiDirac_mul!(tmp, Tel, ForwardDiff.value(μ), egrid)
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     get_noparticles(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
     
@@ -63,10 +58,11 @@ function get_noparticles(Dis, DOS, egrid)
     return integration_algorithm(f,egrid)
 end
 
-#= function get_noparticles!(tmp, Dis, DOS, egrid)
-    @. tmp = DOS(egrid) * Dis
+function get_noparticles(tmp, Dis, DOS, egrid)
+    @. tmp = DOS(egrid)
+    tmp .*= Dis
     return integration_algorithm(tmp,egrid)
-end =#
+end
 """
     p_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -86,11 +82,11 @@ function p_T(μ, Tel, DOS, egrid)
     return integration_algorithm(f, egrid)
 end
 
-#= function p_T!(tmp, μ, Tel, DOS, egrid)
-    dFDdT!(tmp,Tel,μ,egrid)
-    tmp .*= DOS(egrid)
+function p_T(tmp, μ, Tel, DOS, egrid)
+    @. tmp = DOS(egrid)
+    dFDdT_mul!(tmp, Tel, μ, egrid)
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     p_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -110,11 +106,11 @@ function p_μ(μ, Tel, DOS, egrid)
     return integration_algorithm(f, egrid)
 end
 
-#= function p_μ!(tmp, μ, Tel, DOS, egrid)
-    dFDdμ!(tmp, Tel,μ,egrid)
-    tmp .*= DOS(egrid)
+function p_μ(tmp, μ, Tel, DOS, egrid)
+    @. tmp = DOS(egrid)
+    dFDdμ_mul!(tmp, Tel, μ, egrid)
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     get_internalenergy(Dis::Vector{Float64}, DOS::spl, egrid::Vector{Float64})
     
@@ -129,16 +125,16 @@ end =#
     - The internal energy of the given distribution
 """
 function get_internalenergy(Dis, DOS, egrid)
-    # Use spline interpolation for the distribution for smoother integration
     f = DOS(egrid) .* Dis .* egrid
     return integration_algorithm(f, egrid)
 end
 
-#= function get_internalenergy!(tmp, Dis, DOS, egrid)
-    # Use spline interpolation for the distribution for smoother integration
-    @. tmp = DOS(egrid) * Dis * egrid
+function get_internalenergy(tmp, Dis, DOS, egrid)
+    @. tmp = DOS(egrid)
+    tmp .*= Dis
+    tmp .*= egrid
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     c_T(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -158,11 +154,12 @@ function c_T(μ, Tel, DOS, egrid)
     return integration_algorithm(f, egrid)
 end
 
-#= function c_T!(tmp, μ, Tel, DOS, egrid)
-    dFDdT!(tmp,Tel,μ,egrid)
-    tmp .*= DOS(egrid) .* egrid
+function c_T(tmp, μ, Tel, DOS, egrid)
+    @. tmp = DOS(egrid)
+    dFDdT_mul!(tmp, Tel, μ, egrid)
+    tmp .*= egrid
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     c_μ(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -182,11 +179,12 @@ function c_μ(μ, Tel, DOS, egrid)
     return integration_algorithm(f, egrid)
 end
 
-#= function c_μ!(tmp, μ, Tel, DOS, egrid)
-    dFDdμ!(tmp,Tel,μ,egrid)
-    tmp .*= DOS(egrid) .* egrid
+function c_μ(tmp, μ, Tel, DOS, egrid)
+    @. tmp = DOS(egrid)
+    dFDdμ_mul!(tmp, Tel, μ, egrid)
+    tmp .*= egrid
     return integration_algorithm(tmp, egrid)
-end =#
+end
 """
     integration_algorithm(y::AbstractVector, x::AbstractVector)
     
@@ -228,7 +226,7 @@ function integration_algorithm(y::AbstractVector, x)
     return 0.0
 end
 
-function get_particlenumber(DOS, egrid)
+function get_particlenumber(DOS, DOS_file, egrid, μ_offset, μ_offset_reference)
     if DOS isa Vector{spl}
         pn = zeros(length(DOS))
         for i in eachindex(DOS)
@@ -240,14 +238,19 @@ function get_particlenumber(DOS, egrid)
     end
 end
 
-function get_particlenumber(DOS::Vector{spl}, egrid)
+function get_particlenumber(DOS::Vector{spl}, DOS_file, egrid, μ_offset, μ_offset_reference)
     pn = zeros(length(DOS))
+    if μ_offset
+        offset = calculate_μoffset(DOS_file, μ_offset_reference)
+    else
+        offset = zeros(length(DOS))
+    end
     for i in eachindex(DOS)
-        pn[i] = get_thermalparticles(0.0,1e-16,DOS[i], egrid)
+        pn[i] = get_thermalparticles(offset[i],1e-16,DOS[i], egrid)
     end
     return pn
 end
 
-function get_particlenumber(DOS::Missing, egrid)
+function get_particlenumber(DOS::Missing, DOS_file, egrid, μ_offset, μ_offset_reference)
     return missing
 end

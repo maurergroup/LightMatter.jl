@@ -20,6 +20,10 @@ end
 function FermiDirac!(dis, Tel, μ, E)
     @. dis = 1 / (exp((E-μ) / (Constants.kB*Tel))+1)
 end
+
+function FermiDirac_mul!(dis, Tel, μ, E)
+    @. dis = dis * 1 / (exp((E-μ) / (Constants.kB*Tel))+1)
+end
 """
     dFDdE(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -40,6 +44,10 @@ end
 function dFDdE!(tmp, Tel, μ, E)
     @. tmp = -exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)/(Constants.kB*Tel))+1)^2)
 end
+
+function dFDdE_mul!(tmp, Tel, μ, E)
+    @. tmp = tmp * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+end
 """
     dFDdT(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -59,6 +67,10 @@ end
 
 function dFDdT!(tmp, Tel, μ, E)
     @. tmp = (E-μ) * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel^2 * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+end
+
+function dFDdT_mul!(tmp, Tel, μ, E)
+    @. tmp = tmp * (E-μ) * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel^2 * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
 end
 """
     dFDdμ(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
@@ -81,8 +93,12 @@ function dFDdμ!(tmp, Tel, μ, E)
     @. tmp = exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
 end
 
+function dFDdμ_mul!(tmp, Tel, μ, E)
+    @. tmp = tmp * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+end
+
 function boltzmann_E_excitation(f, sim, E_mag, DOS)
-    kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
+    kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
     γ = bessel_gamma(E_mag, sim)
     κ = boltzmann_screening(f, kgrid, sim)
     fspl = get_interpolant(sim.structure.egrid, f)
@@ -92,7 +108,7 @@ function boltzmann_E_excitation(f, sim, E_mag, DOS)
         prefac = sim.electronicdistribution.Ω * pi / Constants.ħ / k
         for l in -3:3
             E1 = sim.structure.egrid[i] + l*sim.laser.hv
-            k1 = sim.stucture.bandstructure[2](E1)
+            k1 = sim.stucture.bandstructure.E_to_k(E1)
             dfrac = DOS(E1) / k1
             F = pauli_excitation_blocking(fspl, sim.structure.egrid[i], E1)
             mom_change = boltzmann_E_momentumintegral(l, k, k1, κ, γ, sim)
@@ -146,7 +162,7 @@ function boltzmann_screening(f, kgrid, sim)
 end
 
 function boltzmann_E_electronelectron(f, sim, DOS)
-    kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
+    kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
     κ = boltzmann_screening(f, kgrid, sim)
     fspl = get_interpolant(sim.structure.egrid, f)
     dfdt = zeros(length(f))
@@ -166,7 +182,7 @@ function boltzmann_eescatter_int1(E, k, DOS, f, κ, sim)
 end
 
 function boltzmann_eescatter_int2(E, E1, k, DOS, f, κ, sim)
-    k1 = sim.structure.bandstructure[2](E1)
+    k1 = sim.structure.bandstructure.E_to_k(E1)
     int(u,p) = boltzmann_eescatter_int2interior(E, E1, u, k, k1, DOS, f, κ, sim)
     prob = IntegralProblem(int, sim.structure.egrid[1], sim.structure.egrid[end])
     sol = solve(prob, HCuabtureJL(intidiv=100), abstol=1e-4, reltol=1e-4)
@@ -174,7 +190,7 @@ function boltzmann_eescatter_int2(E, E1, k, DOS, f, κ, sim)
 end
 
 function boltzmann_eescatter_int2interior(E, E1, E3, k, k1, DOS, f, κ, sim)
-    k3 = sim.structure.bandstructure[2](E3)
+    k3 = sim.structure.bandstructure.E_to_k(E3)
     k2 = k1 + k3 / k
     E2 = E1 + E3 / E
     Δk = abs(k1 - k2)
@@ -200,7 +216,7 @@ function scatter_conservation(k, k1, k2, k3)
 end
 
 function boltzmann_E_electronphonon()
-    kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
+    kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
     κ = boltzmann_screening(f, kgrid, sim)
     γ = bessel_gamma(E_mag, sim)
     fspl = get_interpolant(sim.structure.egrid, f)
@@ -225,7 +241,7 @@ function boltzmann_epscatter_int(Eq, sim, κ, DOS, f, g, γ)
     for l in -3:3
         for i in [-1, 1]
             E1 = E + (i*Eq) - l*sim.laser.hv
-            k1 = sim.structure.bandstructure[2](E1)
+            k1 = sim.structure.bandstructure.E_to_k(E1)
             D1 = DOS(E1) / k1
             F = pauli_epscatter_blocking(f, g, i, E, E1)
             J = average_Bessel(l, γ*q)

@@ -334,7 +334,9 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-@inline get_interpolant(xvals, yvals) = Interpolations.linear_interpolation(xvals, yvals, extrapolation_bc = Flat())
+
+
+@inline get_interpolant(xvals, yvals) = Interpolations.linear_interpolation(xvals, yvals, extrapolation_bc = Flat())#Interpolations.interpolate((xvals,), yvals, Gridded(Linear()))
 """
     build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     
@@ -382,7 +384,7 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing,Missing}, FE::U
                 if structure.Spatial_DOS == true
                     v_g = zeros(structure.dimension.length,length(structure.egrid))
                     for i in 1:structure.dimension.length
-                        v_g[i,:] = effective_one_band_velocity(structure.bandstructure[i][1], structure.DOS[i], structure.egrid, FE)
+                        v_g[i,:] = effective_one_band_velocity(structure.bandstructure[i].k_to_E, structure.DOS[i], structure.egrid, FE)
                     end
                     return v_g
                 elseif structure.Elemental_System != 1
@@ -390,14 +392,14 @@ function build_group_velocity(v_g::Union{Vector{Float64},Nothing,Missing}, FE::U
                     Threads.@threads for i in eachindex(v_g[:,1])
                         j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
                         if isa(FE, Vector)
-                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j], structure.egrid, FE[j])
+                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j].k_to_E, structure.DOS[j], structure.egrid, FE[j])
                         else
-                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j][1], structure.DOS[j], structure.egrid, FE)
+                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j].k_to_E, structure.DOS[j], structure.egrid, FE)
                         end
                     end
                     return v_g
                 else
-                    v_g = effective_one_band_velocity(structure.bandstructure[1], structure.DOS,structure.egrid,FE)
+                    v_g = effective_one_band_velocity(structure.bandstructure.k_to_E, structure.DOS,structure.egrid,FE)
                 end
             end
         else 
@@ -471,18 +473,18 @@ end
     - The effective one band model group velocity as a vector or vector of vectors depending on the structure
     of the system
 """
-function effective_one_band_velocity(bandstructure::Spline1D, DOS::spl, egrid::Vector{Float64}, FE::Float64)
+function effective_one_band_velocity(Bandstructure::Spline1D, DOS::spl, egrid::Vector{Float64}, FE::Float64)
     k_E = effective_onebandmodel(DOS,egrid,FE)
     v_g = similar(k_E)
     if eltype(v_g) <: AbstractVector
         for j in eachindex(v_g)
-            dE_dk = Dierckx.derivative.(Ref(bandstructure),k_E)
+            dE_dk = Dierckx.derivative.(Ref(Bandstructure),k_E)
             kE_spl = LightMatter.get_interpolant(egrid,k_E)
             dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
             v_g[j] = dEdk_spl(kE_spl(egrid))./ Constants.ħ
         end
     else
-        dE_dk = Dierckx.derivative.(Ref(bandstructure),k_E)
+        dE_dk = Dierckx.derivative.(Ref(Bandstructure),k_E)
         kE_spl = LightMatter.get_interpolant(egrid,k_E)
         dEdk_spl = LightMatter.get_interpolant(k_E,dE_dk)
         v_g = dEdk_spl(kE_spl(egrid))./ Constants.ħ
@@ -532,13 +534,13 @@ end
     # Returns
     - Spline objects for band structure interpolation, or missing if not applicable
 """
-function bandstructure_initialization(bandstructure, DOS, egrid, FE)
-    if bandstructure == nothing
+function bandstructure_initialization(Bandstructure, DOS, egrid, FE)
+    if Bandstructure == nothing
         if ismissing(DOS)
             return missing
         end
         if !(typeof(DOS) <: spl)
-            E_k = Vector{Vector{Dierckx.Spline1D}}(undef, length(DOS))
+            E_k = Vector{bandstructure}(undef, length(DOS))
             for i in eachindex(DOS)
                 if length(DOS) == length(FE)
                     fe = FE[i]
@@ -546,17 +548,17 @@ function bandstructure_initialization(bandstructure, DOS, egrid, FE)
                     fe = FE
                 end
                 temp_k = effective_onebandmodel(DOS[i], egrid, fe)
-                E_k[i] = [Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
-                          Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest")]
+                E_k[i] = bandstructure(Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
+                                      Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest"))
             end
             return E_k
         else
             temp_k = effective_onebandmodel(DOS, egrid, FE)
-            return [Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
-                    Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest")]
+            return bandstructure(Dierckx.Spline1D(temp_k, egrid, k=3, bc="nearest"),
+                                 Dierckx.Spline1D(egrid, temp_k, k=3, bc="nearest"))
         end
     else
-        return bandstructure
+        return Bandstructure
     end
 end
 

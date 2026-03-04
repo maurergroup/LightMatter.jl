@@ -1,5 +1,5 @@
 function boltzmann_E_phononelectron()
-    kgrid = sim.stucture.bandstructure[2](sim.structure.egrid)
+    kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
     κ = boltzmann_screening(f, kgrid, sim)
     dgdt = zeros(length(g))
     for i in eachindex(g)
@@ -16,13 +16,13 @@ end
 
 function boltzmann_pescatter_int(E, q, Eq, sim, f, g, DOS)
     tmp = 0.0
-    k = sim.structure.bandstructure[2](E)
+    k = sim.structure.bandstructure.E_to_k(E)
     for l in -3:3
         J = average_Bessel(l, γ*q)
         D = DOS(E) / k
         for i in [-1, 1]
             E1 = E + (i*Eq) - l*sim.laser.hv
-            k1 = sim.structure.bandstructure[2](E1)
+            k1 = sim.structure.bandstructure.E_to_k(E1)
             D1 = DOS(E1) / k1
             F = pauli_epscatter_blocking(f, g, i, E, E1)
             Ξ = boltzmann_step(q, k, k1)

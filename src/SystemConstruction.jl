@@ -68,7 +68,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim)
-            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee))))
+            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee, int_vec))))
         end
     end
     return exprs
@@ -101,11 +101,11 @@ function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, 
                 no_part=zeros(sim.structure.dimension.length)
                 for j in eachindex(sim.structure.dimension.grid)
                     x = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-                    no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[x], sim.structure.egrid)
+                    no_part[j] = get_thermalparticles(sim.structure.μ_offset[x], 1e-32, sim.structure.DOS[x], sim.structure.egrid)
                 end
             end
         else
-            no_part = fill(get_thermalparticles(0.0,1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
+            no_part = fill(get_thermalparticles(sim.structure.μ_offset[1],1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
         end
         merge!(temp_u0,Dict("noe" => no_part ))
     end
@@ -131,8 +131,9 @@ end
     - NamedTuple containing the parameters of the simulation
 """
 function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
+    int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
     if sim.structure.Elemental_System > 1
-        p = (sim=sim, matsim=sim_seperation(sim))
+        p = (sim=sim, matsim=sim_seperation(sim), int_mtx=int_mtx)
     else
         p = (sim=sim)
     end
@@ -156,14 +157,14 @@ function parameter_particle(p, sim)
             no_part=zeros(sim.structure.dimension.length)
             #noe = get_tmp(no_part, 0.0)
             for j in eachindex(sim.structure.dimension.grid)
-                noe[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
+                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
             end
         elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
             no_part=zeros(sim.structure.dimension.length)
             #noe = get_tmp(no_part, 0.0)
             for j in eachindex(sim.structure.dimension.grid)
                 mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-                noe[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+                no_part[j] = get_thermalparticles(sim.structure.μ_offset[mat], 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
             end
         else
             no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
@@ -231,7 +232,7 @@ end
     - Vector of expression for the conductivity of each subsytem if they are enabled
 """
 function conductivity_expressions(sim::Simulation)
-    cond_exprs = [:(du .= 0.0)]
+    cond_exprs = [:(LightMatter.reset_du!(du))]
     
     if sim.electronictemperature.Conductivity == true
         push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(du.Tel, u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph)))
@@ -239,11 +240,20 @@ function conductivity_expressions(sim::Simulation)
     if sim.phononictemperature.Conductivity == true
         push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing)))
     end
-    if sim.athermalelectrons.Conductivity == true
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing)))
+    if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, u.Tel, u.noe, p.tmp, p.sim)))
+    elseif sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, p.Tel, p.noe, p.tmp, p.sim)))
     end
     push!(cond_exprs, :(return nothing))
     return Expr(:block,cond_exprs...)
+end
+
+function reset_du!(du)                                                                                                         
+    A = ArrayPartition(du)                                                                                                     
+    for i in eachindex(A.x)                                                                                                    
+        A.x[i] .= 0.0                                                                                                          
+    end                                                                                                                        
 end
 """
     build_loopbody(sys, sim::Simulation)
@@ -258,7 +268,7 @@ end
 """
 function build_loopbody(sys, sim::Simulation)
     exprs = Vector{Expr}(undef,0)
-    push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end)) # Error checking for missing parameters
+    @debug push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end)) # Error checking for missing parameters
     if sim.structure.Elemental_System > 1
         push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
         push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl
@@ -266,7 +276,8 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,variable_renaming(sim))
     end
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(sim.structure.particle_number, Tel, DOS, sim.structure.egrid)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(sim.structure.particle_number, Tel, DOS, sim.structure.egrid, μ0)))
+        #push!(exprs, :(println("Chemical potential: ", μ)))
     else
         push!(exprs, :(μ = 0.0))
     end
@@ -288,6 +299,7 @@ function build_loopbody(sys, sim::Simulation)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
             push!(exprs,:($(sys["relax"])))
+            #push!(exprs, :(println(any(isnan.(du2)))))
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
             push!(exprs,:(@views du.noe[i] = $(sys["noe"])))
         elseif sim.athermalelectrons.Enabled == true
@@ -316,8 +328,8 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim)]
-    new_name = [:sim]
+    old_name = [:(p.sim), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[1])]
+    new_name = [:sim, :(int_vec), :μ0]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)
@@ -342,7 +354,7 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(fneq, DOS, sim.structure.egrid)))
+            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(int_vec, fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
             push!(old_name, :(@view p.relax_dis[i,:]))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
             push!(new_name, :relax_dis)

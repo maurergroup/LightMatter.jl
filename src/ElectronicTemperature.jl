@@ -153,9 +153,9 @@ end
     - Expression for the time evolution of a, AthEM electronic temperature
 """
 function build_athemelectron(Δu::Expr)
-    return :( 1 / (LightMatter.c_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)
-    - LightMatter.p_T(μ,Tel,DOS,sim.structure.egrid)*LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)) *
-    (LightMatter.p_μ(μ,Tel,DOS,sim.structure.egrid)*$Δu - LightMatter.c_μ(μ,Tel,DOS,sim.structure.egrid)*du.noe[i]))
+    return :( 1 / (LightMatter.c_T(int_vec, μ,Tel,DOS,sim.structure.egrid)*LightMatter.p_μ(int_vec,μ,Tel,DOS,sim.structure.egrid)
+    - LightMatter.p_T(int_vec, μ,Tel,DOS,sim.structure.egrid)*LightMatter.c_μ(int_vec,μ,Tel,DOS,sim.structure.egrid)) *
+    (LightMatter.p_μ(int_vec,μ,Tel,DOS,sim.structure.egrid)*$Δu - LightMatter.c_μ(int_vec,μ,Tel,DOS,sim.structure.egrid)*du.noe[i]))
 end
 """
     athem_electempenergychange(sim::Simulation)
@@ -170,8 +170,8 @@ end
 """
 function athem_electempenergychange(sim::Simulation)
     args = Vector{Union{Expr,Symbol}}(undef, 0)
-    push!(args, :(LightMatter.elec_energychange(sim.structure.egrid, -relax_dis, DOS)))
-    if sim.phononictemperature.Enabled == true
+    push!(args, :(LightMatter.elec_energychange(sim.structure.egrid, -relax_dis, DOS, int_vec)))
+    if sim.electronictemperature.Electron_PhononCoupling == true
        push!(args, electronphonon_coupling(sim::Simulation))
     end
     #= if sim.electronictemperature.Conductivity == true
@@ -193,8 +193,8 @@ end
     # Returns
     - The change in the internal energy of the thermal system due to e-e scattering
 """
-function elec_energychange(egrid, relax_dis, DOS)
-    return LightMatter.get_internalenergy(relax_dis, DOS, egrid)
+function elec_energychange(egrid, relax_dis, DOS, int_vec)
+    return LightMatter.get_internalenergy(int_vec, relax_dis, DOS, egrid)
 end
 """
     electrontemperature_conductivity!(Tel::Vector{Float64}, κ::Union{Float64,Vector{Float64}}, dz::Float64, Tph::Vector{Float64}, cond::Vector{Float64})

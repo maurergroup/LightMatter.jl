@@ -65,8 +65,8 @@ end
     - An expression block assigning simulation-specific variable names.
 """
 function ar_variable_renaming(sim::Simulation)
-    old_name = [:(p.matsim[X])]
-    new_name = [:sim]
+    old_name = [:(p.matsim[X]), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[X])]
+    new_name = [:sim, :int_vec, :μ0]
     if typeof(sim.structure.DOS) == Vector{Vector{spl}}
         push!(old_name, :(p.matsim[X].structure.DOS[i]))
         push!(new_name, :DOS)
@@ -75,11 +75,11 @@ function ar_variable_renaming(sim::Simulation)
         push!(new_name, :DOS)
     end
     if sim.athermalelectrons.Enabled == true
-        push!(old_name,:(@view u.fneq[i,:]))
+        push!(old_name,:(view(u.fneq,i,:)))
         push!(new_name,:fneq)
-        push!(old_name, :(@view p.tmp[i,:]))#:(@view LightMatter.access_DiffCache(p.tmp, u.fneq[i,1])[i,:]))
+        push!(old_name, :(view(p.tmp,i,:)))#:(@view LightMatter.access_DiffCache(p.tmp, u.fneq[i,1])[i,:]))
         push!(new_name, :tmp)
-        push!(old_name, :(@view p.Δfexcite[i,:]))#:(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
+        push!(old_name, :(view(p.Δfexcite,i,:)))#:(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
         push!(new_name, :Δfexcite)
         #= if sim.athermalelectrons.Conductivity == true
             push!(old_name, :(@view p.f_cond[i,:]))#:(@view LightMatter.access_DiffCache(p.f_cond, u.fneq[i,1])[i,:]))
@@ -91,9 +91,9 @@ function ar_variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(u.fneq[i,:], DOS, sim.structure.egrid)))
+            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(int_vec, fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
-            push!(old_name, :(@view p.relax_dis[i,:]))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
+            push!(old_name, :(view(p.relax_dis,i,:)))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
             push!(new_name, :relax_dis)
         end
     end
