@@ -344,8 +344,9 @@ end
 """
 function electron_distribution_transport!(Δf, v_g::Vector{Float64}, f, dz, Tel, noe, ftot, sim)
     calculate_ftot(f, Tel, noe, ftot, sim)
-    #Δf = get_tmp(Δf, f[1,1])
+    
     @views @inbounds for i in 2:size(f, 1)-1
+        # Ballistic transport: advection in space
         @. Δf[i,:] = -v_g * (ftot[i+1,:] - ftot[i-1,:]) / (2*dz)
     end
 
@@ -355,9 +356,9 @@ end
 
 function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz, Tel, noe, ftot, sim)
     calculate_ftot(f, Tel, noe, ftot, sim)
-
-    #Δf = get_tmp(Δf, f[1,1])
+    
     @views @inbounds for i in 2:size(f, 1)-1
+      # Ballistic transport: advection in space
       @. Δf[i,:] = -v_g[i,:] * (ftot[i+1,:] - ftot[i-1,:]) / (2*dz)
     end
     @views @. Δf[1,:] = -v_g[1,:] .* (ftot[2,:] - ftot[1,:]) / dz
@@ -396,6 +397,46 @@ function calculate_ftot(f, Tel::AbstractVector, noe, tmp, sim)
             @views tmp[i,:] .+= f[i,:]
         end
     end
+end
+
+"""
+    compute_band_edge_gradient(sim::Simulation, dz::Float64)
+
+    Computes the spatial gradient of the conduction band edge (dEc/dz) across all spatial locations.
+    This accounts for band alignment discontinuities at heterointerfaces.
+
+    # Arguments
+    - `sim`: Simulation struct containing band alignment information (μ_offset)
+    - `dz`: Spatial resolution
+
+    # Returns
+    - Vector of band edge gradients at each spatial location
+"""
+function compute_band_edge_gradient(sim::Simulation, dz::Float64)
+    ngrid = length(sim.structure.dimension.grid)
+    dEc_dz = zeros(ngrid)
+    
+    if sim.structure.Elemental_System > 1
+        # Multi-material system: use μ_offset to determine band alignment
+        Ec = zeros(ngrid)
+        for i in 1:ngrid
+            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+            Ec[i] = sim.structure.μ_offset[X]
+        end
+        
+        # Compute spatial derivative
+        @inbounds for i in 2:ngrid-1
+            dEc_dz[i] = (Ec[i+1] - Ec[i-1]) / (2*dz)
+        end
+        # Boundary: use forward/backward differences
+        dEc_dz[1] = (Ec[2] - Ec[1]) / dz
+        dEc_dz[end] = (Ec[end] - Ec[end-1]) / dz
+    else
+        # Single material: no band offset gradient
+        fill!(dEc_dz, 0.0)
+    end
+    
+    return dEc_dz
 end
 
 """

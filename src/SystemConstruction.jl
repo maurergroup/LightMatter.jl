@@ -276,7 +276,7 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,variable_renaming(sim))
     end
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(sim.structure.particle_number, Tel, DOS, sim.structure.egrid, μ0)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, μ0)))
         #push!(exprs, :(println("Chemical potential: ", μ)))
     else
         push!(exprs, :(μ = 0.0))
@@ -356,6 +356,8 @@ function variable_renaming(sim::Simulation)
         else 
             push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(int_vec, fneq, DOS, sim.structure.egrid)))
             push!(new_name, :n)
+            push!(old_name, :(u.noe[i]))
+            push!(new_name, :noe)
             push!(old_name, :(@view p.relax_dis[i,:]))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))
             push!(new_name, :relax_dis)
         end
