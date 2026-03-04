@@ -346,11 +346,11 @@ function electron_distribution_transport!(Δf, v_g::Vector{Float64}, f, dz, Tel,
     calculate_ftot(f, Tel, noe, ftot, sim)
     #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
-        @. Δf[i,:] = (ftot[i-1,:] - 2*ftot[i,:] + ftot[i+1,:]) / (dz^2) * v_g[i,:]
+        @. Δf[i,:] = -v_g * (ftot[i+1,:] - ftot[i-1,:]) / (2*dz)
     end
 
-    @views @. Δf[1, :] = (-(ftot[1, :] - ftot[2, :]) / dz) * v_g
-    @views @. Δf[end, :] = ((ftot[end-1, :] - ftot[end, :]) / dz) * v_g
+    @views @. Δf[1, :] = -v_g * (ftot[2, :] - ftot[1, :]) / dz
+    @views @. Δf[end, :] = -v_g * (ftot[end, :] - ftot[end-1, :]) / dz
 end
 
 function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz, Tel, noe, ftot, sim)
@@ -358,10 +358,10 @@ function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz, Tel,
 
     #Δf = get_tmp(Δf, f[1,1])
     @views @inbounds for i in 2:size(f, 1)-1
-        @. Δf[i,:] = (ftot[i-1,:] - 2*ftot[i,:] + ftot[i+1,:]) / (dz^2) * v_g[i,:]
+      @. Δf[i,:] = -v_g[i,:] * (ftot[i+1,:] - ftot[i-1,:]) / (2*dz)
     end
-    @views @. Δf[1,:] = (-(ftot[1,:] - ftot[2,:])/dz) .* v_g[1,:]
-    @views @. Δf[end,:] = ((ftot[end-1,:] - ftot[end,:])/dz) .* v_g[end,:]
+    @views @. Δf[1,:] = -v_g[1,:] .* (ftot[2,:] - ftot[1,:]) / dz
+    @views @. Δf[end,:] = -v_g[end,:] .* (ftot[end,:] - ftot[end-1,:]) / dz
 end
 
 function calculate_ftot(f, Tel::Real, noe, tmp, sim)
