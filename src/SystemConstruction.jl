@@ -68,7 +68,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim)
-            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee, int_vec))))
+            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee, int_vec, Δfexcite))))
         end
     end
     return exprs
@@ -132,15 +132,15 @@ end
 """
 function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
     int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
+    tmp = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
     if sim.structure.Elemental_System > 1
-        p = (sim=sim, matsim=sim_seperation(sim), int_mtx=int_mtx)
+        p = (sim=sim, matsim=sim_seperation(sim), int_mtx=int_mtx, tmp = tmp)
     else
-        p = (sim=sim)
+        p = (sim=sim, int_mtx=int_mtx, tmp = tmp)
     end
     p = parameter_particle(p, sim)
     if sim.athermalelectrons.Enabled
-        p =(; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)),
-                    tmp = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
+        p =(; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         if !sim.electronictemperature.Enabled
             p = (; p..., Tel = initialtemps["Tel"])
         else
@@ -241,9 +241,9 @@ function conductivity_expressions(sim::Simulation)
         push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing)))
     end
     if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, u.Tel, u.noe, p.tmp, p.sim)))
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, u.Tel, u.noe, p.tmp, p.int_mtx, p.sim)))
     elseif sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, p.Tel, p.noe, p.tmp, p.sim)))
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, p.Tel, p.noe, p.tmp, p.int_mtx, p.sim)))
     end
     push!(cond_exprs, :(return nothing))
     return Expr(:block,cond_exprs...)
@@ -276,7 +276,7 @@ function build_loopbody(sys, sim::Simulation)
         push!(exprs,variable_renaming(sim))
     end
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, μ0)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec, μ0)))
         #push!(exprs, :(println("Chemical potential: ", μ)))
     else
         push!(exprs, :(μ = 0.0))
@@ -328,8 +328,8 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[1])]
-    new_name = [:sim, :(int_vec), :μ0]
+    old_name = [:(p.sim), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[1]), :(@view p.tmp[i,:])]
+    new_name = [:sim, :(int_vec), :μ0, :tmp]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)
@@ -340,8 +340,6 @@ function variable_renaming(sim::Simulation)
     if sim.athermalelectrons.Enabled == true
         push!(old_name,:(@view u.fneq[i,:]))
         push!(new_name,:fneq)
-        push!(old_name, :(@view p.tmp[i,:]))#:(@view LightMatter.access_DiffCache(p.tmp, u.fneq[i,1])[i,:]))
-        push!(new_name, :tmp)
         push!(old_name, :(@view p.Δfexcite[i,:]))#:(@view LightMatter.access_DiffCache(p.Δfexcite, u.fneq[i,1])[i,:]))
         push!(new_name, :Δfexcite)
         #= if sim.athermalelectrons.Conductivity == true
@@ -354,8 +352,6 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.fneq[i,1])[i]))
             push!(new_name, :n)
         else 
-            push!(old_name, :(u.noe[i] + LightMatter.get_noparticles(int_vec, fneq, DOS, sim.structure.egrid)))
-            push!(new_name, :n)
             push!(old_name, :(u.noe[i]))
             push!(new_name, :noe)
             push!(old_name, :(@view p.relax_dis[i,:]))#:(@view LightMatter.access_DiffCache(p.relax_dis, u.fneq[i,1])[i,:]))

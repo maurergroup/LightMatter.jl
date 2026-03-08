@@ -1,21 +1,22 @@
-"""
-    find_chemicalpotential(no_part::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
-    
-    Determines the chemical potential at the current temperature
 
-    # Arguments
-    - 'no_part': Float64 of particles in the thermal electronic system
-    - 'Tel': Temperature of the electronic bath
-    - 'DOS': Density-of-states of the system
-    - 'egrid': Energy grid the simulation is solved over
+using Roots
 
-    # Returns
-    - The value of the chemical potential
-"""
-function find_chemicalpotential(no_part, Tel, DOS, egrid, μ0)
-    f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, μ0);alg=SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
-end 
+function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vector{Float64},
+                                tmp, tmp2, μ_init::Float64 = 0.0)
+    # n(μ) - N_target: the function to zero
+    function residual(μ)
+        return get_thermalparticles(tmp2, μ, Tel, DOS, egrid) - N_target
+    end
+
+    # Exact derivative dn/dμ — plugs in your existing function directly
+    function dresidual(μ)
+        return p_μ(tmp, μ, Tel, DOS, egrid)
+    end
+
+    # Newton with automatic fallback to bisection if it struggles
+    return find_zero((residual, dresidual), μ_init, Order8(), atol=1e-5, rtol=1e-5)
+end
+
 """
     get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
     
@@ -226,31 +227,29 @@ function integration_algorithm(y::AbstractVector, x)
     return 0.0
 end
 
-function get_particlenumber(DOS, DOS_file, egrid, μ_offset, μ_offset_reference)
+function get_particlenumber(DOS, egrid, offset)
     if DOS isa Vector{spl}
         pn = zeros(length(DOS))
         for i in eachindex(DOS)
-            pn[i] = get_thermalparticles(0.0,1e-16,DOS[i], egrid)
+            pn[i] = get_thermalparticles(offset[i],1e-16,DOS[i], egrid)
         end
         return pn
     else
-        return get_thermalparticles(0.0,1e-16, DOS, egrid)
+        return get_thermalparticles(offset[1],1e-16, DOS, egrid)
     end
 end
 
-function get_particlenumber(DOS::Vector{spl}, DOS_file, egrid, μ_offset, μ_offset_reference)
-    pn = zeros(length(DOS))
-    if μ_offset
-        offset = calculate_μoffset(DOS_file, μ_offset_reference)
-    else
-        offset = zeros(length(DOS))
-    end
-    for i in eachindex(DOS)
-        pn[i] = get_thermalparticles(offset[i],1e-16,DOS[i], egrid)
-    end
-    return pn
-end
-
-function get_particlenumber(DOS::Missing, DOS_file, egrid, μ_offset, μ_offset_reference)
+function get_particlenumber(DOS::Missing, egrid, offset)
     return missing
+end
+"""
+    find_chemicalpotential_ORIGINAL(no_part::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
+    
+    Original implementation - kept for reference. Has allocation issues.
+"""
+function find_chemicalpotential_ORIGINAL(no_part, Tel, DOS, egrid, μ0)
+    # PROBLEM: This creates a closure that captures variables
+    # Each solve iteration may allocate through ForwardDiff
+    f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
+    return solve(NonlinearProblem(f, μ0);alg=SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
 end

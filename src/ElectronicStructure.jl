@@ -20,7 +20,7 @@
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, μ_offset=true, DOS_reference=1)
+                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, offset)
     if DOS !== nothing
         return DOS
     else
@@ -34,15 +34,9 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
             if zDOS == true 
                 DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
             else
-                DOS = generate_DOS(bulk_DOS, 1/Vbulk) 
+                DOS = generate_DOS(bulk_DOS, 1/Vbulk; offset=offset[1])
             end
         else
-            if μ_offset 
-                offset = calculate_μoffset(bulk_DOS, DOS_reference)
-            else
-                offset = zeros(length(bulk_DOS))
-            end
-
             Vbulk = zeros(length(bulk_DOS))
             DOS = Vector{spl}(undef, length(bulk_DOS))
             for i in eachindex(bulk_DOS)
@@ -358,9 +352,12 @@ end
     # Returns
     - The group velocity vector or array of vectors as requested by the user for ballistic electron transport, or missing if not applicable
 """
-function build_group_velocity(v_g::Union{Vector{Float64},Nothing,Missing}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
-    if isnothing(v_g) || ismissing(v_g)
+function build_group_velocity(v_g::Union{Vector{Float64},Missing,Float64}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
+    if ismissing(v_g)
         if Conductivity == true
+            if typeof(v_g) == Float64
+                return fill(v_g, length(structure.egrid))
+            end
             if ismissing(structure.DOS) || ismissing(FE)
                 return missing
             end
@@ -508,7 +505,7 @@ end
 function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     k_E = zeros(length(egrid))
     
-    factor = 3π^2
+    factor = 6π
     int(u,p) = DOS(u)
 
     for (i,E) in enumerate(egrid)
@@ -560,6 +557,53 @@ function bandstructure_initialization(Bandstructure, DOS, egrid, FE)
     else
         return Bandstructure
     end
+end
+
+"""
+    dos_velocity(DOS::spl, egrid::Vector{Float64}, FE::Float64)
+    
+    Calculates the group velocity directly from the density-of-states without assuming 
+    a parabolic bandstructure. Uses the effective one-band model inversion:
+    
+    v_g(E) = (ℏ/3) * (3π * ∫ g(E') dE')^(2/3) / g(E)
+    
+    This avoids reconstructing a parabolic E(k) and gives more realistic velocities
+    for materials with non-parabolic bands (e.g., gold).
+    For more details see Mueller & Rethfeld, Phys. Rev. B 87, 035139.
+
+    # Arguments
+    - 'DOS': The density-of-states spline
+    - 'egrid': Energy grid all distributions are solved on
+    - 'FE': The Fermi energy
+
+    # Returns
+    - Group velocity v_g(E) as a vector in units of nm/fs (if ℏ is eV⋅fs)
+"""
+function dos_velocity(DOS::spl, egrid::Vector{Float64}, FE::Float64)
+    # Calculate the integrated DOS at each energy
+    factor = 6π
+    int(u, p) = DOS(u)
+    
+    integrated_dos = zeros(length(egrid))
+    for (i, E) in enumerate(egrid)
+        prob = IntegralProblem(int, -FE, E)
+        sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-8, reltol=1e-8)
+        integrated_dos[i] = sol.u
+    end
+    
+    # Calculate v_g(E) = (ℏ/3) * (3π * N(E))^(2/3) / g(E)
+    dos_values = DOS.(egrid)
+    v_g = similar(egrid)
+    
+    for i in eachindex(egrid)
+        if dos_values[i] > 1e-10  # Avoid division by zero
+            v_g[i] = (Constants.ħ / 3) * (factor * integrated_dos[i])^(2/3) / dos_values[i]
+        else
+            v_g[i] = 0.0
+        end
+    end
+    
+    return v_g
 end
 
 function calculate_μoffset(DOS::Vector{String}, primary=1)

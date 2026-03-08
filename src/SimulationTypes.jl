@@ -222,12 +222,12 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     DOS_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    calculate_bandstructure::Bool = false, μ_offset::Bool = false, μ_offset_reference::Int=1)
+    calculate_bandstructure::Bool = false, μ_offset::Bool = false, μ_offset_reference::Int=1, offset=missing)
 
 
     if μ_offset
         offset = calculate_μoffset(DOS_file, μ_offset_reference)
-    else
+    elseif ismissing(offset)
         if DOS_file != nothing
             offset = zeros(length(DOS_file))
         else
@@ -235,7 +235,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
         end
     end
 
-    DOS = DOS_initialization(DOS_file, DOS_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, μ_offset, μ_offset_reference)
+    DOS = DOS_initialization(DOS_file, DOS_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, offset)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields
@@ -249,7 +249,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         bandstructure = missing
     end
-    pn = get_particlenumber(DOS, DOS_file, egrid, μ_offset, μ_offset_reference)
+    pn = get_particlenumber(DOS, egrid, offset)
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
                     bandstructure = bandstructure, ChemicalPotential=chemicalpotential,particle_number = pn, μ_offset = offset)
 end
