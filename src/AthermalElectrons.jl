@@ -325,7 +325,8 @@ end
 """
     athem_thermalelectronparticlechange(sim::Simulation)
     
-    Returns an expression for the total thermal electronum number due to relaxation and optional conductivity.
+    Returns an expression for the total thermal electron number due to relaxation e-e relaxation.
+    Currently assumes that athermal electron-phonon coupling is particle conserving.
 
     # Arguments
     - 'sim': settings of the desired simulation
@@ -334,7 +335,7 @@ end
     - Expr for the time dependence of the thermal electron number.
 """
 function athem_thermalelectronparticlechange(sim::Simulation)
-    return :(-LightMatter.get_noparticles(int_vec, du.fneq[i,:],DOS,sim.structure.egrid))
+    return :(-LightMatter.get_noparticles(int_vec, relax_dis,DOS,sim.structure.egrid))
 end
 """
     electron_distribution_transport!(v_g::Vector{Float64},f::AbstractArray{Float64},Δf::AbstractArray{Float64},dz::Float64)
