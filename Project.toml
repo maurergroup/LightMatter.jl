@@ -1,6 +1,6 @@
 name = "LightMatter"
 uuid = "b578e399-e75b-4901-9c37-d6aa618b88c4"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Henry Snowden, Reinhard Maurer"]
 
 [deps]
