@@ -14,8 +14,23 @@ function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vec
     end
 
     # Newton with automatic fallback to bisection if it struggles
-    return find_zero((residual, dresidual), μ_init, Order8(), atol=1e-5, rtol=1e-5)
+    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=1000)
+    #return find_zero((residual, dresidual), μ_init, Roots.Newton(), atol=1e-5, rtol=1e-5)
 end
+
+function newton_rf(f, df, x0;tol, maxiter)
+    x=x0
+    for _ in 1:maxiter
+        x_new = x-f(x)/df(x)
+        if abs(x_new-x) < tol
+            return x_new
+        end
+        x = x_new
+    end
+    @warn "Convergence not found in number of iterations, current diff is $(f(x))"
+    return x
+end
+
 
 """
     get_thermalparticles(μ::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
