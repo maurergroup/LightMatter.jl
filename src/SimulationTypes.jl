@@ -181,7 +181,6 @@ end
     DOS::Union{spl, Vector{spl}, Missing} # The density of states of the simulation
     bandstructure::Union{bandstructure, Vector{<:bandstructure}, Missing}# The band structure of the simulation
     egrid::Vector{Float64} # An energy grid for electronic or phononic distributions to be solved on
-    particle_number::Union{Float64, Vector{Float64}, Missing} # The total number of particles in the system
 
     dimension::Dimension # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
@@ -249,9 +248,8 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         bandstructure = missing
     end
-    pn = get_particlenumber(DOS, egrid, offset)
     return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential,particle_number = pn, μ_offset = offset)
+                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential, μ_offset = offset)
 end
 """
     WIP!!!

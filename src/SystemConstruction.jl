@@ -68,7 +68,7 @@ function generate_expressions(sim::Simulation, laser::Expr)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
             merge!(exprs,Dict("noe" => LightMatter.athem_thermalelectronparticlechange(sim)))
             τee = electron_relaxationtime(sim)
-            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, sim.structure.particle_number, $τee, int_vec, Δfexcite))))
+            merge!(exprs,Dict("relax" => :(LightMatter.athem_electronelectronscattering!(relax_dis, tmp, Tel, μ, sim.structure.egrid, fneq, DOS, noe, $τee, int_vec, Δfexcite))))
         end
     end
     return exprs
@@ -363,7 +363,7 @@ function variable_renaming(sim::Simulation)
         push!(new_name, :Tel)
         if sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
-            push!(new_name, :n)
+            push!(new_name, :noe)
         end
         #= if sim.electronictemperature.Conductivity == true
             push!(old_name,:(p.Tel_cond[i]))#:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))

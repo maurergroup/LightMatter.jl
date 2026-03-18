@@ -34,7 +34,7 @@ end
     # Returns
     - Expression for the time evolution of a two-temperature model electronic temperature
 """
-function build_electronTTM(sim::Simulation, Source::Expr, ElecPhon::Expr, HeatCapacity::Expr)
+function build_electronTTM(sim::Simulation, Source::Expr, ElecPhon, HeatCapacity::Expr)
     args = Union{Expr, Symbol, Float64}[Source, ElecPhon]
     #= if sim.electronictemperature.Conductivity == true
         push!(args, :Tel_cond)
@@ -108,7 +108,7 @@ function electronphonon_coupling(sim::Simulation)
             return :(-sim.electronictemperature.g*(Tel-Tph))
         end
     else
-        return 0.0
+        return :(0.0)
     end
 end
 """

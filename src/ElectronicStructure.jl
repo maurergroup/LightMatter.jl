@@ -308,7 +308,7 @@ end
 function DOSScale!(Temp::Matrix{Float64}, bulk::Vector{Float64}, Energies::Vector{Float64})
     fd = FermiDirac(0.0,0.0, Energies)
     for i in eachindex(Temp[:,1])
-        f(u,p) = integration_alogirthm(u*fd.*Temp[i,:], Energies) - integration_alogirthm(fd.*bulk, Energies)
+        f(u,p) = integration_algorithm(u*fd.*Temp[i,:], Energies) - integration_algorithm(fd.*bulk, Energies)
         x0 = 1
         prob = NonlinearProblem(f,x0)
         rescale = solve(prob, SimpleNewtonRaphson(); atol=1e-12, rtol=1e-12)
