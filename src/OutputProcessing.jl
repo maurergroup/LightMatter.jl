@@ -443,14 +443,18 @@ function output_chemicalpotential(f, results, sim)
             noe = n[1]
             Threads.@threads for i in eachindex(Tel[1,:])
                 DOS = get_DOS(dos, sim, i)
+                tmp1 = zeros(length(sim.structure.egrid))
+                tmp2 = zeros(length(sim.structure.egrid))
                 X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-                cp[:,i] .= find_chemicalpotential.(noe,Tel[:,i],(DOS,),(sim.structure.egrid,), sim.structure.μ_offset[X])
+                cp[:,i] .= find_chemicalpotential.(noe,Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2), sim.structure.μ_offset[X])
             end
         else
             Threads.@threads for i in eachindex(Tel[1,:])
+                tmp1 = zeros(length(sim.structure.egrid))
+                tmp2 = zeros(length(sim.structure.egrid))
                 DOS = get_DOS(dos, sim, i)
                 X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],(DOS,),(sim.structure.egrid,), sim.structure.μ_offset[X])
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2), sim.structure.μ_offset[X])
             end
         end
 
