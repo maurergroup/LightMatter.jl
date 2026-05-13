@@ -239,6 +239,34 @@ function electrontemperature_conductivity!(cond, Tel, κ, dz, Tph)
     flux_end = K_minusend * (Tel[end-1] - Tel[end]) / dz
     cond[end] = flux_end / dz
 end
+
+function thermalparticle_conductivity!(cond, n, κ, dz, Tph, Tel)
+    # Calculate temperature-dependent thermal conductivity: K = κ * Tel / Tph
+    K = κ.*Tel./Tph
+    
+    # Interior points: compute flux at edges, then divergence
+    for i in 2:length(K)-1
+        # Thermal conductivity at the edges (average between adjacent points)
+        K_plus = 1 / 2 * (K[i+1] + K[i])
+        K_minus = 1 / 2 * (K[i] + K[i-1])
+        
+        # Heat flux at edges: q = -K * dT/dz
+        flux_plus = K_plus * (n[i+1] - n[i]) / dz
+        flux_minus = K_minus * (n[i] - n[i-1]) / dz
+        
+        # Temperature change from divergence of heat flux: dT/dt = -dq/dz
+        cond[i] = (flux_plus - flux_minus) / dz
+    end
+
+    # Boundary conditions: allow heat flow into the boundaries symmetrically
+    K_plus1 = 1 / 2 * (K[2] + K[1])
+    flux_1 = K_plus1 * (n[2] - n[1]) / dz
+    cond[1] = flux_1 / dz
+    
+    K_minusend = 1 / 2 * (K[end] + K[end-1])
+    flux_end = K_minusend * (n[end-1] - n[end]) / dz
+    cond[end] = flux_end / dz
+end
 """
     depthderivative!(vec::Vector{Float64}, dz::Float64, Diff::Vector{Float64})
     

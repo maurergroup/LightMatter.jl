@@ -264,7 +264,7 @@ end
 @kwdef struct DensityMatrix <: SimulationTypes
     Enabled::Bool
     DipoleMatrix::Vector{Matrix{Complex}}
-    Fields::Fields
+    Fields::TotalFields
     H0::Matrix{Complex}
 end
 """
@@ -273,14 +273,18 @@ end
 
     Once implemented will build a density matrix and store Hamiltonian for propagation via the vonNeumann equation.
 """
-function build_DensityMatrix(; Enabled = false, las=build_Laser(), DipoleMatrix= fill(Complex.(zeros(2,2,)),3), H0=Complex.(zeros(2,2)), ext_fields = Fields(fill(:(0.0),3), fill(:(0.0),3)))
-    las_field = get_laser_fields(las)
-    total_fields = Fields(Vector{Expr}(undef,3), Vector{Expr}(undef,3))
-    for i in 1:3
-        total_fields.Electric[i] = Expr(:call, :(.+), (las_field.Electric[i], ext_fields.Electric[i])...)
-        total_fields.Magnetic[i] = Expr(:call, :(.+), (las_field.Magnetic[i], ext_fields.Magnetic[i])...)
+function build_DensityMatrix(; Enabled = false, fields::Bool=false, las=build_Laser(), DipoleMatrix= fill(Complex.(zeros(2,2,)),3), H0=Complex.(zeros(2,2)), ext_fields = Fields(fill(:(0.0),3), fill(:(0.0),3)))
+    if fields
+        las_field = get_laser_fields(las)
+        total_field = TotalFields(las_field, ext_fields)
+        for i in 1:3
+            total_field.Electric[i] = Expr(:call, :(.+), (las_field.Electric[i], ext_fields.Electric[i])...)
+            total_field.Magnetic[i] = Expr(:call, :(.+), (las_field.Magnetic[i], ext_fields.Magnetic[i])...)
+        end
+    else
+        total_field = TotalFields(Fields(fill(0.0, 3), fill(0.0, 3)), Fields(fill(0.0, 3), fill(0.0, 3)))
     end
-    return DensityMatrix(Enabled = Enabled, DipoleMatrix = DipoleMatrix, Fields=total_fields, H0=H0)
+    return DensityMatrix(Enabled = Enabled, DipoleMatrix = DipoleMatrix, Fields=total_field, H0=H0)
 end
 """
     AthermalElectrons <: SimulationTypes

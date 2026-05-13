@@ -14,7 +14,7 @@ function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vec
     end
 
     # Newton with automatic fallback to bisection if it struggles
-    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=1000)
+    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=10000)
     #return find_zero((residual, dresidual), μ_init, Roots.Newton(), atol=1e-5, rtol=1e-5)
 end
 
@@ -26,6 +26,7 @@ function newton_rf(f, df, x0;tol, maxiter)
             return x_new
         end
         x = x_new
+        #println(x)
     end
     @warn "Convergence not found in number of iterations, current diff is $(f(x))"
     return x

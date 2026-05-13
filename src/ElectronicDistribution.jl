@@ -38,16 +38,17 @@ end
     - Value or vector of the partial derivative of the Fermi distribution with respect to energy
 """
 function dFDdE(Tel, μ, E)
-    return -exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
+    return -1/(Constants.kB*Tel) .* FermiDirac(Tel, μ, E) .* (1 .- FermiDirac(Tel, μ, E))
 end
 
 function dFDdE!(tmp, Tel, μ, E)
-    @. tmp = -exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)/(Constants.kB*Tel))+1)^2)
+    @. tmp = -1/(Constants.kB*Tel) * FermiDirac(Tel, μ, E) * (1 - FermiDirac(Tel, μ, E))
 end
 
 function dFDdE_mul!(tmp, Tel, μ, E)
-    @. tmp = tmp * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+    @. tmp = tmp * -1/(Constants.kB*Tel) * FermiDirac(Tel, μ, E) * (1 - FermiDirac(Tel, μ, E))
 end
+
 """
     dFDdT(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
     
@@ -62,15 +63,15 @@ end
     - Value or vector of the partial derivative of the Fermi distribution with respect to temperature
 """
 function dFDdT(Tel, μ, E)
-    return (E.-μ) .* exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel^2 * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
+    return (E-μ)/(Constants.kB*Tel^2) .* FermiDirac(Tel, μ, E) .* (1 .- FermiDirac(Tel, μ, E))
 end
 
 function dFDdT!(tmp, Tel, μ, E)
-    @. tmp = (E-μ) * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel^2 * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+    @. tmp = (E-μ)/(Constants.kB*Tel^2) .* FermiDirac(Tel, μ, E) .* (1 .- FermiDirac(Tel, μ, E))
 end
 
 function dFDdT_mul!(tmp, Tel, μ, E)
-    @. tmp = tmp * (E-μ) * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel^2 * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+    @. tmp = tmp * (E-μ)/(Constants.kB*Tel^2) .* FermiDirac(Tel, μ, E) .* (1 .- FermiDirac(Tel, μ, E))
 end
 """
     dFDdμ(Tel::Float64, μ::Float64, E::Union{Vector{Float64},Float64})
@@ -86,16 +87,17 @@ end
     - Value or vector of the partial derivative of the Fermi distribution with respect to chemical potential
 """
 function dFDdμ(Tel, μ, E)
-    return exp.((E.-μ)./(Constants.kB*Tel)) ./ (Constants.kB*Tel * (exp.((E.-μ)./(Constants.kB*Tel)).+1).^2)
+    return 1/(Constants.kB*Tel) .* FermiDirac(Tel, μ, E) .* (1 .- FermiDirac(Tel, μ, E))
 end
 
 function dFDdμ!(tmp, Tel, μ, E)
-    @. tmp = exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+    @. tmp = 1/(Constants.kB*Tel) * FermiDirac(Tel, μ, E) * (1 - FermiDirac(Tel, μ, E))
 end
 
 function dFDdμ_mul!(tmp, Tel, μ, E)
-    @. tmp = tmp * exp((E-μ)./(Constants.kB*Tel)) / (Constants.kB*Tel * (exp((E-μ)./(Constants.kB*Tel))+1)^2)
+    @. tmp = tmp * 1/(Constants.kB*Tel) * FermiDirac(Tel, μ, E) * (1 - FermiDirac(Tel, μ, E))
 end
+
 
 function boltzmann_E_excitation(f, sim, E_mag, DOS)
     kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
