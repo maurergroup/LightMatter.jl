@@ -96,19 +96,28 @@ end
     - Expression for the spatial shape of the laser
 """
 function spatial_z_laser(sim::Simulation)
+    return spatial_z_laser(sim, sim.structure)
+end
+
+function spatial_z_laser(sim::Simulation, ::Structure{1})
+    if length(sim.structure.dimension.grid) == 1
+        return :(1.0)
+    end
     decay = spatial_laser_decay(sim)
-    const_expr = :(1 ./ $decay)
-    if sim.structure.Elemental_System != 1
-        exprs = antennareactor_laserdecay(sim)
-        # Select the appropriate layer expression based on material index X
-        layer_selection = Expr(:call, :ifelse, :(X == 1), exprs[1], exprs[2])
-        for j in 3:length(exprs)
-            layer_selection = Expr(:call, :ifelse, :(X == $j), exprs[j], layer_selection)
-        end
-        return layer_selection
-    else
-        return :($const_expr .* exp.(-sim.structure.dimension.grid[i]./$decay))
-    end 
+    return :( (1 ./ $decay) * exp(-sim.structure.dimension.grid[i]./$decay) )
+end
+
+function spatial_z_laser(sim::Simulation, structure::Structure{N}) where {N}
+    if length(sim.structure.dimension.grid) == 1
+        return :(1.0)
+    end
+    decay = spatial_laser_decay(sim)
+    exprs = antennareactor_laserdecay(sim, structure)
+    layer_selection = Expr(:call, :ifelse, :(X == 1), exprs[1], exprs[2])
+    for j in 3:length(exprs)
+        layer_selection = Expr(:call, :ifelse, :(X == $j), exprs[j], layer_selection)
+    end
+    return layer_selection
 end
 
 """
@@ -122,11 +131,11 @@ end
     # Returns
     - Array of expressions for laser decay through each material layer
 """
-function antennareactor_laserdecay(sim::Simulation)
+function antennareactor_laserdecay(sim::Simulation, ::Structure{N}) where {N}
     depths = sort(vcat(sim.structure.dimension.InterfaceHeight, sim.structure.dimension.grid[end]))
 
     layer_exprs = Expr[]
-    for i in 1:sim.structure.Elemental_System
+    for i in 1:N
         ϵ = sim.laser.ϵ[i]
         z0 = (i == 1) ? 0.0 : depths[i-1]   # start of layer
         zend = depths[i]                     # end of layer

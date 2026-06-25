@@ -225,16 +225,10 @@ end
     - Dictionary of the DOS
 """
 function write_DOS(structure::Structure)
-    
-    if typeof(structure.DOS) == Vector{spl} && structure.Elemental_System == 1
+    if structure.DOS isa Vector
         DOS = zeros(length(structure.DOS), length(structure.egrid))
         for i in eachindex(structure.DOS)
-            DOS[i,:] = structure.DOS[i](structure.egrid)
-        end
-    elseif structure.Elemental_System > 1 && structure.DOS isa Vector
-        DOS = zeros(length(structure.DOS), length(structure.egrid))
-        for i in eachindex(structure.DOS)
-            DOS[i,:] = structure.DOS[i](structure.egrid)
+            DOS[i, :] = structure.DOS[i](structure.egrid)
         end
     else
         DOS = zeros(length(structure.egrid))
@@ -349,21 +343,45 @@ end
     - Array of the number of thermal electrons at each spatial point
 """
 function particlenumber_values(sim::Simulation)
+    return particlenumber_values(sim, sim.structure)
+end
+
+function particlenumber_values(sim::Simulation, ::Structure{1})
     L = sim.structure.dimension.length
-    if typeof(sim.structure.DOS) == Vector{spl} && length(sim.structure.DOS) == L #DOS per z point
+    if typeof(sim.structure.DOS) == Vector{spl} && length(sim.structure.DOS) == L
         no_part = zeros(1, L)
         for j in eachindex(sim.structure.dimension.grid)
             no_part[1, j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
         end
-    elseif typeof(sim.structure.DOS) == Vector{spl} #DOS for each material rather than heights
+    elseif typeof(sim.structure.DOS) == Vector{spl}
         no_part = zeros(1, L)
         for j in eachindex(sim.structure.dimension.grid)
             mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-            no_part[1, j] = get_thermalparticles(0.0,1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+            no_part[1, j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
         end
-    else #One DOS
+    else
         no_part = zeros(1, L)
-        no_part[1,:] .= get_thermalparticles(0.0, 1e-32, sim.structure.DOS,sim.structure.egrid)
+        no_part[1, :] .= get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid)
+    end
+    return no_part
+end
+
+function particlenumber_values(sim::Simulation, ::Structure{N}) where {N}
+    L = sim.structure.dimension.length
+    if typeof(sim.structure.DOS) == Vector{spl} && length(sim.structure.DOS) == L
+        no_part = zeros(1, L)
+        for j in eachindex(sim.structure.dimension.grid)
+            no_part[1, j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
+        end
+    elseif typeof(sim.structure.DOS) == Vector{spl}
+        no_part = zeros(1, L)
+        for j in eachindex(sim.structure.dimension.grid)
+            mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
+            no_part[1, j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+        end
+    else
+        no_part = zeros(1, L)
+        no_part[1, :] .= get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid)
     end
     return no_part
 end
@@ -534,7 +552,11 @@ function output_TelConductivity(f, results, sim)
     Tph = results["Tph"]
     spat = similar(Tel)
     Threads.@threads for i in eachindex(Tel[:,1])
-        @views electrontemperature_conductivity!(Tel[i,:], sim.electronictemperature.κ, sim.structure.dimension.spacing, Tph[i,:], spat[i,:])
+        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(sim.structure.μ_offset[1], size(Tel, 2))
+        tmp = zeros(length(Tel[i,:]), length(sim.structure.egrid))
+        int_mtx = zeros(length(Tel[i,:]), length(sim.structure.egrid))
+        heatcapacity = electronic_heatcapacity_profile(Tel[i,:], noe, tmp, int_mtx, sim)
+        @views electrontemperature_conductivity!(spat[i,:], Tel[i,:], Tph[i,:], heatcapacity, sim)
     end
     write_dataset(f["Electronic Temperature"], "Thermal Conductivity", spat)
 end
@@ -591,19 +613,14 @@ end
 function output_electronheatcapacity(f, results, sim)
     Tel = results["Tel"]
     hc = similar(Tel)
-    if sim.electronictemperature.ElectronicHeatCapacity == nonlinear
+    if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
         output_chemicalpotential(f, results, sim)
-        μ = results["μ"]
-        dos = sim.structure.DOS
-        Threads.@threads for i in eachindex(Tel[1,:])
-            DOS = get_DOS(dos, sim, i)
-            @views hc[i,:] .= nonlinear_electronheatcapacity.(Tel[:,i], μ[:,i], Ref(DOS))
-        end
-    else
-        Threads.@threads for i in eachindex(Tel[:,1])
-            gamma =  get_parameterhvalue(sim.electronictemperature.γ, sim, i)
-            @views hc[i,:] .= gamma*Tel[i,:]
-        end
+    end
+    Threads.@threads for i in eachindex(Tel[:,1])
+        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(sim.structure.μ_offset[1], size(Tel, 2))
+        tmp = zeros(length(Tel[i,:]), length(sim.structure.egrid))
+        int_mtx = zeros(length(Tel[i,:]), length(sim.structure.egrid))
+        @views hc[i,:] .= electronic_heatcapacity_profile(Tel[i,:], noe, tmp, int_mtx, sim)
     end
     write_dataset(f["Electronic Temperature"], "Electronic Heat Capacity", hc)
 end
@@ -633,10 +650,12 @@ function output_athermalelectronelectronscattering(f, results, sim)
         lifetime = mk_function((sim,μ,Tel,),(),τ_expr)
         grid = sim.structure.dimension.grid
         sims = vec_simulation(sim)
+        dos = sim.structure.DOS
 
         Threads.@threads for i in eachindex(fneq[:,1,1])
             for j in eachindex(tel[1,:])
                 X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
+                DOS = get_DOS(dos, sim, j)
                 τee = lifetime(sims[X], μ[i,j], tel[i,j])
                 @views rel[1,j,:] .= -athem_electronelectronscattering(tel[i,j], μ[i,j], sim, fneq[i,j,:], DOS, n[i,j], τee)
             end
@@ -690,16 +709,12 @@ function output_phononicheatcapacity(f, results, sim)
     if sim.phononictemperature.PhononicHeatCapacity == :variable
         tph = results["Tph"]
         cph = similar(tph)
-        (; n, θ) = sim.phononictemperature
-        Threads.@threads for i in eachindex(Tph[:,1])
-            for j in eachindex(Tph[1,:])
-                (no_elec, θD) = get_parameterhvalue((n, θ), sim, j)
-                cph[i,j] .= variable_phononheatcapacity(tph[i,j], no_elec, θD)
-            end
+        Threads.@threads for i in eachindex(tph[:,1])
+            @views cph[i,:] .= phononic_heatcapacity_profile(tph[i,:], sim)
         end
         write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", cph)
     else
-        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", sim.phononictemperature.Cph)
+        write_dataset(f["Phononic Temperature"], "Phonon Heat Capacity", fill(sim.phononictemperature.Cph, size(results["Tph"])))
     end
 end
 
@@ -728,7 +743,7 @@ function output_athemelectronphononscattering(f, results, sim)
         sims = vec_simulation(sim)
 
         Threads.@threads for i in eachindex(Tel[:,1])
-            for j in eachindex(uep[1,:])
+            for j in eachindex(Tel[1,:])
                 X = mat_picker(grid[j], sim.structure.dimension.InterfaceHeight)
                 @views @. tmp[i,j,:] = -fneq[i,j,:] / lifetime(sims[X], Tel[i,j], Tph[i,j])
             end
@@ -948,12 +963,16 @@ end
     - Parameter value at the spatial position, or array of values for multi-element system
 """
 function get_parameterhvalue(val, sim, i)
-    if sim.structure.Elemental_System > 1
-        X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return getindex(val, X)
-    else
-        return val
-    end
+    return get_parameterhvalue(val, sim, i, sim.structure)
+end
+
+function get_parameterhvalue(val, sim, i, ::Structure{1})
+    return val
+end
+
+function get_parameterhvalue(val, sim, i, ::Structure{N}) where {N}
+    X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+    return getindex(val, X)
 end
 
 """
@@ -970,12 +989,16 @@ end
     - Tuple of parameter values at the spatial position
 """
 function get_parameterhvalue(tup::Tuple, sim, i)
-    if sim.structure.Elemental_System > 1
-        X = mat_picker(sim.structure.dimension.grid[i],sim.structure.dimension.InterfaceHeight)
-        return getindex.(tup, X)
-    else
-        return tup
-    end
+    return get_parameterhvalue(tup, sim, i, sim.structure)
+end
+
+function get_parameterhvalue(tup::Tuple, sim, i, ::Structure{1})
+    return tup
+end
+
+function get_parameterhvalue(tup::Tuple, sim, i, ::Structure{N}) where {N}
+    X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+    return getindex.(tup, X)
 end
 
 """
@@ -990,12 +1013,15 @@ end
     - Single Simulation object or array of Simulation objects, one per elemental system
 """
 function vec_simulation(sim::Simulation)
-    if sim.structure.Elemental_System > 1
-        sims = sim_seperation(sim)
-    else 
-        sims = sim
-    end
-    return sims
+    return vec_simulation(sim, sim.structure)
+end
+
+function vec_simulation(sim::Simulation, ::Structure{1})
+    return sim
+end
+
+function vec_simulation(sim::Simulation, ::Structure{N}) where {N}
+    return sim_seperation(sim)
 end
 
 """

@@ -80,11 +80,61 @@ end
     - The current heat capacity of the electronic thermal bath
 """
 function nonlinear_electronheatcapacity(Tel, μ, DOS)
-    #Tel = ForwardDiff.value(Tel)
-    #μ = ForwardDiff.value(μ)
     int(u,p) = dFDdT(Tel, μ, u) * DOS(u) * u
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
     return solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
+end
+
+function electronic_heatcapacity_profile(Tel, noe, tmp, int_mtx, sim::Simulation{<:Structure{1}})
+    heatcapacity = similar(Tel)
+
+    if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
+        μ = similar(Tel)
+        Threads.@threads for i in eachindex(Tel)
+            DOS = LightMatter.get_DOS(sim.structure.DOS, sim, i)
+            @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:], 0.0)
+            heatcapacity[i] = LightMatter.nonlinear_electronheatcapacity(Tel[i], μ[i], DOS)
+        end
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
+        Threads.@threads for i in eachindex(Tel)
+            γ = sim.electronictemperature.γ
+            heatcapacity[i] = γ * Tel[i]
+        end
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :constant
+        Threads.@threads for i in eachindex(Tel)
+            heatcapacity[i] = sim.electronictemperature.γ
+        end
+    end
+
+    return heatcapacity
+end
+
+function electronic_heatcapacity_profile(Tel, noe, tmp, int_mtx, sim::Simulation{<:Structure{N}}) where {N}
+    heatcapacity = similar(Tel)
+
+    if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
+        μ = similar(Tel)
+        Threads.@threads for i in eachindex(Tel)
+            DOS = LightMatter.get_DOS(sim.structure.DOS, sim, i)
+            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+            μ0 = sim.structure.μ_offset[X]
+            @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:], μ0)
+            heatcapacity[i] = LightMatter.nonlinear_electronheatcapacity(Tel[i], μ[i], DOS)
+        end
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
+        Threads.@threads for i in eachindex(Tel)
+            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+            γ = sim.electronictemperature.γ[X]
+            heatcapacity[i] = γ * Tel[i]
+        end
+    elseif sim.electronictemperature.ElectronicHeatCapacity == :constant
+        Threads.@threads for i in eachindex(Tel)
+            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+            heatcapacity[i] = sim.electronictemperature.γ[X]
+        end
+    end
+
+    return heatcapacity
 end
 """
     electronphonon_coupling(sim::Simulation)
@@ -103,7 +153,7 @@ end
 function electronphonon_coupling(sim::Simulation)
     if sim.electronictemperature.Electron_PhononCoupling == true
         if sim.electronictemperature.ElectronPhononCouplingValue == :variable
-            return :(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λ, sim.electronictemperature.ω, DOS, Tel, μ, Tph))
+            return :(LightMatter.variable_electronphononcoupling(sim.electronictemperature.λω, DOS, Tel, μ, Tph))
         elseif sim.electronictemperature.ElectronPhononCouplingValue == :constant
             return :(-sim.electronictemperature.g*(Tel-Tph))
         end
@@ -112,15 +162,14 @@ function electronphonon_coupling(sim::Simulation)
     end
 end
 """
-    variable_electronphononcoupling(λ::Float64, ω::Float64, DOS::spl, Tel::Float64, μ::Float64, Tph::Float64, egrid::Vector{Float64})
+    variable_electronphononcoupling(λω::Float64, DOS::spl, Tel::Float64, μ::Float64, Tph::Float64, egrid::Vector{Float64})
     
     Calculates the non-linear electron phonon coupling parameter and subsequent energy flow from the density-of-states
     of the system. More accurate than a constant value. 
     The expression can be found in Z. Lin, L. V. Zhigilei and V. Celli, Phys. Rev. B, 2008, 77, 075133.
 
     # Arguments
-    - 'λ': Electron-phonon mass enhancement parameter
-    - 'ω': Second moment of the phonon spectrum
+    - 'λω': Electron-phonon mass enhancement parameter multiplied by the second moment of the phonon spectral function
     - 'DOS': Density-of-states of the system
     - 'Tel': Temperature of the electronic bath
     - 'μ': Chemical potential of the electronic bath
@@ -130,11 +179,8 @@ end
     # Returns
     - Energy flow between an electronic and phononic bath with a calculate g parameter
 """
-function variable_electronphononcoupling(λ, ω, DOS, Tel, μ, Tph)
-    #Tel = ForwardDiff.value(Tel)
-    #Tph = ForwardDiff.value(Tph)
-    #μ = ForwardDiff.value(μ)
-    prefac=pi * Constants.kB * λ * ω / DOS(μ) / Constants.ħ
+function variable_electronphononcoupling(λω, DOS, Tel, μ, Tph)
+    prefac=pi * Constants.kB * λω / DOS(μ) / Constants.ħ
     int(u,p) = DOS(u)^2 *-dFDdE(Tel, μ, u) * prefac
     prob = IntegralProblem(int, -8*Constants.kB*Tel, 8*Constants.kB*Tel)
     sol = solve(prob, HCubatureJL(initdiv=25, buffer=true), abstol=1e-5, reltol=1e-5).u
@@ -212,12 +258,13 @@ end
     # Returns
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
-function electrontemperature_conductivity!(cond, Tel, κ, dz, Tph)
+function electrontemperature_conductivity!(cond, Tel, Tph, HeatCapacity, sim)
     # Calculate temperature-dependent thermal conductivity: K = κ * Tel / Tph
-    K = κ.*Tel./Tph
+    K = sim.electronictemperature.κ.*Tel./Tph
+    dz = sim.structure.dimension.spacing
     
     # Interior points: compute flux at edges, then divergence
-    for i in 2:length(K)-1
+    Threads.@threads for i in 2:length(K)-1
         # Thermal conductivity at the edges (average between adjacent points)
         K_plus = 1 / 2 * (K[i+1] + K[i])
         K_minus = 1 / 2 * (K[i] + K[i-1])
@@ -238,6 +285,8 @@ function electrontemperature_conductivity!(cond, Tel, κ, dz, Tph)
     K_minusend = 1 / 2 * (K[end] + K[end-1])
     flux_end = K_minusend * (Tel[end-1] - Tel[end]) / dz
     cond[end] = flux_end / dz
+
+    cond ./= HeatCapacity
 end
 
 function thermalparticle_conductivity!(cond, n, κ, dz, Tph, Tel)

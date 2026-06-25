@@ -352,74 +352,114 @@ end
     # Returns
     - The group velocity vector or array of vectors as requested by the user for ballistic electron transport, or missing if not applicable
 """
-function build_group_velocity(v_g::Union{Vector{Float64},Missing,Float64}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
+function build_group_velocity(v_g::Union{Vector{Float64},Missing,Float64}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure{1})
+    Conductivity || return missing
+
     if ismissing(v_g)
-        if Conductivity == true
-            if typeof(v_g) == Float64
-                return fill(v_g, length(structure.egrid))
+        return build_group_velocity_missing(structure, FE, conductive_velocity)
+    elseif conductive_velocity == :constant
+        return convert_units(u"nm/fs", v_g)
+    end
+
+    return missing
+end
+
+function build_group_velocity(v_g::Union{Vector{Float64},Missing,Float64}, FE::Union{Float64,Vector{Float64},Missing}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure{N}) where {N}
+    Conductivity || return missing
+
+    if ismissing(v_g)
+        return build_group_velocity_missing(structure, FE, conductive_velocity)
+    elseif conductive_velocity == :constant
+        return build_group_velocity_constant(v_g, structure)
+    end
+
+    return missing
+end
+
+function build_group_velocity(v_g::Union{Vector{Float64},Missing,Float64}, FE::AbstractVector, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure{N}) where {N}
+    Conductivity || return missing
+
+    if ismissing(v_g) || ismissing(structure.DOS)
+        return missing
+    elseif conductive_velocity == :constant
+        return build_group_velocity_constant(v_g, structure)
+    elseif conductive_velocity == :fermigas
+        return build_group_velocity_fermigas(structure, FE)
+    elseif conductive_velocity == :effectiveoneband
+        return build_group_velocity_effective(structure, FE)
+    end
+
+    return missing
+end
+
+function build_group_velocity_missing(structure::Structure{1}, FE, conductive_velocity::Symbol)
+    if ismissing(structure.DOS) || ismissing(FE)
+        return missing
+    elseif conductive_velocity == :fermigas
+        return get_fermigas_velocity(Ref(structure.egrid), FE)
+    elseif conductive_velocity == :effectiveoneband
+        if structure.Spatial_DOS == true
+            vg = zeros(structure.dimension.length, length(structure.egrid))
+            for i in 1:structure.dimension.length
+                vg[i, :] = effective_one_band_velocity(structure.bandstructure[i].k_to_E, structure.DOS[i], structure.egrid, FE)
             end
-            if ismissing(structure.DOS) || ismissing(FE)
-                return missing
-            end
-            if conductive_velocity == :fermigas
-                if structure.Elemental_System > 1
-                    elements = structure.Elemental_System
-                    v_g = Vector{Vector{Float64}}(undef,elements)
-                    grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in eachindex(grids)
-                        if isa(FE, Vector) && length(FE) == elements
-                            v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE[i]),length(grids[i]))
-                        else
-                            v_g[i] = fill(get_fermigas_velocity(Ref(structure.egrid),FE),length(grids[i]))
-                        end
-                    end
-                    return v_g
-                else
-                    return get_fermigas_velocity(Ref(structure.egrid),FE)
-                end
-            elseif conductive_velocity == :effectiveoneband
-                if structure.Spatial_DOS == true
-                    v_g = zeros(structure.dimension.length,length(structure.egrid))
-                    for i in 1:structure.dimension.length
-                        v_g[i,:] = effective_one_band_velocity(structure.bandstructure[i].k_to_E, structure.DOS[i], structure.egrid, FE)
-                    end
-                    return v_g
-                elseif structure.Elemental_System != 1
-                    v_g = zeros(structure.dimension.length,length(structure.egrid))
-                    Threads.@threads for i in eachindex(v_g[:,1])
-                        j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
-                        if isa(FE, Vector)
-                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j].k_to_E, structure.DOS[j], structure.egrid, FE[j])
-                        else
-                            v_g[i,:] .= effective_one_band_velocity(structure.bandstructure[j].k_to_E, structure.DOS[j], structure.egrid, FE)
-                        end
-                    end
-                    return v_g
-                else
-                    v_g = effective_one_band_velocity(structure.bandstructure.k_to_E, structure.DOS,structure.egrid,FE)
-                end
-            end
-        else 
-            return missing
+            return vg
+        else
+            return effective_one_band_velocity(structure.bandstructure.k_to_E, structure.DOS, structure.egrid, FE)
         end
+    end
+
+    return missing
+end
+
+function build_group_velocity_missing(structure::Structure{N}, FE::AbstractVector, conductive_velocity::Symbol) where {N}
+    if ismissing(structure.DOS)
+        return missing
+    elseif conductive_velocity == :fermigas
+        return build_group_velocity_fermigas(structure, FE)
+    elseif conductive_velocity == :effectiveoneband
+        return build_group_velocity_effective(structure, FE)
+    end
+
+    return missing
+end
+
+function build_group_velocity_constant(v_g, structure::Structure{1})
+    return convert_units(u"nm/fs", v_g)
+end
+
+function build_group_velocity_constant(v_g, structure::Structure{N}) where {N}
+    vg = Vector{Vector{Float64}}(undef, N)
+    grids = split_grid(structure.dimension.grid, structure.dimension.InterfaceHeight)
+    for i in eachindex(grids)
+        vg[i] = fill(convert_units(u"nm/fs", v_g), length(grids[i]))
+    end
+    return vg
+end
+
+function build_group_velocity_fermigas(structure::Structure{N}, FE) where {N}
+    vg = Vector{Vector{Float64}}(undef, N)
+    grids = split_grid(structure.dimension.grid, structure.dimension.InterfaceHeight)
+    for i in eachindex(grids)
+        vg[i] = fill(get_fermigas_velocity(Ref(structure.egrid), FE[i]), length(grids[i]))
+    end
+    return vg
+end
+
+function build_group_velocity_effective(structure::Structure{N}, FE) where {N}
+    if structure.Spatial_DOS == true
+        vg = zeros(structure.dimension.length, length(structure.egrid))
+        for i in 1:structure.dimension.length
+            vg[i, :] = effective_one_band_velocity(structure.bandstructure[i].k_to_E, structure.DOS[i], structure.egrid, FE[i])
+        end
+        return vg
     else
-        if Conductivity == true
-            if conductive_velocity == :constant
-                if structure.Elemental_System > 1
-                    elements = structure.Elemental_System
-                    V_g = Vector{Vector{Float64}}(undef,elements)
-                    grids = split_grid(structure.dimension.grid,structure.dimension.InterfaceHeight)
-                    for i in eachindex(grids)
-                        V_g[i] = fill(convert_units(u"nm/fs", v_g),length(grids[i]))
-                    end
-                    return V_g
-                else
-                    return convert_units(u"nm/fs", v_g)
-                end
-            end
-        else 
-            return missing
+        vg = zeros(structure.dimension.length, length(structure.egrid))
+        Threads.@threads for i in eachindex(vg[:, 1])
+            j = mat_picker(structure.dimension.grid[i], structure.dimension.InterfaceHeight)
+            vg[i, :] .= effective_one_band_velocity(structure.bandstructure[j].k_to_E, structure.DOS[j], structure.egrid, FE[i])
         end
+        return vg
     end
 end
 """

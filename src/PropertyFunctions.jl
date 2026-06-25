@@ -14,8 +14,7 @@ function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vec
     end
 
     # Newton with automatic fallback to bisection if it struggles
-    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=10000)
-    #return find_zero((residual, dresidual), μ_init, Roots.Newton(), atol=1e-5, rtol=1e-5)
+    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=1e3)
 end
 
 function newton_rf(f, df, x0;tol, maxiter)
@@ -26,9 +25,8 @@ function newton_rf(f, df, x0;tol, maxiter)
             return x_new
         end
         x = x_new
-        #println(x)
     end
-    @warn "Convergence not found in number of iterations, current diff is $(f(x))"
+    #@warn "Convergence not found in number of iterations, current diff is $(f(x))"
     return x
 end
 
@@ -257,15 +255,4 @@ end
 
 function get_particlenumber(DOS::Missing, egrid, offset)
     return missing
-end
-"""
-    find_chemicalpotential_ORIGINAL(no_part::Float64, Tel::Float64, DOS::spl, egrid::Vector{Float64})
-    
-    Original implementation - kept for reference. Has allocation issues.
-"""
-function find_chemicalpotential_ORIGINAL(no_part, Tel, DOS, egrid, μ0)
-    # PROBLEM: This creates a closure that captures variables
-    # Each solve iteration may allocate through ForwardDiff
-    f(u,p) = no_part - get_thermalparticles(u, Tel, DOS, egrid)
-    return solve(NonlinearProblem(f, μ0);alg=SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
 end

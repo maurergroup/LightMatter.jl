@@ -171,7 +171,7 @@ end
     Struct that contains any spatial information including the DOS, the spatial grid to solve the simulation on and
     the elemental composition of the simulation (e.g. an antenna-reactor system would contain two elemental systems)
 """
-@kwdef struct Structure <: SimulationTypes
+@kwdef struct Structure{N} <: SimulationTypes
     Spatial_DOS::Bool # Whether to vary the DOS with height - if so the DOS becomes a vector
     ChemicalPotential::Bool
 
@@ -217,24 +217,24 @@ end
     - The Structure struct with the DOS and egrid assembled or provided by the user
 """
 function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
-    DOS_file::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
-    DOS_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
+    bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
+    bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
     calculate_bandstructure::Bool = false, μ_offset::Bool = false, μ_offset_reference::Int=1, offset=missing)
 
 
     if μ_offset
-        offset = calculate_μoffset(DOS_file, μ_offset_reference)
+        offset = calculate_μoffset(bulk_DOS, μ_offset_reference)
     elseif ismissing(offset)
-        if DOS_file != nothing
-            offset = zeros(length(DOS_file))
+        if bulk_DOS == Vector{String}
+            offset = zeros(length(bulk_DOS))
         else
             offset = zeros(1)
         end
     end
 
-    DOS = DOS_initialization(DOS_file, DOS_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, offset)
+    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, offset)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields
@@ -248,9 +248,11 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
     else
         bandstructure = missing
     end
-    return Structure(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
+    return Structure{Elemental_System}(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
                     bandstructure = bandstructure, ChemicalPotential=chemicalpotential, μ_offset = offset)
 end
+
+elemental_system(::Structure{N}) where {N} = N
 """
     WIP!!!
     DensityMatrix <: SimulationTypes
@@ -402,8 +404,7 @@ end
 
         γ::Union{Float64,Vector{Float64}} = 1.0 # Specific heat capacity of electrons at room temperature for linear heat capacity
         κ::Union{Float64,Vector{Float64}} = 1.0 # Thermal conductivity of electrons at room temperature
-        λ::Union{Float64,Vector{Float64}} = 1.0 # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
-        ω::Union{Float64,Vector{Float64}} = 1.0 # Second moment of phonon spectral function for non-linear electron-phonon coupling
+        λω::Union{Float64,Vector{Float64}} = 1.0 # Electron-phonon mass enhancement parameter multiplied by the second moment of the phonon spectral function, see DOI: 10.1103/PhysRevB.77.075133
         g::Union{Float64,Vector{Float64}} = 1.0 # Constant electron-phonon coupling value 
     end
 
@@ -425,8 +426,7 @@ end
 
     γ::Union{Float64,Vector{Float64}, Missing} = missing # Specific heat capacity of electrons at room temperature for linear heat capacity
     κ::Union{Float64,Vector{Float64}, Missing} = missing # Thermal conductivity of electrons at room temperature
-    λ::Union{Float64,Vector{Float64}, Missing} = missing # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
-    ω::Union{Float64,Vector{Float64}, Missing} = missing # Second moment of phonon spectral function for non-linear electron-phonon coupling
+    λω::Union{Float64,Vector{Float64}, Missing} = missing # Electron-phonon mass enhancement factor for non-linear electron-phonon coupling
     g::Union{Float64,Vector{Float64}, Missing} = missing # Constant electron-phonon coupling value 
 end
 """
@@ -445,34 +445,21 @@ end
     - 'ElectronPhononCouplingValue': Method for calculating the electron phonon coupling value, either :constant or :variable
     - 'γ': unit = eV/nm³/K²: Specific heat capacity of electronic bath for :linear ElectronicHeatCapacity
     - 'κ': unit = eV/fs/nm/K: Thermal conductivity of electrons at room temperature
-    - 'λ': unit = unitless: Electron-phonon mass enhancement parameter
-    - 'ω': unit = eV^2: The second moment of the phonon spectrum
+    - 'λω': unit = eV^2: Electron-phonon mass enhancement parameter multiplied by the second moment of the phonon spectral function, see DOI: 10.1103/PhysRevB.77.075133
     - 'g': unit = eV/fs/nm³/K: Constant value for the electron-phonon coupling if using :constant
 
     # Returns
     - The ElectronicTemperature struct with the users settings and parameters with any neccessary unit conversion.
 """
 function build_ElectronicTemperature(; Enabled = false, structure=build_Structure(), AthermalElectron_ElectronCoupling = false, Electron_PhononCoupling = false, Conductivity = false,
-                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = missing, κ = missing, λ = missing, ω = missing, g = missing)
+                               ElectronicHeatCapacity = :linear, ElectronPhononCouplingValue = :constant, γ = missing, κ = missing, λω = missing, g = missing)
 
     if !ismissing(γ)
         γ = convert_units(u"eV/nm^3/K^2", γ)
     end
-    if !ismissing(κ)
-        if structure.Elemental_System == 1
-            κ = convert_units(u"eV/fs/nm/K", κ)
-        else
-            new_κ = zeros(structure.dimension.length)
-            κ = convert_units(u"eV/fs/nm/K", κ)
-            for i in eachindex(new_κ)
-                X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
-                new_κ[i] = κ[X]
-            end
-            κ = new_κ
-        end
-    end
-    if !ismissing(ω)
-        ω = convert_units(u"eV^2", ω)
+    κ = build_kappa(structure, κ)
+    if !ismissing(λω)
+        λω = convert_units(u"eV^2", λω)
     end
     if !ismissing(g)
         g = convert_units(u"eV/fs/nm^3/K", g)
@@ -480,7 +467,25 @@ function build_ElectronicTemperature(; Enabled = false, structure=build_Structur
     return ElectronicTemperature(Enabled=Enabled, AthermalElectron_ElectronCoupling=AthermalElectron_ElectronCoupling, 
                                  Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
                                  ElectronicHeatCapacity=ElectronicHeatCapacity, ElectronPhononCouplingValue=ElectronPhononCouplingValue,
-                                 γ=γ, κ=κ, λ=λ, ω=ω, g=g)
+                                 γ=γ, κ=κ, λω=λω, g=g)
+end
+
+function build_kappa(structure::Structure{1}, κ)
+    if !ismissing(κ)
+        return κ = convert_units(u"eV/fs/nm/K", κ)
+    end
+end
+
+function build_kappa(structure::Structure{N}, κ) where {N}
+    if !ismissing(κ)
+        new_κ = zeros(structure.dimension.length)
+        κ = convert_units(u"eV/fs/nm/K", κ)
+        Threads.@threads for i in eachindex(new_κ)
+            X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
+            new_κ[i] = κ[X]
+        end
+        κ = new_κ
+    end
 end
 """
     struct PhononicTemperature <: SimulationTypes
@@ -551,7 +556,7 @@ function build_PhononicTemperature(;Enabled = false, AthermalElectron_PhononCoup
         Cph = convert_units(u"eV/nm^3/K", Cph)
     end
     if !ismissing(κ)
-        κ = convert_units(u"eV/nm", κ)
+        κ = convert_units(u"eV/fs/nm/K", κ)
     end
     return PhononicTemperature(Enabled=Enabled, AthermalElectron_PhononCoupling=AthermalElectron_PhononCoupling, 
                                Electron_PhononCoupling=Electron_PhononCoupling, Conductivity=Conductivity, 
@@ -669,13 +674,13 @@ end =#
     end
     This struct contains all the others and is the main simulation object both in assembling a simulation and during it
 """
-@kwdef struct Simulation <: SimulationTypes
+@kwdef struct Simulation{S<:Structure} <: SimulationTypes
     electronictemperature::ElectronicTemperature
     phononictemperature::PhononicTemperature
     athermalelectrons::AthermalElectrons
     electronicdistribution::ElectronicDistribution
     phononicdistribution::PhononicDistribution
-    structure::Structure
+    structure::S
     laser::Laser
     densitymatrix::DensityMatrix
     #cache::Cache
@@ -759,7 +764,7 @@ function build_Simulation(;densitymatrix::Union{DensityMatrix,NamedTuple,Nothing
         build_Laser(; merge(temp, laser isa NamedTuple ? laser : NamedTuple())...)
     end
 
-    return Simulation(densitymatrix=densitymatrix,electronictemperature=electronictemperature,phononictemperature=phononictemperature,athermalelectrons=athermalelectrons,
+    return Simulation{typeof(structure)}(densitymatrix=densitymatrix,electronictemperature=electronictemperature,phononictemperature=phononictemperature,athermalelectrons=athermalelectrons,
     electronicdistribution=electronicdistribution,phononicdistribution=phononicdistribution,structure=structure,laser=laser)
 end
 """

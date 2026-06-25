@@ -71,10 +71,27 @@ end
     - The current heat capacity of the phononic thermal bath
 """
 function variable_phononheatcapacity(Tph, n, θ)
-    #Tph = ForwardDiff.value(Tph)
     int(u,p) = u^4 * exp(u) / (exp(u)-1)^2
     prob = IntegralProblem(int, (0.0, θ/Tph))
     return 9*n*Constants.kB*(Tph/θ)^3 * solve(prob, HCubatureJL(initdiv=10); abstol=1e-5, reltol=1e-5).u
+end
+
+function phononic_heatcapacity_profile(Tph, sim)
+    heatcapacity = similar(Tph)
+
+    if sim.phononictemperature.PhononicHeatCapacity == :variable
+        (; n, θ) = sim.phononictemperature
+        Threads.@threads for i in eachindex(Tph)
+            (no_elec, θD) = LightMatter.get_parameterhvalue((n, θ), sim, i)
+            heatcapacity[i] = LightMatter.variable_phononheatcapacity(Tph[i], no_elec, θD)
+        end
+    else
+        Threads.@threads for i in eachindex(Tph)
+            heatcapacity[i] = LightMatter.get_parameterhvalue(sim.phononictemperature.Cph, sim, i)
+        end
+    end
+
+    return heatcapacity
 end
 """
     phonontemperature_source(sim::Simulation)
@@ -128,10 +145,24 @@ end
     # Returns
     - Updates cond with the change in temperature at each z-grid point
 """
-function phonontemperature_conductivity!(cond, Tph, κ, dz)
-    #cond = get_tmp(cond, Tph[1])
-    depthderivative!(Tph, dz, cond)
-    cond[1] = 0.0
-    cond[end] = 0.0
-    depthderivative!((cond.*κ), dz, cond)
+function phonontemperature_conductivity!(cond, Tph, HeatCapacity, sim)
+    κ = sim.phononictemperature.κ
+    dz = sim.structure.dimension.spacing
+
+    Threads.@threads for i in 2:length(Tph)-1
+
+        flux_plus = κ * (Tph[i+1] - Tph[i]) / dz
+        flux_minus = κ * (Tph[i] - Tph[i-1]) / dz
+
+        cond[i] = (flux_plus - flux_minus) / dz
+    end
+
+    flux_1 = κ * (Tph[2] - Tph[1]) / dz
+    cond[1] = flux_1 / dz
+
+    flux_end = κ * (Tph[end-1] - Tph[end]) / dz
+    cond[end] = flux_end / dz
+
+    cond ./= HeatCapacity
+    
 end

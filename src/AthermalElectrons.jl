@@ -53,9 +53,6 @@ end
 """
 function build_athemdistribution(sim::Simulation, athemexcite::Expr, Elecelec::Union{Expr,Float64}, Elecphon::Union{Expr,Float64})
     args = Union{Expr, Symbol, Float64}[athemexcite, Elecelec, Elecphon]
-    #= if sim.athermalelectrons.Conductivity == true
-        push!(args, :f_cond)
-    end =#
     return Expr(:call, :(.+), (args)...)
 end
 """
@@ -78,43 +75,37 @@ end
       full excitation shape change
 """
 function athemexcitation!(Δfneqe, Δfneqh, ftot, egrid, DOS, hv::Float64, M, int_vec, laser)
-    #Δfneqh = get_tmp(Δfneqh, ftot)
-    #Δfneqe = get_tmp(Δfneqe, ftot)
     ftotspl = get_interpolant(egrid, ftot)
     athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv, M)
     athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv, M)
-    pc_sf = get_noparticles(int_vec, Δfneqe, DOS, egrid) / get_noparticles(int_vec, Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
-    Δfneqe .-= (pc_sf * Δfneqh)
-
-    #Δfneqe .*= excite_laser_internalenergy(Δfneqe, DOS, egrid, laser,int_vec)
-    int_en = get_internalenergy(int_vec, Δfneqe, DOS, egrid)
-    Δfneqe .*= ifelse(int_en == 0, laser, laser/int_en) # Normalizes the excitation to the inputted laser energy
-
+    particle_scale, energy_scale = excite_laser_conservation(Δfneqe, Δfneqh, DOS, egrid, laser, int_vec)
+    Δfneqe .-= particle_scale .* Δfneqh
+    Δfneqe .*= energy_scale
     return nothing
 end
 
-function athemexcitation!(Δfneqh, Δfneqe, ftot, egrid, DOS, hv::Matrix{Float64}, M, int_vec,laser)
-    Δneqs = zeros(size(hv,1),length(egrid))
-    for i in 1:size(hv,1)
-        ftotspl = get_interpolant(egrid, ftot)
-        athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv[i,1], M)
-        athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv[i,1], M)
-        pc_sf = get_noparticles(int_vec, Δfneqe, DOS, egrid) / get_noparticles(int_vec, Δfneqh, DOS, egrid) # Corrects for particle conservation in the generation shape
-        Δfneqe .-= (pc_sf * Δfneqh)
-        tot_en = get_internalenergy(int_vec, Δfneqe, DOS, egrid)
-        Δneqs[i,:] .=  ifelse(tot_en == 0, Δfneqe .* hv[i,2], Δfneqe .* hv[i,2] ./ get_internalenergy(Δfneqe, DOS, egrid))
-    end
-    return Δneqs # Returns the different frequency changes
-end
+function excite_laser_conservation(dis_e, dis_h, DOS, egrid, laser, int_vec)
+    particle_denom = get_noparticles(int_vec, dis_h, DOS, egrid)
+    particle_guess = iszero(particle_denom) ? 0.0 : get_noparticles(int_vec, dis_e, DOS, egrid) / particle_denom
+    shape_guess = dis_e .- particle_guess .* dis_h
+    energy_denom = get_internalenergy(int_vec, shape_guess, DOS, egrid)
+    energy_guess = iszero(energy_denom) ? 1.0 : laser / energy_denom
+    u0 = [particle_guess, energy_guess]
 
-#= function excite_laser_internalenergy(dis, DOS, egrid, laser,int_vec)
-    println(get_internalenergy(int_vec, 1.0*dis, DOS, egrid))
-    int(u,p) = laser - get_internalenergy(int_vec, ForwardDiff.value(u)*dis, DOS, egrid)
-    prob = NonlinearProblem(int, 1.0)
-    sol = solve(prob, SimpleNewtonRaphson(), abstol=1e-3, reltol=1e-3).u
-    println(sol)
+    tmp = similar(dis_e)
+    function int!(res, u, p)
+        particle_scale = ForwardDiff.value(u[1])
+        energy_scale = ForwardDiff.value(u[2])
+        @. tmp = energy_scale * (dis_e - particle_scale * dis_h)
+        res[1] = get_noparticles(int_vec, tmp, DOS, egrid)
+        res[2] = get_internalenergy(int_vec, tmp, DOS, egrid) - laser
+        return nothing
+    end
+
+    prob = NonlinearProblem(int!, u0)
+    sol = solve(prob, abstol=1e-3, reltol=1e-3).u
     return sol
-end =#
+end
 """
     athem_holegeneration!(tmp::Vector, egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
 
@@ -236,13 +227,14 @@ end
     - Change in the non-equilibrium distribution due to scattering with a thermal electronic system
 """
 function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS, n, τee, int_vec, tmp)
-    ftot = LightMatter.FermiDirac(Tel, μ, egrid) .+ fneq
+    feq = LightMatter.FermiDirac(Tel, μ, egrid)
+    ftot = feq .+ fneq
     goal = get_internalenergy(int_vec, ftot, DOS, egrid)
-    find_relaxeddistribution(frel, egrid, goal, n, DOS, int_vec, μ, tmp)
-    fdis .= -(fneq ./τee) .+ ((ftot-frel) ./ τee) #fdis = feq + fneq so we need to add fneq twice to get fneq - feq
+    find_relaxeddistribution!(frel, egrid, goal, n, DOS, int_vec, μ, tmp)
+    fdis .= -(fneq ./τee) .+ ((feq.-frel) ./ τee)
 end
 """
-    find_relaxeddistribution(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64)
+    find_relaxeddistribution!(egrid::Vector{Float64},goal::Float64,n::Float64,DOS::spl,kB::Float64)
     
     Solves for a Fermi distribution with the same internal energy as a given target.
 
@@ -255,11 +247,10 @@ end
     # Returns
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
-function find_relaxeddistribution(out, egrid, goal, n, DOS, int_vec, μ0, tmp)
-    prob = NonlinearProblem(find_relaxedtemp, 1000, (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
-    sol = solve(prob; abstol=1e-5, reltol=1e-5).u
+function find_relaxeddistribution!(out, egrid, goal, n, DOS, int_vec, μ0, tmp)
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (10.0, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
+    sol = solve(prob; alg=Brent(),abstol=1e-6, reltol=1e-6).u
     μ = find_chemicalpotential(n, sol, DOS, egrid, int_vec, tmp, μ0)
-    #out = get_tmp(out, sol)
     FermiDirac!(out, sol, μ, egrid)
     return nothing
 end
@@ -403,36 +394,44 @@ function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz, Tel,
 end
 
 function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim)
-    if sim.structure.Elemental_System > 1
-        @views @inbounds for i in 1:size(f, 1)
-            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-            μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:],sim.structure.μ_offset[X])
-            LightMatter.FermiDirac!(view(tmp, i, :),Tel, μ, sim.structure.egrid)
-            tmp[i,:] .+= f[i,:]
-        end
-    else
-        @views @inbounds for i in 1:size(f, 1)
-            μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
-            LightMatter.FermiDirac!(view(tmp, i, :),Tel, μ, sim.structure.egrid)
-            tmp[i,:] .+= f[i,:]
-        end
+    return calculate_ftot(f, Tel, noe, tmp, tmp2, sim, sim.structure)
+end
+
+function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim, ::Structure{1})
+    @views @inbounds for i in 1:size(f, 1)
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
+        LightMatter.FermiDirac!(view(tmp, i, :), Tel, μ, sim.structure.egrid)
+        tmp[i,:] .+= f[i,:]
+    end
+end
+
+function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim, ::Structure{N}) where {N}
+    @views @inbounds for i in 1:size(f, 1)
+        X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[X])
+        LightMatter.FermiDirac!(view(tmp, i, :), Tel, μ, sim.structure.egrid)
+        tmp[i,:] .+= f[i,:]
     end
 end
 
 function calculate_ftot(f, Tel::AbstractVector, noe, tmp, tmp2, sim)
-    if sim.structure.Elemental_System > 1
-        @views @inbounds for i in 1:size(f, 1)
-            X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-            μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[X])
-            LightMatter.FermiDirac!(view(tmp, i, :),Tel[i], μ, sim.structure.egrid)
-            @views tmp[i,:] .+= f[i,:]
-        end
-    else
-        @views @inbounds for i in 1:size(f, 1)
-            μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
-            LightMatter.FermiDirac!(view(tmp, i, :),Tel[i], μ, sim.structure.egrid)
-            tmp[i,:] .+= f[i,:]
-        end
+    return calculate_ftot(f, Tel, noe, tmp, tmp2, sim, sim.structure)
+end
+
+function calculate_ftot(f, Tel::AbstractVector, noe, tmp, tmp2, sim, ::Structure{1})
+    @views @inbounds for i in 1:size(f, 1)
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
+        LightMatter.FermiDirac!(view(tmp, i, :), Tel[i], μ, sim.structure.egrid)
+        tmp[i,:] .+= f[i,:]
+    end
+end
+
+function calculate_ftot(f, Tel::AbstractVector, noe, tmp, tmp2, sim, ::Structure{N}) where {N}
+    @views @inbounds for i in 1:size(f, 1)
+        X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[X])
+        LightMatter.FermiDirac!(view(tmp, i, :), Tel[i], μ, sim.structure.egrid)
+        @views tmp[i,:] .+= f[i,:]
     end
 end
 

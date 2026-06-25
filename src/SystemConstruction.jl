@@ -86,28 +86,16 @@ end
     - NamedArrayPartition containing the initial conditions of the simulation
 """
 function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64})
+    return generate_initialconditions(sim, initialtemps, sim.structure)
+end
+
+function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64}, ::Structure{1})
     temp_u0 = Dict()
     if sim.athermalelectrons.Enabled == true
-        merge!(temp_u0, Dict("fneq"=>zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
+        merge!(temp_u0, Dict("fneq" => zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
     end
-    if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true 
-        if typeof(sim.structure.DOS) == Vector{spl}
-            if sim.structure.Elemental_System == 1
-                no_part=zeros(sim.structure.dimension.length)
-                for j in eachindex(sim.structure.dimension.grid)
-                    no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
-                end
-            else
-                no_part=zeros(sim.structure.dimension.length)
-                for j in eachindex(sim.structure.dimension.grid)
-                    x = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-                    no_part[j] = get_thermalparticles(sim.structure.μ_offset[x], 1e-32, sim.structure.DOS[x], sim.structure.egrid)
-                end
-            end
-        else
-            no_part = fill(get_thermalparticles(sim.structure.μ_offset[1],1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
-        end
-        merge!(temp_u0,Dict("noe" => no_part ))
+    if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
+        merge!(temp_u0, Dict("noe" => no_particle_profile(sim)))
     end
     if sim.electronictemperature.Enabled == true
         merge!(temp_u0, Dict("Tel" => fill(initialtemps["Tel"], sim.structure.dimension.length)))
@@ -115,7 +103,25 @@ function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, 
     if sim.phononictemperature.Enabled == true
         merge!(temp_u0, Dict("Tph" => fill(initialtemps["Tph"], sim.structure.dimension.length)))
     end
-    namtup = NamedTuple((Symbol(key),value) for (key,value) in temp_u0)
+    namtup = NamedTuple((Symbol(key), value) for (key, value) in temp_u0)
+    return NamedArrayPartition(namtup)
+end
+
+function generate_initialconditions(sim::Simulation, initialtemps::Dict{String, Float64}, ::Structure{N}) where {N}
+    temp_u0 = Dict()
+    if sim.athermalelectrons.Enabled == true
+        merge!(temp_u0, Dict("fneq" => zeros(sim.structure.dimension.length, length(sim.structure.egrid))))
+    end
+    if sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
+        merge!(temp_u0, Dict("noe" => no_particle_profile(sim)))
+    end
+    if sim.electronictemperature.Enabled == true
+        merge!(temp_u0, Dict("Tel" => fill(initialtemps["Tel"], sim.structure.dimension.length)))
+    end
+    if sim.phononictemperature.Enabled == true
+        merge!(temp_u0, Dict("Tph" => fill(initialtemps["Tph"], sim.structure.dimension.length)))
+    end
+    namtup = NamedTuple((Symbol(key), value) for (key, value) in temp_u0)
     return NamedArrayPartition(namtup)
 end
 """
@@ -131,47 +137,66 @@ end
     - NamedTuple containing the parameters of the simulation
 """
 function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64})
+    return generate_parameters(sim, initialtemps, sim.structure)
+end
+
+function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64}, ::Structure{1})
     int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
     tmp = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
-    if sim.structure.Elemental_System > 1
-        p = (sim=sim, matsim=sim_seperation(sim), int_mtx=int_mtx, tmp = tmp)
-    else
-        p = (sim=sim, int_mtx=int_mtx, tmp = tmp)
-    end
-    p = parameter_particle(p, sim)
+    p = (sim = sim, int_mtx = int_mtx, tmp = tmp)
+    p = parameter_particle(p, sim, sim.structure)
     if sim.athermalelectrons.Enabled
-        p =(; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
+        p = (; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         if !sim.electronictemperature.Enabled
             p = (; p..., Tel = initialtemps["Tel"])
         else
             p = (; p..., relax_dis = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         end
     end
-
-    return p 
+    return p
 end
 
-function parameter_particle(p, sim)
-    if (sim.athermalelectrons.Enabled || sim.electronictemperature.Enabled) && !sim.athermalelectrons.AthermalElectron_ElectronCoupling
-        if typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System == 1
-            no_part=zeros(sim.structure.dimension.length)
-            #noe = get_tmp(no_part, 0.0)
-            for j in eachindex(sim.structure.dimension.grid)
-                no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[j], sim.structure.egrid)
-            end
-        elseif typeof(sim.structure.DOS) == Vector{spl} && sim.structure.Elemental_System > 1
-            no_part=zeros(sim.structure.dimension.length)
-            #noe = get_tmp(no_part, 0.0)
-            for j in eachindex(sim.structure.dimension.grid)
-                mat = mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-                no_part[j] = get_thermalparticles(sim.structure.μ_offset[mat], 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
-            end
+function generate_parameters(sim::Simulation, initialtemps::Dict{String, Float64}, ::Structure{N}) where {N}
+    int_mtx = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
+    tmp = zeros(sim.structure.dimension.length, length(sim.structure.egrid))
+    p = (sim = sim, matsim = sim_seperation(sim), int_mtx = int_mtx, tmp = tmp)
+    p = parameter_particle(p, sim, sim.structure)
+    if sim.athermalelectrons.Enabled
+        p = (; p..., Δfexcite = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
+        if !sim.electronictemperature.Enabled
+            p = (; p..., Tel = initialtemps["Tel"])
         else
-            no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
+            p = (; p..., relax_dis = zeros(sim.structure.dimension.length, length(sim.structure.egrid)))
         end
-        p = (; p..., noe = no_part)
     end
     return p
+end
+
+function parameter_particle(p, sim, ::Structure{1})
+    if (sim.athermalelectrons.Enabled || sim.electronictemperature.Enabled) && !sim.athermalelectrons.AthermalElectron_ElectronCoupling
+        p = (; p..., noe = no_particle_profile(sim))
+    end
+    return p
+end
+
+function parameter_particle(p, sim, ::Structure{N}) where {N}
+    if (sim.athermalelectrons.Enabled || sim.electronictemperature.Enabled) && !sim.athermalelectrons.AthermalElectron_ElectronCoupling
+        p = (; p..., noe = no_particle_profile(sim))
+    end
+    return p
+end
+
+function no_particle_profile(sim::Simulation)
+    if typeof(sim.structure.DOS) == Vector{spl}
+        no_part = zeros(sim.structure.dimension.length)
+        for j in eachindex(sim.structure.dimension.grid)
+            mat = sim.structure.Elemental_System == 1 ? 1 : mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
+            no_part[j] = get_thermalparticles(sim.structure.μ_offset[mat], 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+        end
+    else
+        no_part = fill(get_thermalparticles(sim.structure.μ_offset[1], 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
+    end
+    return no_part
 end
 """
     simulation_construction(sys, sim::Simulation)
@@ -187,11 +212,15 @@ end
     - Quote block for the entire ODE problem
 """
 function simulation_construction(sys, sim::Simulation, print_time)
-    if sim.structure.Elemental_System == 1
-        return monometallic_system(sys, sim, print_time)
-    else
-        return antenna_reactor_system(sys, sim, print_time)
-    end
+    return simulation_construction(sys, sim, sim.structure, print_time)
+end
+
+function simulation_construction(sys, sim::Simulation, ::Structure{1}, print_time)
+    return monometallic_system(sys, sim, print_time)
+end
+
+function simulation_construction(sys, sim::Simulation, ::Structure{N}, print_time) where {N}
+    return antenna_reactor_system(sys, sim, print_time)
 end
 """
     monometallic_system(sys, sim::Simulation)
@@ -233,12 +262,12 @@ end
 """
 function conductivity_expressions(sim::Simulation)
     cond_exprs = [:(LightMatter.reset_du!(du))]
-    
     if sim.electronictemperature.Conductivity == true
-        push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(du.Tel, u.Tel, p.sim.electronictemperature.κ, p.sim.structure.dimension.spacing, u.Tph)))
+        noe_expr = sim.athermalelectrons.Enabled == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true ? :(u.noe) : :(p.noe)
+        push!(cond_exprs,:(LightMatter.electrontemperature_conductivity!(du.Tel, u.Tel, u.Tph, LightMatter.electronic_heatcapacity_profile(u.Tel, $noe_expr, p.tmp, p.int_mtx, p.sim), p.sim)))
     end
     if sim.phononictemperature.Conductivity == true
-        push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, p.sim.phononictemperature.κ, p.sim.structure.dimension.spacing)))
+        push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, LightMatter.phononic_heatcapacity_profile(u.Tph, p.sim), p.sim)))
     end
     if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
         push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, u.Tel, u.noe, p.tmp, p.int_mtx, p.sim)))
@@ -267,17 +296,15 @@ end
     - Quote block for the multithreaded section of the ODE problem
 """
 function build_loopbody(sys, sim::Simulation)
-    exprs = Vector{Expr}(undef,0)
-    @debug push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end)) # Error checking for missing parameters
-    if sim.structure.Elemental_System > 1
-        push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight))) # Picks the active material
-        push!(exprs, ar_variable_renaming(sim)) # Translates variable names from DiffEq.jl to LightMatter.jl
-    else
-        push!(exprs,variable_renaming(sim))
-    end
+    return build_loopbody(sys, sim, sim.structure)
+end
+
+function build_loopbody(sys, sim::Simulation, ::Structure{1})
+    exprs = Vector{Expr}(undef, 0)
+    @debug push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end))
+    push!(exprs, variable_renaming(sim))
     if sim.structure.ChemicalPotential
         push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec, μ0)))
-        #push!(exprs, :(println("Chemical potential: ", μ)))
     else
         push!(exprs, :(μ = 0.0))
     end
@@ -299,7 +326,6 @@ function build_loopbody(sys, sim::Simulation)
     else
         if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
             push!(exprs,:($(sys["relax"])))
-            #push!(exprs, :(println(any(isnan.(du2)))))
             push!(exprs,:(@views du.fneq[i,:] .= $(sys["fneq"])))
             push!(exprs,:(@views du.noe[i] = $(sys["noe"])))
         elseif sim.athermalelectrons.Enabled == true
@@ -311,6 +337,50 @@ function build_loopbody(sys, sim::Simulation)
         end
         if sim.phononictemperature.Enabled == true
             push!(exprs,:(du.Tph[i] = $(sys["Tph"])))
+        end
+    end
+    return Expr(:block, exprs...)
+end
+
+function build_loopbody(sys, sim::Simulation, ::Structure{N}) where {N}
+    exprs = Vector{Expr}(undef, 0)
+    @debug push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end))
+    push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight)))
+    push!(exprs, ar_variable_renaming(sim))
+    if sim.structure.ChemicalPotential
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec, μ0)))
+    else
+        push!(exprs, :(μ = 0.0))
+    end
+    if sim.athermalelectrons.EmbeddedAthEM == true
+        embedding = quote
+            if i == 1
+                relax_dis = $(sys["relax_AthEM"])
+                du.noe = $(sys["noe_AthEM"])
+                Δn = du.noe[1]
+                du.fneq[1,:] .= $(sys["fneq_AthEM"])
+                du.Tel[1] = $(sys["Tel_AthEM"])
+                du.Tph[1] = $(sys["Tph_AthEM"])
+            else
+                du.Tel[i] = $(sys["Tel"])
+                du.Tph[i] = $(sys["Tph"])
+            end
+        end
+        push!(exprs, embedding)
+    else
+        if sim.electronictemperature.Enabled == true && sim.electronictemperature.AthermalElectron_ElectronCoupling == true
+            push!(exprs, :($(sys["relax"])))
+            push!(exprs, :( @views du.fneq[i,:] .= $(sys["fneq"]) ))
+            push!(exprs, :( @views du.noe[i] = $(sys["noe"]) ))
+        elseif sim.athermalelectrons.Enabled == true
+            push!(exprs, :( @views du.fneq[i,:] .= $(sys["fneq"]) ))
+        end
+
+        if sim.electronictemperature.Enabled == true
+            push!(exprs, :(du.Tel[i] = $(sys["Tel"])))
+        end
+        if sim.phononictemperature.Enabled == true
+            push!(exprs, :(du.Tph[i] = $(sys["Tph"])))
         end
     end
     return Expr(:block, exprs...)

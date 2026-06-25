@@ -135,17 +135,22 @@ end
     - A vector of `Simulation` objects, each corresponding to a single elemental subsystem.
 """
 function sim_seperation(sim::Simulation)
-    function conditional_split(field, enabled::Bool) #Splits the system into its subcomponents or replicates the disabled system
-        enabled ? split_struct(field, sim.structure.Elemental_System) :
-                  fill(field, sim.structure.Elemental_System)
-    end
-    lasers = fill(sim.laser, sim.structure.Elemental_System) #Will always be enabled so doesn't need checking
+    return sim_seperation(sim, sim.structure)
+end
+
+function sim_seperation(sim::Simulation, ::Structure{1})
+    return (sim,)
+end
+
+function sim_seperation(sim::Simulation, structure::Structure{N}) where {N}
+    conditional_split(field, enabled::Bool) = enabled ? split_struct(field, Val(N)) : fill(field, N)
+    lasers = fill(sim.laser, N)
     tels   = conditional_split(sim.electronictemperature, sim.electronictemperature.Enabled)
     tphs   = conditional_split(sim.phononictemperature, sim.phononictemperature.Enabled)
     neqs   = conditional_split(sim.athermalelectrons, sim.athermalelectrons.Enabled)
-    structs = split_structure(sim.structure)
-    new_sim = ()#Build and fill vector of simulation objects
-    for i in 1:sim.structure.Elemental_System 
+    structs = split_structure(structure)
+    new_sim = ()
+    for i in 1:N
         new_sim = (new_sim..., build_Simulation(laser=lasers[i], electronictemperature=tels[i], phononictemperature=tphs[i],
                                     athermalelectrons=neqs[i], structure=structs[i]))
     end
@@ -165,14 +170,14 @@ end
     # Returns
     - A vector of the subsystem with scalar data extracted from the original vector fields.
 """
-function split_struct(data::SimulationTypes, number::Int)
+function split_struct(data::SimulationTypes, ::Val{N}) where {N}
     field_values = map(f -> getfield(data, f), fieldnames(typeof(data))) #Extracts all values from fields of subssytem into dict
     value_indices = findall(x -> x isa Vector, field_values) # Determines which fields of the subsystem need splitting 
 
     return [
         typeof(data)(
             map((val, idx) -> idx in value_indices && length(val) != 1 ? val[i] : val, field_values, 1:length(field_values))...
-        ) for i in 1:number
+        ) for i in 1:N
     ] # Creates a vector of the subsystem with each containing one value of the vector fields as a scalar
 end
 """
@@ -188,25 +193,23 @@ end
     # Returns
     - A vector of `Structure` objects, one per element if applicable.
 """
-function split_structure(structure::Structure)
-    field_values = Dict(f => getfield(structure, f) for f in fieldnames(typeof(structure))) #Extracts all values from fields of subssytem into dict
-    
-    # Check if DOS or particlenumber are vectors
-    dos_is_vector = :DOS in keys(field_values) && field_values[:DOS] isa Vector
-    
-    if !dos_is_vector && !pn_is_vector
-        return fill(structure, structure.Elemental_System)  # Return as-is if neither field is a vector
+function split_structure(structure::Structure{1})
+    return (structure,)
+end
+
+function split_structure(structure::Structure{N}) where {N}
+    field_values = Dict(f => getfield(structure, f) for f in fieldnames(typeof(structure)))
+    dos_is_vector = field_values[:DOS] isa Vector
+
+    if !dos_is_vector
+        return fill(structure, N)
     end
-    
-    # Determine the number of structures to create
-    n_structures = length(field_values[:DOS])
-    
+
     return [
         typeof(structure)(
-            (f == :DOS ? (dos_is_vector ? field_values[f][i] : field_values[f]) : 
-             field_values[f] for f in fieldnames(typeof(structure)))...
-        ) for i in 1:n_structures
-    ] # Creates a vector of the Structure struct with the DOS and particlenumber split into their seperate materials
+            (f == :DOS ? field_values[f][i] : field_values[f] for f in fieldnames(typeof(structure)))...
+        ) for i in 1:length(field_values[:DOS])
+    ]
 end
 """
     split_grid(grid, cutoffs)
