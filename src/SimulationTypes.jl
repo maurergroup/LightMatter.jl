@@ -184,7 +184,6 @@ end
 
     dimension::Dimension # A struct holding all spatial grid structure (0D or 1D)
     fields::TotalFields # Any laser and external fields in the simulation
-    μ_offset::Vector{Float64}
 end
 """
     build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
@@ -216,29 +215,18 @@ end
     # Returns
     - The Structure struct with the DOS and egrid assembled or provided by the user
 """
-function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
+function build_Structure(; laser::Laser=build_Laser(), Spatial_DOS::Bool = false, Elemental_System::Int = 1, dimension::Dimension = build_Dimension(),
     bulk_DOS::Union{String,Vector{String},Nothing} = nothing, DOS_folder::Union{String,Vector{String},Nothing} = nothing, 
     bulk_geometry::Union{String,Vector{String},Nothing} = nothing, slab_geometry::Union{String,Vector{String},Nothing} = nothing, 
     atomic_layer_tolerance::Union{Float64,Vector{Float64}} = 0.1, DOS::Union{spl,Vector{spl},Nothing} = nothing, egrid = collect(-10.0:0.01:10.0),
     ext_fields = Fields(fill(0.0, 3), fill(0.0, 3)), bandstructure::Union{Symbol, Nothing} = nothing, FE = 0.0, fields = false, chemicalpotential=false,
-    calculate_bandstructure::Bool = false, μ_offset::Bool = false, μ_offset_reference::Int=1, offset=missing)
+    calculate_bandstructure::Bool = false)
 
-
-    if μ_offset
-        offset = calculate_μoffset(bulk_DOS, μ_offset_reference)
-    elseif ismissing(offset)
-        if bulk_DOS == Vector{String}
-            offset = zeros(length(bulk_DOS))
-        else
-            offset = zeros(1)
-        end
-    end
-
-    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS, offset)
+    DOS = DOS_initialization(bulk_DOS, bulk_geometry, DOS_folder, slab_geometry, atomic_layer_tolerance, dimension, Spatial_DOS, DOS)
     egrid = build_egrid(egrid)
     FE = convert_units(u"eV", FE)
     if fields
-        las_field = get_laser_fields(las)
+        las_field = get_laser_fields(laser)
         total_field = TotalFields(las_field, ext_fields)
     else
         total_field = TotalFields(Fields(fill(0.0, 3), fill(0.0, 3)), Fields(fill(0.0, 3), fill(0.0, 3)))
@@ -249,7 +237,7 @@ function build_Structure(; las::Laser=build_Laser(), Spatial_DOS::Bool = false, 
         bandstructure = missing
     end
     return Structure{Elemental_System}(Spatial_DOS=Spatial_DOS, Elemental_System=Elemental_System, DOS=DOS, egrid=egrid, dimension=dimension, fields = total_field,
-                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential, μ_offset = offset)
+                    bandstructure = bandstructure, ChemicalPotential=chemicalpotential)
 end
 
 elemental_system(::Structure{N}) where {N} = N
@@ -457,7 +445,9 @@ function build_ElectronicTemperature(; Enabled = false, structure=build_Structur
     if !ismissing(γ)
         γ = convert_units(u"eV/nm^3/K^2", γ)
     end
-    κ = build_kappa(structure, κ)
+    if !ismissing(κ)
+        κ = build_kappa(structure, κ)
+    end
     if !ismissing(λω)
         λω = convert_units(u"eV^2", λω)
     end
@@ -471,21 +461,17 @@ function build_ElectronicTemperature(; Enabled = false, structure=build_Structur
 end
 
 function build_kappa(structure::Structure{1}, κ)
-    if !ismissing(κ)
-        return κ = convert_units(u"eV/fs/nm/K", κ)
-    end
+    return κ = convert_units(u"eV/fs/nm/K", κ)
 end
 
 function build_kappa(structure::Structure{N}, κ) where {N}
-    if !ismissing(κ)
-        new_κ = zeros(structure.dimension.length)
-        κ = convert_units(u"eV/fs/nm/K", κ)
-        Threads.@threads for i in eachindex(new_κ)
-            X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
-            new_κ[i] = κ[X]
-        end
-        κ = new_κ
+    new_κ = zeros(structure.dimension.length)
+    κ = convert_units(u"eV/fs/nm/K", κ)
+    Threads.@threads for i in eachindex(new_κ)
+        X = mat_picker(structure.dimension.grid[i],structure.dimension.InterfaceHeight)
+        new_κ[i] = κ[X]
     end
+    κ = new_κ
 end
 """
     struct PhononicTemperature <: SimulationTypes

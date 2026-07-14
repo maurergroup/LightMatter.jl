@@ -100,17 +100,11 @@ function spatial_z_laser(sim::Simulation)
 end
 
 function spatial_z_laser(sim::Simulation, ::Structure{1})
-    if length(sim.structure.dimension.grid) == 1
-        return :(1.0)
-    end
     decay = spatial_laser_decay(sim)
     return :( (1 ./ $decay) * exp(-sim.structure.dimension.grid[i]./$decay) )
 end
 
 function spatial_z_laser(sim::Simulation, structure::Structure{N}) where {N}
-    if length(sim.structure.dimension.grid) == 1
-        return :(1.0)
-    end
     decay = spatial_laser_decay(sim)
     exprs = antennareactor_laserdecay(sim, structure)
     layer_selection = Expr(:call, :ifelse, :(X == 1), exprs[1], exprs[2])

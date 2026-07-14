@@ -206,11 +206,11 @@ function electron_relaxationtime(sim::Simulation)
     if sim.athermalelectrons.ElectronicRelaxation == :constant
         return :(sim.athermalelectrons.τ)
     elseif sim.athermalelectrons.ElectronicRelaxation == :FLT
-        return :(sim.athermalelectrons.τ * (μ-μ0+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))
+        return :(sim.athermalelectrons.τ * (μ+sim.athermalelectrons.FE)^2 ./((sim.structure.egrid.-μ).^2 .+ (pi*Constants.kB*Tel)^2))
     end
 end       
 """
-    athem_electronelectronscattering(fdis::VectorTel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
+    athem_electronelectronscattering(fdis::Vector,Tel::Float64,μ::Float64,sim::Simulation,fneq::Vector{Float64},DOS::spl,n::Float64,τee::Union{Float64,Vector{Float64}})
 
     Calculates the electron-electron scattering contribution using a modified relaxation time approximation.
 
@@ -399,7 +399,7 @@ end
 
 function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim, ::Structure{1})
     @views @inbounds for i in 1:size(f, 1)
-        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:])
         LightMatter.FermiDirac!(view(tmp, i, :), Tel, μ, sim.structure.egrid)
         tmp[i,:] .+= f[i,:]
     end
@@ -408,7 +408,7 @@ end
 function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim, ::Structure{N}) where {N}
     @views @inbounds for i in 1:size(f, 1)
         X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[X])
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel, sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:])
         LightMatter.FermiDirac!(view(tmp, i, :), Tel, μ, sim.structure.egrid)
         tmp[i,:] .+= f[i,:]
     end
@@ -420,7 +420,7 @@ end
 
 function calculate_ftot(f, Tel::AbstractVector, noe, tmp, tmp2, sim, ::Structure{1})
     @views @inbounds for i in 1:size(f, 1)
-        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[1])
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS, sim.structure.egrid, tmp[i,:], tmp2[i,:])
         LightMatter.FermiDirac!(view(tmp, i, :), Tel[i], μ, sim.structure.egrid)
         tmp[i,:] .+= f[i,:]
     end
@@ -429,7 +429,7 @@ end
 function calculate_ftot(f, Tel::AbstractVector, noe, tmp, tmp2, sim, ::Structure{N}) where {N}
     @views @inbounds for i in 1:size(f, 1)
         X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:], sim.structure.μ_offset[X])
+        μ = LightMatter.find_chemicalpotential(noe[i], Tel[i], sim.structure.DOS[X], sim.structure.egrid, tmp[i,:], tmp2[i,:])
         LightMatter.FermiDirac!(view(tmp, i, :), Tel[i], μ, sim.structure.egrid)
         @views tmp[i,:] .+= f[i,:]
     end
@@ -465,19 +465,4 @@ function create_energy_window(egrid::Vector{Float64}, center::Float64; width_bel
     end
     
     return result
-end
-
-function FE_initialization(bulk_DOS::Vector{String}, μ_offset::Bool=true, reference=1)
-    FE = zeros(length(bulk_DOS))
-    if μ_offset
-        offset = calculate_μoffset(bulk_DOS, reference)
-        for i in eachindex(bulk_DOS)
-            FE[i] = get_FermiEnergy(bulk_DOS[i]) + offset[i]
-        end
-    else
-        for i in eachindex(bulk_DOS)
-            FE[i] = get_FermiEnergy(bulk_DOS[i])
-        end
-    end
-    return FE
 end

@@ -65,8 +65,8 @@ end
     - An expression block assigning simulation-specific variable names.
 """
 function ar_variable_renaming(sim::Simulation)
-    old_name = [:(p.matsim[X]), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[X]), :(view(p.tmp,i,:))]
-    new_name = [:sim, :int_vec, :μ0, :tmp]
+    old_name = [:(p.matsim[X]), :(view(p.int_mtx,i,:)), :(view(p.tmp,i,:))]
+    new_name = [:sim, :int_vec, :tmp]
     if typeof(sim.structure.DOS) == Vector{Vector{spl}}
         push!(old_name, :(p.matsim[X].structure.DOS[i]))
         push!(new_name, :DOS)

@@ -163,58 +163,115 @@ function boltzmann_screening(f, kgrid, sim)
     return prefac * integration_algorithm(f, kgrid)
 end
 
-function boltzmann_E_electronelectron(f, sim, DOS)
-    kgrid = sim.stucture.bandstructure.E_to_k(sim.structure.egrid)
-    κ = boltzmann_screening(f, kgrid, sim)
-    fspl = get_interpolant(sim.structure.egrid, f)
-    dfdt = zeros(length(f))
-    for i in eachindex(f)
-        k = kgrid[i]
-        prefac = sim.electronicdistribution.Ω^3 * pi^3 / Constants.ħ / k
-        dfdt[i] = prefac * boltzmann_eescatter_int1(E, k, DOS, fspl, κ, sim)
+"""
+    ee_collision_integral(egrid, fgrid, N, v0; Constants.ħ=1.0)
+
+Compute the electron-electron collision term
+
+    (df/dt)_{e-e}
+
+for every energy in `egrid` using sampled data on an energy grid.
+
+The distribution `f` is assumed to be sampled on the same monotonically
+increasing energy grid `egrid`. The density-of-states factor `N` is a spline
+or other callable interpolation object. The delta function is used to
+eliminate `xi'` analytically via `xi' = eps + epsp - xi`, and values of `f`
+outside the grid are taken to be zero.
+
+Arguments
+- `egrid`: Energy grid shared by `fgrid`.
+- `fgrid`: Occupation values sampled on `egrid`.
+- `N`: Density-of-states spline or callable interpolation object.
+- `v0`: Interaction strength.
+- `Constants.ħ`: Reduced Planck constant.
+
+Returns
+- A vector containing `(df/dt)_{e-e}` evaluated at each point in `egrid`.
+"""
+function ee_collision_integral(sim, DOS, fgrid, v0)
+    egrid = sim.structure.egrid
+    out = similar(fgrid, promote_type(eltype(egrid), eltype(fgrid), Float64))
+    cache = EECollisionIntegralCache(egrid)
+    ee_collision_integral!(out, sim, fgrid, DOS, v0, cache)
+    return out
+end
+
+"""
+    ee_collision_integral!(out, egrid, fgrid, N, v0; Constants.ħ=1.0)
+
+Fill `out` with the collision term evaluated at every energy in `egrid`.
+"""
+mutable struct EECollisionIntegralCache{T}
+    ngrid::Vector{T}
+    inner::Vector{Vector{T}}
+    epsp_values::Vector{Vector{T}}
+end
+
+function EECollisionIntegralCache(egrid::AbstractVector)
+    T = promote_type(eltype(egrid), Float64)
+    n = length(egrid)
+    nslots = max(Threads.nthreads(), Threads.maxthreadid())
+    return EECollisionIntegralCache{T}(zeros(T, n), [zeros(T, n) for _ in 1:nslots], [zeros(T, n) for _ in 1:nslots])
+end
+
+function ee_collision_integral!(out, sim, fgrid, DOS, v0)
+    cache = EECollisionIntegralCache(sim.structure.egrid)
+    return ee_collision_integral!(out, sim, fgrid, DOS, v0, cache)
+end
+
+function ee_collision_integral!(out, sim, fgrid, DOS, v0, cache::EECollisionIntegralCache)
+    egrid = sim.structure.egrid
+    n = length(egrid)
+
+    prefactor = 2pi / Constants.ħ * v0^2
+    sample_on_grid!(cache.ngrid, DOS, egrid)
+    #@inbounds for k in eachindex(egrid)
+    Threads.@threads for k in eachindex(egrid)
+        tid = Threads.threadid()
+        inner = cache.inner[tid]
+        epsp_values = cache.epsp_values[tid]
+        #eps = egrid[k]
+        f_eps = fgrid[k]
+        #n_eps = cache.ngrid[k]
+
+        @inbounds for i in eachindex(egrid)
+            #epsp = egrid[i]
+            f_epsp = fgrid[i]
+            n_epsp = cache.ngrid[i]
+
+            for j in eachindex(egrid)
+                idx_xip = k + i - j
+                if idx_xip < 1 || idx_xip > n
+                    inner[j] = zero(eltype(inner))
+                    continue
+                end
+
+                f_xi = fgrid[j]
+                n_xi = cache.ngrid[j]
+                n_xip = cache.ngrid[idx_xip]
+                f_xip = fgrid[idx_xip]
+
+                loss = f_eps * f_epsp * (1 - f_xi) * (1 - f_xip)
+                gain = (1 - f_eps) * (1 - f_epsp) * f_xi * f_xip
+
+                inner[j] = n_xi * n_xip * (gain - loss)
+            end
+
+            epsp_values[i] = n_epsp * integration_algorithm(inner, egrid)
+        end
+
+        out[k] = prefactor * integration_algorithm(epsp_values, egrid)
     end
-    return dfdt
+
+    return out
 end
 
-function boltzmann_eescatter_int1(E, k, DOS, f, κ, sim)
-    int(u,p) = boltzmann_eescatter_int2(E, u, k, DOS, f, κ, sim)
-    prob = IntegralProblem(int, sim.structure.egrid[1], sim.structure.egrid[end])
-    sol = solve(prob, HCuabtureJL(intidiv=100), abstol=1e-3, reltol=1e-3)
-    return sol.u
-end
-
-function boltzmann_eescatter_int2(E, E1, k, DOS, f, κ, sim)
-    k1 = sim.structure.bandstructure.E_to_k(E1)
-    int(u,p) = boltzmann_eescatter_int2interior(E, E1, u, k, k1, DOS, f, κ, sim)
-    prob = IntegralProblem(int, sim.structure.egrid[1], sim.structure.egrid[end])
-    sol = solve(prob, HCuabtureJL(intidiv=100), abstol=1e-4, reltol=1e-4)
-    return sol.u
-end
-
-function boltzmann_eescatter_int2interior(E, E1, E3, k, k1, DOS, f, κ, sim)
-    k3 = sim.structure.bandstructure.E_to_k(E3)
-    k2 = k1 + k3 / k
-    E2 = E1 + E3 / E
-    Δk = abs(k1 - k2)
-    M = electron_electron_matrix(sim, Δk, κ)
-    DOS_factor =  DOS(E1) / k1 * DOS(E2) / k2 * DOS(E3) / k3
-    F = pauli_eescatter_blocking(f, E, E1, E2, E3)
-    Ξ = scatter_conservation(k, k1, k2, k3)
-    return M * DOS_factor * F * Ξ
-end
-
-function pauli_eescatter_blocking(f, E, E1, E2, E3)
-    return f(E1)*f(E3)*(1-f(E))*(1-f(E2)) - f(E)*f(E2)*(1-f(E1))*(1-f(E3))
-end
-
-function scatter_conservation(k, k1, k2, k3)
-    a = abs((k^2 + k2^2 - k1^2 - k3^2) / (2 * k1 * k3))
-    b = (k * k2) / (k1 * k3)
-    if a ≤ 1 + b
-        return 1.0
-    else 
-        return 0.0
+function sample_on_grid!(dest::AbstractVector, f, grid::AbstractVector)
+    @assert length(dest) == length(grid) "destination and grid must have the same length"
+    @inbounds for i in eachindex(grid)
+        dest[i] = f(grid[i])
     end
+    return dest
 end
 
 function boltzmann_E_electronphonon()

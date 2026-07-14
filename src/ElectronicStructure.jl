@@ -20,7 +20,7 @@
 """
 function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk_geometry::Union{String,Vector{String},Nothing},
                             DOS_folder::Union{Nothing,String}, slab_geometry::Union{Nothing,String},
-                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl}, offset)
+                            atomic_layer_tolerance::Float64, dimension::Dimension, zDOS::Bool, DOS::Union{Nothing, spl})
     if DOS !== nothing
         return DOS
     else
@@ -34,11 +34,12 @@ function DOS_initialization(bulk_DOS::Union{String,Vector{String},Nothing}, bulk
             if zDOS == true 
                 DOS = spatial_DOS(DOS_folder, slab_geometry, bulk_DOS, Vbulk, dimension, atomic_layer_tolerance)
             else
-                DOS = generate_DOS(bulk_DOS, 1/Vbulk; offset=offset[1])
+                DOS = generate_DOS(bulk_DOS, 1/Vbulk)
             end
         else
             Vbulk = zeros(length(bulk_DOS))
             DOS = Vector{spl}(undef, length(bulk_DOS))
+            offset = calculate_μoffset(DOS, Vbulk)
             for i in eachindex(bulk_DOS)
                 if bulk_geometry isa Nothing
                     return missing
@@ -646,19 +647,100 @@ function dos_velocity(DOS::spl, egrid::Vector{Float64}, FE::Float64)
     return v_g
 end
 
-function calculate_μoffset(DOS::Vector{String}, primary=1)
-    μ_offset = zeros(length(DOS))
-    reference = readdlm(DOS[primary])
-    ref_line = findall(x->x[13] == "mu", eachrow(reference))
-    μ_ref = reference[ref_line[1],15]
+function calculate_μoffset(DOS::Vector{String}, Vbulk)
+    grid = collect(range(-20.0,20.0, length=1001))
+    tmp_DOS = Vector{Spl}(undef, length(DOS))
+    N0s = zeros(length(DOS))
+    Dmax = zeros(length(DOS))
+    offset = zeros(length(DOS))
     for i in eachindex(DOS)
-        if i != primary
-            current = readdlm(DOS[i])
-            cur_line = findall(x->x[13] == "mu", eachrow(current))
-            μ_cur = current[cur_line[1],15]
-            μ_off = μ_cur - μ_ref
-            μ_offset[i] = μ_off
+        ref_line = findall(x->x[13] == "mu", eachrow(readdlm(DOS[i])))
+        offset[i] = reference[ref_line[1],15]
+        tmp_DOS[i] = generate_DOS(DOS[i], 1/Vbulk[i], offset=offset[i])
+        Dmax[i] = integration_algorithm(tmp_DOS[i], grid)
+        N0s[i] = get_thermalparticles(0.0, 1e-16, tmp_DOS[i], grid)
+    end
+    Ntotal = sum(N0s)
+
+    function root_function(μ)
+        X = sum(get_thermalparticles(μ, 1e-16, tmp_DOS[i], grid) for i in eachindex(tmp_DOS))
+        return X - Ntotal
+    end
+
+    Emin = grid[1]
+    Emax = grid[end]
+
+    margin = 1e-6
+
+    lo = Emin - margin
+    hi = Emax + margin
+
+    flo = root_function(lo)
+    fhi = root_function(hi)
+
+    # Expand bracket if needed.
+    niter = 0
+    while flo > 0 && niter < 100
+        margin *= 2
+        lo -= margin
+        flo = root_function(lo)
+        niter += 1
+    end
+
+    niter = 0
+    while fhi < 0 && niter < 100
+        margin *= 2
+        hi += margin
+        fhi = root_function(hi)
+        niter += 1
+    end
+
+    if sign(flo) == sign(fhi)
+        error("""
+        Could not bracket common chemical potential.
+
+        root_function(lo) = $flo at lo = $lo
+        root_function(hi) = $fhi at hi = $hi
+
+        Check DOS energy ranges and normalization.
+        """)
+    end
+
+    mu_common = bisect_root(root_function, lo, hi;)
+
+    return offset .- mu_common   
+end
+
+function bisect_root(f, a, b; tol = 1e-10, maxiter = 200)
+    fa = f(a)
+    fb = f(b)
+
+    if abs(fa) < tol
+        return a
+    elseif abs(fb) < tol
+        return b
+    end
+
+    if sign(fa) == sign(fb)
+        error("Root is not bracketed: f(a) = $fa, f(b) = $fb")
+    end
+
+    for _ in 1:maxiter
+        c = 0.5 * (a + b)
+        fc = f(c)
+
+        if abs(fc) < tol || abs(b - a) < tol
+            return c
+        end
+
+        if sign(fc) == sign(fa)
+            a = c
+            fa = fc
+        else
+            b = c
+            fb = fc
         end
     end
-    return μ_offset
+
+    return 0.5 * (a + b)
 end

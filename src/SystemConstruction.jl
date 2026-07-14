@@ -191,10 +191,10 @@ function no_particle_profile(sim::Simulation)
         no_part = zeros(sim.structure.dimension.length)
         for j in eachindex(sim.structure.dimension.grid)
             mat = sim.structure.Elemental_System == 1 ? 1 : mat_picker(sim.structure.dimension.grid[j], sim.structure.dimension.InterfaceHeight)
-            no_part[j] = get_thermalparticles(sim.structure.μ_offset[mat], 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
+            no_part[j] = get_thermalparticles(0.0, 1e-32, sim.structure.DOS[mat], sim.structure.egrid)
         end
     else
-        no_part = fill(get_thermalparticles(sim.structure.μ_offset[1], 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
+        no_part = fill(get_thermalparticles(0.0, 1e-32, sim.structure.DOS, sim.structure.egrid), sim.structure.dimension.length)
     end
     return no_part
 end
@@ -398,8 +398,8 @@ end
     - Expression for the variabble renaming to enter the top of the multithreaded loop
 """
 function variable_renaming(sim::Simulation)
-    old_name = [:(p.sim), :(view(p.int_mtx,i,:)), :(p.sim.structure.μ_offset[1]), :(@view p.tmp[i,:])]
-    new_name = [:sim, :(int_vec), :μ0, :tmp]
+    old_name = [:(p.sim), :(view(p.int_mtx,i,:)), :(@view p.tmp[i,:])]
+    new_name = [:sim, :(int_vec), :tmp]
     if typeof(sim.structure.DOS) == Vector{spl}
         push!(old_name, :(p.sim.structure.DOS[i]))
         push!(new_name, :DOS)

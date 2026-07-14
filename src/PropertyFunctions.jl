@@ -241,18 +241,18 @@ function integration_algorithm(y::AbstractVector, x)
     return 0.0
 end
 
-function get_particlenumber(DOS, egrid, offset)
+function get_particlenumber(DOS, egrid)
     if DOS isa Vector{spl}
         pn = zeros(length(DOS))
         for i in eachindex(DOS)
-            pn[i] = get_thermalparticles(offset[i],1e-16,DOS[i], egrid)
+            pn[i] = get_thermalparticles(0.0,1e-16,DOS[i], egrid)
         end
         return pn
     else
-        return get_thermalparticles(offset[1],1e-16, DOS, egrid)
+        return get_thermalparticles(0.0,1e-16, DOS, egrid)
     end
 end
 
-function get_particlenumber(DOS::Missing, egrid, offset)
+function get_particlenumber(DOS::Missing, egrid)
     return missing
 end

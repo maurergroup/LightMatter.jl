@@ -464,7 +464,7 @@ function output_chemicalpotential(f, results, sim)
                 tmp1 = zeros(length(sim.structure.egrid))
                 tmp2 = zeros(length(sim.structure.egrid))
                 X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-                cp[:,i] .= find_chemicalpotential.(noe,Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2), sim.structure.μ_offset[X])
+                cp[:,i] .= find_chemicalpotential.(noe,Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2))
             end
         else
             Threads.@threads for i in eachindex(Tel[1,:])
@@ -472,7 +472,7 @@ function output_chemicalpotential(f, results, sim)
                 tmp2 = zeros(length(sim.structure.egrid))
                 DOS = get_DOS(dos, sim, i)
                 X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2), sim.structure.μ_offset[X])
+                cp[:,i] .= find_chemicalpotential.(n[:,i],Tel[:,i],(DOS,),(sim.structure.egrid,), Ref(tmp1), Ref(tmp2))
             end
         end
 
@@ -552,7 +552,7 @@ function output_TelConductivity(f, results, sim)
     Tph = results["Tph"]
     spat = similar(Tel)
     Threads.@threads for i in eachindex(Tel[:,1])
-        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(sim.structure.μ_offset[1], size(Tel, 2))
+        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(get_thermalparticles(0.0, 1e-16, sim.structure.DOS, sim.structure.egrid), size(Tel, 2))
         tmp = zeros(length(Tel[i,:]), length(sim.structure.egrid))
         int_mtx = zeros(length(Tel[i,:]), length(sim.structure.egrid))
         heatcapacity = electronic_heatcapacity_profile(Tel[i,:], noe, tmp, int_mtx, sim)
@@ -617,7 +617,7 @@ function output_electronheatcapacity(f, results, sim)
         output_chemicalpotential(f, results, sim)
     end
     Threads.@threads for i in eachindex(Tel[:,1])
-        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(sim.structure.μ_offset[1], size(Tel, 2))
+        noe = haskey(results, "noe") ? @view(results["noe"][i,:]) : fill(get_thermalparticles(0.0, 1e-16, sim.structure.DOS, sim.structure.egrid), size(Tel, 2))
         tmp = zeros(length(Tel[i,:]), length(sim.structure.egrid))
         int_mtx = zeros(length(Tel[i,:]), length(sim.structure.egrid))
         @views hc[i,:] .= electronic_heatcapacity_profile(Tel[i,:], noe, tmp, int_mtx, sim)
