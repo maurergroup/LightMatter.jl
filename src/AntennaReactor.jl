@@ -1,32 +1,4 @@
 """
-    antenna_reactor_system(sys, sim)
-
-    Constructs the main expression for an antenna reactor simulation system.
-
-    # Arguments
-    - `sys`::Dict{String, Union{Expr, Vector{Expr}}}
-           A dictionary or configuration object containing the expressions for each system propagated
-    - `sim`::Simulation
-           A simulation object containing all necessary input data for the simulation.
-
-    # Returns
-    - An expression block containing the time output, conductivity expressions, and a threaded simulation loop.
-"""
-function antenna_reactor_system(sys::Dict{String, Union{Expr, Vector{Expr}}}, sim::Simulation, print_time)
-    loop_body = build_loopbody(sys, sim) # Expr block for the body of a threaded for loop over the systems and depth
-    if print_time
-        t_expr = :(println(t))
-    else
-        t_expr = :()
-    end
-    return quote 
-        $t_expr
-        Threads.@threads for i in 1:p.sim.structure.dimension.length
-            $loop_body
-        end
-    end # The whole simulation that is propgated as one Expr block
-end
-"""
     mat_picker(height, cutoffs)
 
     Selects an index based on material interface height and given cutoffs.

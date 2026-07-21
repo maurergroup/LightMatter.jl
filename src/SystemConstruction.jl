@@ -1,3 +1,4 @@
+using Base.Threads: @threads
 """
     function_builder(sim::Simulation)
     
@@ -212,41 +213,22 @@ end
     - Quote block for the entire ODE problem
 """
 function simulation_construction(sys, sim::Simulation, print_time)
-    return simulation_construction(sys, sim, sim.structure, print_time)
-end
-
-function simulation_construction(sys, sim::Simulation, ::Structure{1}, print_time)
-    return monometallic_system(sys, sim, print_time)
-end
-
-function simulation_construction(sys, sim::Simulation, ::Structure{N}, print_time) where {N}
-    return antenna_reactor_system(sys, sim, print_time)
-end
-"""
-    monometallic_system(sys, sim::Simulation)
-    
-    Creates the expression block for the entire ODE function including multithreading.
-    This function is sepcfically for a monometallic system, Elemental_System == 1
-
-    # Arguments
-    - 'sys': Dictionary of expressions for each subssytem propagated
-    - 'sim': Simulation settings and parameters
-
-    # Returns
-    - Quote block for the monometallic problem
-"""
-function monometallic_system(sys, sim::Simulation, print_time)
     loop_body = build_loopbody(sys, sim)
     if print_time
         t_expr = :(println(t))
     else
         t_expr = :()
     end
+    for_header = :(i = 1:p.sim.structure.dimension.length)
+    for_expr = Expr(:for, for_header, loop_body)
+    if sim.structure.dimension.length > 1
+        thread_expr = :(Threads.@threads $for_expr)
+    else
+        thread_expr = :($for_expr)
+    end
     return quote
         $t_expr
-        Threads.@threads for i in 1:p.sim.structure.dimension.length
-            $loop_body
-        end
+        $thread_expr
     end
 end
 """

@@ -248,7 +248,7 @@ end
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
 function find_relaxeddistribution!(out, egrid, goal, n, DOS, int_vec, μ0, tmp)
-    prob = IntervalNonlinearProblem(find_relaxedtemp, (10.0, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (1e-6, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
     sol = solve(prob; alg=Brent(),abstol=1e-6, reltol=1e-6).u
     μ = find_chemicalpotential(n, sol, DOS, egrid, int_vec, tmp, μ0)
     FermiDirac!(out, sol, μ, egrid)

@@ -30,9 +30,6 @@ end
 """
 function build_phonontemperature(sim::Simulation, Source::Union{Expr,Float64}, ElecPhon::Expr, HeatCapacity::Expr)
     args = Union{Expr,Symbol,Float64}[Source,ElecPhon]
-    #= if sim.phononictemperature.Conductivity == true
-        push!(args,:Tph_cond)
-    end =#
     return Expr(:call,:./,Expr(:call,:+,args...),HeatCapacity)
 end
 """
