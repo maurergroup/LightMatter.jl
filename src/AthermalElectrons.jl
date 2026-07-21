@@ -78,33 +78,28 @@ function athemexcitation!(Δfneqe, Δfneqh, ftot, egrid, DOS, hv::Float64, M, in
     ftotspl = get_interpolant(egrid, ftot)
     athem_holegeneration!(Δfneqh, egrid, DOS, ftotspl, hv, M)
     athem_electrongeneration!(Δfneqe, egrid, DOS, ftotspl,hv, M)
-    particle_scale, energy_scale = excite_laser_conservation(Δfneqe, Δfneqh, DOS, egrid, laser, int_vec)
-    Δfneqe .-= particle_scale .* Δfneqh
-    Δfneqe .*= energy_scale
+    electron_scale, hole_scale = excite_laser_conservation(Δfneqe, Δfneqh, DOS, egrid, laser, int_vec)
+    Δfneqe .*= electron_scale
+    Δfneqh .*= hole_scale
+    Δfneqe .-=  Δfneqh
     return nothing
 end
 
 function excite_laser_conservation(dis_e, dis_h, DOS, egrid, laser, int_vec)
-    particle_denom = get_noparticles(int_vec, dis_h, DOS, egrid)
-    particle_guess = iszero(particle_denom) ? 0.0 : get_noparticles(int_vec, dis_e, DOS, egrid) / particle_denom
-    shape_guess = dis_e .- particle_guess .* dis_h
-    energy_denom = get_internalenergy(int_vec, shape_guess, DOS, egrid)
-    energy_guess = iszero(energy_denom) ? 1.0 : laser / energy_denom
-    u0 = [particle_guess, energy_guess]
 
-    tmp = similar(dis_e)
-    function int!(res, u, p)
-        particle_scale = ForwardDiff.value(u[1])
-        energy_scale = ForwardDiff.value(u[2])
-        @. tmp = energy_scale * (dis_e - particle_scale * dis_h)
-        res[1] = get_noparticles(int_vec, tmp, DOS, egrid)
-        res[2] = get_internalenergy(int_vec, tmp, DOS, egrid) - laser
-        return nothing
-    end
+    A_h = get_noparticles(int_vec, -1 * dis_h, DOS, egrid)   # ∫ D(E+) F_h+(E) D(E) dE
+    A_e = get_noparticles(int_vec, dis_e, DOS, egrid)   # ∫ D(E-) F_e-(E) D(E) dE
 
-    prob = NonlinearProblem(int!, u0)
-    sol = solve(prob, abstol=1e-3, reltol=1e-3).u
-    return sol
+    B_h = get_internalenergy(int_vec, -1 * dis_h, DOS, egrid)  # ∫ D(E+) F_h+(E) D(E) E dE
+    B_e = get_internalenergy(int_vec, dis_e, DOS, egrid)  # ∫ D(E-) F_e-(E) D(E) E dE
+
+    # (15b): δ_h+ A_h + δ_e- A_e = 0
+    # (16b): δ_h+ B_h + δ_e- B_e = s(t)
+    M   = @SMatrix [A_h A_e; B_h B_e]   # or plain [A_h A_e; B_h B_e]
+    rhs = [0.0, laser]
+
+    δ_h, δ_e = M \ rhs
+    return δ_h, δ_e
 end
 """
     athem_holegeneration!(tmp::Vector, egrid::Vector{Float64},DOS::spl,ftotspl::spl,hv::Float64,M::Union{Float64,Vector{Float64}})
