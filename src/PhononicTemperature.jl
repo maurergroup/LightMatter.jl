@@ -78,12 +78,12 @@ function phononic_heatcapacity_profile(Tph, sim)
 
     if sim.phononictemperature.PhononicHeatCapacity == :variable
         (; n, θ) = sim.phononictemperature
-        Threads.@threads for i in eachindex(Tph)
+        for i in eachindex(Tph)
             (no_elec, θD) = LightMatter.get_parameterhvalue((n, θ), sim, i)
             heatcapacity[i] = LightMatter.variable_phononheatcapacity(Tph[i], no_elec, θD)
         end
     else
-        Threads.@threads for i in eachindex(Tph)
+        for i in eachindex(Tph)
             heatcapacity[i] = LightMatter.get_parameterhvalue(sim.phononictemperature.Cph, sim, i)
         end
     end

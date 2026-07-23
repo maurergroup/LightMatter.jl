@@ -90,18 +90,18 @@ function electronic_heatcapacity_profile(Tel, noe, tmp, int_mtx, sim::Simulation
 
     if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
         μ = similar(Tel)
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             DOS = LightMatter.get_DOS(sim.structure.DOS, sim, i)
             @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:], 0.0)
             heatcapacity[i] = LightMatter.nonlinear_electronheatcapacity(Tel[i], μ[i], DOS)
         end
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             γ = sim.electronictemperature.γ
             heatcapacity[i] = γ * Tel[i]
         end
     elseif sim.electronictemperature.ElectronicHeatCapacity == :constant
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             heatcapacity[i] = sim.electronictemperature.γ
         end
     end
@@ -114,20 +114,20 @@ function electronic_heatcapacity_profile(Tel, noe, tmp, int_mtx, sim::Simulation
 
     if sim.electronictemperature.ElectronicHeatCapacity == :nonlinear
         μ = similar(Tel)
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             DOS = LightMatter.get_DOS(sim.structure.DOS, sim, i)
             X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
             @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:])
             heatcapacity[i] = LightMatter.nonlinear_electronheatcapacity(Tel[i], μ[i], DOS)
         end
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
             γ = sim.electronictemperature.γ[X]
             heatcapacity[i] = γ * Tel[i]
         end
     elseif sim.electronictemperature.ElectronicHeatCapacity == :constant
-        Threads.@threads for i in eachindex(Tel)
+        for i in eachindex(Tel)
             X = LightMatter.mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
             heatcapacity[i] = sim.electronictemperature.γ[X]
         end
@@ -219,9 +219,6 @@ function athem_electempenergychange(sim::Simulation)
     if sim.electronictemperature.Electron_PhononCoupling == true
        push!(args, electronphonon_coupling(sim::Simulation))
     end
-    #= if sim.electronictemperature.Conductivity == true
-        push!(args, :(Tel_cond))
-    end =#
     return Expr(:call, :+, args...)
 end
 """
