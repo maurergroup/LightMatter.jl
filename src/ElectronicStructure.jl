@@ -546,7 +546,7 @@ end
 function effective_onebandmodel(DOS, egrid::Vector{Float64}, FE::Float64)
     k_E = zeros(length(egrid))
     
-    factor = 6π
+    factor = 3π^2
     int(u,p) = DOS(u)
 
     for (i,E) in enumerate(egrid)

@@ -47,7 +47,7 @@ global const BaseUnits = (time = 1e15, length = 1e9, mass = 6.2415e30, electric_
     Global named tuple for accessing constant physical values during a Simulation
 """
 global const Constants = (ħ = ustrip(convert_units(u"eV*fs",Unitful.ħ)), kB = ustrip(convert_units(u"eV/K",Unitful.k)), me = ustrip(Unitful.me)*BaseUnits.mass, c = ustrip(convert_units(u"nm/fs",Unitful.c0)),
-                          ϵ0 = 8.854e-12 * BaseUnits.time^4 / BaseUnits.mass/ BaseUnits.length^3, q=ustrip(-Unitful.q)*BaseUnits.time)
+                          ϵ0 = 0.05526, q=1)
 
 
 Unitful.uconvert(a::Unitful.FreeUnits, b::Union{Real, Array{<:Real}}) = b

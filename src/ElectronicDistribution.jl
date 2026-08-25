@@ -132,12 +132,6 @@ function boltzmann_E_momentumintegral(l, k, k1, κ, γ, sim)
     return sol.u
 end
 
-function electron_electron_matrix(sim, Δk, κ)
-    frac1 = Constants.q^2 / Constants.ϵ0 / sim.electronicdistribution.Ω
-    frac2 = 1/ (Δk^2 + κ^2)
-    return (frac1*frac2)^2
-end
-
 function average_Bessel(order, value)
     int(u,p) = besselj(order, value*u)^2
     prob = IntegralProblem(int, -1, 1)
@@ -156,11 +150,6 @@ function boltzmann_step(q, k, k1)
     else 
         return 0.0
     end
-end
-
-function boltzmann_screening(f, kgrid, sim)
-    prefac = Constants.q^2 * sim.electronicdistribution.me /(pi^2*Constants.ħ^2*Constants.ϵ0)
-    return prefac * integration_algorithm(f, kgrid)
 end
 
 """
@@ -201,29 +190,109 @@ end
 
 Fill `out` with the collision term evaluated at every energy in `egrid`.
 """
-mutable struct EECollisionIntegralCache{T}
+mutable struct RethfeldCollisionIntegralCache{T}
     ngrid::Vector{T}
+    kgrid::Vector{T}
     inner::Vector{Vector{T}}
     epsp_values::Vector{Vector{T}}
+    me_eff::Float64
 end
 
-function EECollisionIntegralCache(egrid::AbstractVector)
+mutable struct OnoCollisionIntegralCache{T}
+    ngrid::Vector{T}
+    kgrid::Vector{T}
+    inner::Vector{Vector{T}}
+    epsp_values::Vector{Vector{T}}
+    v0::Float64
+end
+
+function EECollisionIntegralCache(egrid::AbstractVector, val, type::Symbol)
     T = promote_type(eltype(egrid), Float64)
     n = length(egrid)
     nslots = max(Threads.nthreads(), Threads.maxthreadid())
-    return EECollisionIntegralCache{T}(zeros(T, n), [zeros(T, n) for _ in 1:nslots], [zeros(T, n) for _ in 1:nslots])
+    if type == :Rethfeld
+        return RethfeldCollisionIntegralCache{T}(zeros(T, n), zeros(T, n), 
+        [zeros(T, n) for _ in 1:nslots], 
+        [zeros(T, n) for _ in 1:nslots], 
+        val)
+    elseif type == :Ono
+        return OnoCollisionIntegralCache{T}(zeros(T, n), zeros(T, n), 
+        [zeros(T, n) for _ in 1:nslots], 
+        [zeros(T, n) for _ in 1:nslots], 
+        val)
+    end
 end
 
-function ee_collision_integral!(out, sim, fgrid, DOS, v0)
-    cache = EECollisionIntegralCache(sim.structure.egrid)
-    return ee_collision_integral!(out, sim, fgrid, DOS, v0, cache)
+function ee_collision_integral!(out, sim, fgrid, DOS, val, type::Symbol)
+    cache = EECollisionIntegralCache(sim.structure.egrid, val, type)
+    return ee_collision_integral!(out, sim, fgrid, DOS, cache)
 end
 
-function ee_collision_integral!(out, sim, fgrid, DOS, v0, cache::EECollisionIntegralCache)
+function ee_collision_integral!(out, sim, fgrid, DOS, cache::RethfeldCollisionIntegralCache)
+    egrid = sim.structure.egrid
+    n = length(egrid)
+    
+    sample_on_grid!(cache.ngrid, DOS, egrid)
+    sample_on_grid!(cache.kgrid, sim.structure.bandstructure.E_to_k, egrid)
+
+    I = ee_matrix_element(fgrid, sim, cache.kgrid, cache.me_eff)
+    prefactor = pi^3 ./ (Constants.ħ*8*cache.kgrid) 
+    #@inbounds for k in eachindex(egrid)
+    Threads.@threads for k in eachindex(egrid)
+        tid = Threads.threadid()
+        inner = cache.inner[tid]
+        epsp_values = cache.epsp_values[tid]
+        f_eps = fgrid[k]
+        k_eps = cache.kgrid[k]
+
+        @inbounds for i in eachindex(egrid)
+            #epsp = egrid[i]
+            f_epsp = fgrid[i]
+            n_epsp = cache.ngrid[i]
+            k_epsp = cache.kgrid[i]
+
+            for j in eachindex(egrid)
+                idx_xip = k + i - j
+
+                if idx_xip < 1 || idx_xip > n
+                    inner[j] = zero(eltype(inner))
+                    continue
+                end
+
+                f_xi = fgrid[j]
+                n_xi = cache.ngrid[j]
+                k_xi = cache.kgrid[j]
+                n_xip = cache.ngrid[idx_xip]
+                f_xip = fgrid[idx_xip]
+                k_xip = cache.kgrid[idx_xip]
+
+                a = (k_eps^2 + k_epsp^2 - k_xi^2 - k_xip^2) / (2*k_xi*k_xip)
+                b = (k_eps*k_epsp) / (k_xi*k_xip)
+                if abs(a) > 1 + b
+                    inner[j] = zero(eltype(inner))
+                    continue
+                end
+
+                loss = f_eps * f_epsp * (1 - f_xi) * (1 - f_xip)
+                gain = (1 - f_eps) * (1 - f_epsp) * f_xi * f_xip
+
+                inner[j] = (n_xi/k_xi) * (n_xip/k_xip) * (gain - loss)
+            end
+
+            epsp_values[i] = (n_epsp/k_epsp) * integration_algorithm(inner, egrid)
+        end
+
+        out[k] = prefactor[k] * integration_algorithm(epsp_values, egrid) * I
+    end
+
+    return out 
+end
+
+function ee_collision_integral!(out, sim, fgrid, DOS, cache::OnoCollisionIntegralCache)
     egrid = sim.structure.egrid
     n = length(egrid)
 
-    prefactor = 2pi / Constants.ħ * v0^2
+    prefactor = 2pi / Constants.ħ * cache.v0^2
     sample_on_grid!(cache.ngrid, DOS, egrid)
     #@inbounds for k in eachindex(egrid)
     Threads.@threads for k in eachindex(egrid)
@@ -262,7 +331,6 @@ function ee_collision_integral!(out, sim, fgrid, DOS, v0, cache::EECollisionInte
 
         out[k] = prefactor * integration_algorithm(epsp_values, egrid)
     end
-
     return out
 end
 
@@ -272,6 +340,30 @@ function sample_on_grid!(dest::AbstractVector, f, grid::AbstractVector)
         dest[i] = f(grid[i])
     end
     return dest
+end
+
+function ee_matrix_element(f, sim, kgrid, me_eff)
+    κ = boltzmann_screening(f, sim, kgrid, me_eff)
+    int(u,p) = electron_electron_matrix(u, κ)
+    prob = IntegralProblem(int, 0.0, 2*maximum(kgrid))
+    sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-4, reltol=1e-4)
+    return sol.u
+end
+
+function boltzmann_screening(f, sim, kgrid, me_eff)
+    prefac = Constants.q^2 * Constants.me * me_eff / (Constants.ϵ0*Constants.ħ^2*pi^2)
+    D_E = sim.structure.DOS(sim.structure.egrid)
+    f_spl = get_interpolant(kgrid, f)
+    int(u,p) = f_spl(u)
+    prob = IntegralProblem(int, minimum(kgrid), maximum(kgrid))
+    sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-4, reltol=1e-4)
+    return sqrt(prefac * sol.u)
+end
+
+function electron_electron_matrix(Δk, κ)
+    frac1 = Constants.q^2 / Constants.ϵ0
+    frac2 = 1/ (Δk^2 + κ^2)
+    return (frac1*frac2)^2
 end
 
 function boltzmann_E_electronphonon()
