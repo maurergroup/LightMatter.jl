@@ -2,7 +2,7 @@
 using Roots
 
 function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vector{Float64},
-                                tmp, tmp2, μ_init::Float64 = 0.0)
+                                tmp, tmp2)
     # n(μ) - N_target: the function to zero
     function residual(μ)
         return get_thermalparticles(tmp2, μ, Tel, DOS, egrid) - N_target
@@ -14,7 +14,7 @@ function find_chemicalpotential(N_target::Float64, Tel::Float64, DOS, egrid::Vec
     end
 
     # Newton with automatic fallback to bisection if it struggles
-    return newton_rf(residual, dresidual, μ_init;tol=1e-4, maxiter=1e3)
+    return newton_rf(residual, dresidual, 0.0;tol=1e-4, maxiter=1e3)
 end
 
 function newton_rf(f, df, x0;tol, maxiter)

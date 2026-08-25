@@ -92,7 +92,7 @@ function electronic_heatcapacity_profile(Tel, noe, tmp, int_mtx, sim::Simulation
         μ = similar(Tel)
         for i in eachindex(Tel)
             DOS = LightMatter.get_DOS(sim.structure.DOS, sim, i)
-            @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:], 0.0)
+            @views μ[i] = LightMatter.find_chemicalpotential(noe[i], Tel[i], DOS, sim.structure.egrid, tmp[i,:], int_mtx[i,:])
             heatcapacity[i] = LightMatter.nonlinear_electronheatcapacity(Tel[i], μ[i], DOS)
         end
     elseif sim.electronictemperature.ElectronicHeatCapacity == :linear
