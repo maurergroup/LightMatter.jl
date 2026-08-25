@@ -235,8 +235,8 @@ function ee_collision_integral!(out, sim, fgrid, DOS, cache::RethfeldCollisionIn
     sample_on_grid!(cache.ngrid, DOS, egrid)
     sample_on_grid!(cache.kgrid, sim.structure.bandstructure.E_to_k, egrid)
 
-    I = ee_matrix_element(fgrid, sim, cache.kgrid, cache.me_eff)
-    prefactor = pi^3 ./ (Constants.ħ*8*cache.kgrid) 
+    prefactor = pi^3 ./ (Constants.ħ*cache.kgrid) 
+    κ = boltzmann_screening(fgrid, sim, cache.kgrid, cache.me_eff)
     #@inbounds for k in eachindex(egrid)
     Threads.@threads for k in eachindex(egrid)
         tid = Threads.threadid()
@@ -276,13 +276,17 @@ function ee_collision_integral!(out, sim, fgrid, DOS, cache::RethfeldCollisionIn
                 loss = f_eps * f_epsp * (1 - f_xi) * (1 - f_xip)
                 gain = (1 - f_eps) * (1 - f_epsp) * f_xi * f_xip
 
-                inner[j] = (n_xi/k_xi) * (n_xip/k_xip) * (gain - loss)
+                Δk_min = max(abs(k_eps - k_xi), abs(k_xip - k_epsp))
+                Δk_max = min(k_eps + k_xi, k_xip + k_epsp)
+                Mee2_integral = ee_matrix_element_integral(Δk_min, Δk_max, κ)
+
+                inner[j] = (n_xi/k_xi) * (n_xip/k_xip) * (gain - loss) * Mee2_integral
             end
 
             epsp_values[i] = (n_epsp/k_epsp) * integration_algorithm(inner, egrid)
         end
 
-        out[k] = prefactor[k] * integration_algorithm(epsp_values, egrid) * I
+        out[k] = prefactor[k] * integration_algorithm(epsp_values, egrid)
     end
 
     return out 
@@ -342,17 +346,15 @@ function sample_on_grid!(dest::AbstractVector, f, grid::AbstractVector)
     return dest
 end
 
-function ee_matrix_element(f, sim, kgrid, me_eff)
-    κ = boltzmann_screening(f, sim, kgrid, me_eff)
-    int(u,p) = electron_electron_matrix(u, κ)
-    prob = IntegralProblem(int, 0.0, 2*maximum(kgrid))
-    sol = solve(prob, HCubatureJL(initdiv=100), abstol=1e-4, reltol=1e-4)
-    return sol.u
+# closed-form ∫_{Δk_min}^{Δk_max} |M_ee(Δk,κ)|² dΔk, avoiding numerical quadrature
+# inside the O(n³) loop. |M_ee(Δk,κ)|² = (q²/ϵ0)² / (Δk²+κ²)²
+function ee_matrix_element_integral(Δk_min, Δk_max, κ)
+    F(x) = x/(2κ^2*(x^2+κ^2)) + atan(x/κ)/(2κ^3)
+    return (Constants.q^2/Constants.ϵ0)^2 * (F(Δk_max) - F(Δk_min))
 end
 
 function boltzmann_screening(f, sim, kgrid, me_eff)
     prefac = Constants.q^2 * Constants.me * me_eff / (Constants.ϵ0*Constants.ħ^2*pi^2)
-    D_E = sim.structure.DOS(sim.structure.egrid)
     f_spl = get_interpolant(kgrid, f)
     int(u,p) = f_spl(u)
     prob = IntegralProblem(int, minimum(kgrid), maximum(kgrid))
