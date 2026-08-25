@@ -225,7 +225,7 @@ function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS
     feq = LightMatter.FermiDirac(Tel, μ, egrid)
     ftot = feq .+ fneq
     goal = get_internalenergy(int_vec, ftot, DOS, egrid)
-    find_relaxeddistribution!(frel, egrid, goal, n, DOS, int_vec, μ, tmp)
+    find_relaxeddistribution!(frel, egrid, goal, n, DOS, int_vec, tmp)
     fdis .= -(fneq ./τee) .+ ((feq.-frel) ./ τee)
 end
 """
@@ -242,10 +242,10 @@ end
     # Returns
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
-function find_relaxeddistribution!(out, egrid, goal, n, DOS, int_vec, μ0, tmp)
-    prob = IntervalNonlinearProblem(find_relaxedtemp, (1e-6, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
+function find_relaxeddistribution!(out, egrid, goal, n, DOS, int_vec, tmp)
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (1e-6, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp))
     sol = solve(prob; alg=Brent(),abstol=1e-6, reltol=1e-6).u
-    μ = find_chemicalpotential(n, sol, DOS, egrid, int_vec, tmp, μ0)
+    μ = find_chemicalpotential(n, sol, DOS, egrid, int_vec, tmp)
     FermiDirac!(out, sol, μ, egrid)
     return nothing
 end
@@ -263,8 +263,8 @@ end
     # Returns
     - Internal energy of the current temperature guess.
 """
-function find_relaxedtemp(u, (out, n, DOS, egrid, goal, int_vec, tmp, μ0))
-    μ = find_chemicalpotential(n, ForwardDiff.value(u), DOS, egrid, int_vec, tmp, μ0)
+function find_relaxedtemp(u, (out, n, DOS, egrid, goal, int_vec, tmp))
+    μ = find_chemicalpotential(n, ForwardDiff.value(u), DOS, egrid, int_vec, tmp)
     FermiDirac!(out, ForwardDiff.value(u), μ, egrid)
     return goal - get_internalenergy(int_vec, out, DOS, egrid)
 end 

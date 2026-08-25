@@ -222,6 +222,7 @@ function simulation_construction(sys, sim::Simulation, print_time)
     else
         t_expr = :()
     end
+    #cond_expr = conductivity_expressions(sim)
     for_header = :(i = 1:p.sim.structure.dimension.length)
     for_expr = Expr(:for, for_header, loop_body)
     if sim.structure.dimension.length > 1
@@ -231,6 +232,7 @@ function simulation_construction(sys, sim::Simulation, print_time)
     end
     return quote
         $t_expr
+        #$cond_expr
         $thread_expr
     end
 end
@@ -289,7 +291,7 @@ function build_loopbody(sys, sim::Simulation, ::Structure{1})
     @debug push!(exprs, :(if ismissing(u) ;  @error "Missing parameter required for simulation." end))
     push!(exprs, variable_renaming(sim))
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec, μ0)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec)))
     else
         push!(exprs, :(μ = 0.0))
     end
@@ -333,7 +335,7 @@ function build_loopbody(sys, sim::Simulation, ::Structure{N}) where {N}
     push!(exprs, :(X = LightMatter.mat_picker(p.sim.structure.dimension.grid[i], p.sim.structure.dimension.InterfaceHeight)))
     push!(exprs, ar_variable_renaming(sim))
     if sim.structure.ChemicalPotential
-        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec, μ0)))
+        push!(exprs, :(μ = LightMatter.find_chemicalpotential(noe, Tel, DOS, sim.structure.egrid, tmp, int_vec)))
     else
         push!(exprs, :(μ = 0.0))
     end

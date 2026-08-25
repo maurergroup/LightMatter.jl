@@ -35,6 +35,7 @@ function run_simulation(sim::Simulation, initialtemps::Dict{String, Float64},
     f1!(similar(u0),u0,p,0.0)
     f2!(similar(u0),u0,p,0.0)
     prob=SplitODEProblem(f1!,f2!,u0,tspan,p)
+    #prob = ODEProblem(f2!,u0,tspan,p)
     println("Running Script")
     sol = solve(prob, alg; kwargs...)
     return sol
