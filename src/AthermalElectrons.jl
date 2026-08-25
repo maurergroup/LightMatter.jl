@@ -225,7 +225,7 @@ function athem_electronelectronscattering!(fdis, frel, Tel, μ, egrid, fneq, DOS
     feq = LightMatter.FermiDirac(Tel, μ, egrid)
     ftot = feq .+ fneq
     goal = get_internalenergy(int_vec, ftot, DOS, egrid)
-    find_relaxeddistribution!(frel, egrid, goal, n, DOS, int_vec, μ, tmp)
+    find_relaxeddistribution!(frel, egrid, goal, n, DOS, int_vec, tmp)
     fdis .= -(fneq ./τee) .+ ((feq.-frel) ./ τee)
 end
 """
