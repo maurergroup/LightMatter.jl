@@ -32,8 +32,10 @@ function run_simulation(sim::Simulation, initialtemps::Dict{String, Float64},
     f2! = mk_function((:du,:u,:p,:t),(), singlepoint_expr)
 
     println("Precompiling") 
-    f1!(similar(u0),u0,p,0.0)
-    f2!(similar(u0),u0,p,0.0)
+    tmp1 = similar(u0)
+    tmp2 = similar(u0)
+    f1!(tmp1,u0,p,0.0)
+    f2!(tmp2,u0,p,0.0)
     prob=SplitODEProblem(f1!,f2!,u0,tspan,p)
     #prob = ODEProblem(f2!,u0,tspan,p)
     println("Running Script")

@@ -255,34 +255,33 @@ end
     - Updates the cond vector with the change in electronic temperature at each grid point
 """
 function electrontemperature_conductivity!(cond, Tel, Tph, HeatCapacity, sim)
-    # Calculate temperature-dependent thermal conductivity: K = κ * Tel / Tph
-    K = sim.electronictemperature.κ.*Tel./Tph
+    N = length(Tel)
     dz = sim.structure.dimension.spacing
-    
-    # Interior points: compute flux at edges, then divergence
-    Threads.@threads for i in 2:length(K)-1
-        # Thermal conductivity at the edges (average between adjacent points)
-        K_plus = 1 / 2 * (K[i+1] + K[i])
-        K_minus = 1 / 2 * (K[i] + K[i-1])
-        
-        # Heat flux at edges: q = -K * dT/dz
-        flux_plus = K_plus * (Tel[i+1] - Tel[i]) / dz
-        flux_minus = K_minus * (Tel[i] - Tel[i-1]) / dz
-        
-        # Temperature change from divergence of heat flux: dT/dt = -dq/dz
-        cond[i] = (flux_plus - flux_minus) / dz
+    K = sim.electronictemperature.κ .* Tel ./ Tph
+
+    fill!(cond, 0.0)
+
+    @inbounds for i in 2:N-1
+        Kp = 0.5 * (K[i+1] + K[i])
+        Km = 0.5 * (K[i] + K[i-1])
+
+        cond[i] = (
+            Kp * (Tel[i+1] - Tel[i]) -
+            Km * (Tel[i] - Tel[i-1])
+        ) / dz^2
     end
 
-    # Boundary conditions: allow heat flow into the boundaries symmetrically
-    K_plus1 = 1 / 2 * (K[2] + K[1])
-    flux_1 = K_plus1 * (Tel[2] - Tel[1]) / dz
-    cond[1] = flux_1 / dz
-    
-    K_minusend = 1 / 2 * (K[end] + K[end-1])
-    flux_end = K_minusend * (Tel[end-1] - Tel[end]) / dz
-    cond[end] = flux_end / dz
+    # Zero conductive flux at both boundaries.
+    @inbounds begin
+        Kp = 0.5 * (K[1] + K[2])
+        Km = 0.5 * (K[N-1] + K[N])
+
+        cond[1] = Kp * (Tel[2] - Tel[1]) / dz^2
+        cond[N] = -Km * (Tel[N] - Tel[N-1]) / dz^2
+    end
 
     cond ./= HeatCapacity
+    return nothing
 end
 
 function thermalparticle_conductivity!(cond, n, κ, dz, Tph, Tel)

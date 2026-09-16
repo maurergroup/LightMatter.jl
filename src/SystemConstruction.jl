@@ -256,10 +256,8 @@ function conductivity_expressions(sim::Simulation)
     if sim.phononictemperature.Conductivity == true
         push!(cond_exprs,:(LightMatter.phonontemperature_conductivity!(du.Tph, u.Tph, LightMatter.phononic_heatcapacity_profile(u.Tph, p.sim), p.sim)))
     end
-    if sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == true
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, u.Tel, u.noe, p.tmp, p.int_mtx, p.sim)))
-    elseif sim.athermalelectrons.Conductivity == true && sim.athermalelectrons.AthermalElectron_ElectronCoupling == false
-        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing, p.Tel, p.noe, p.tmp, p.int_mtx, p.sim)))
+    if sim.athermalelectrons.Conductivity == true 
+        push!(cond_exprs,:(LightMatter.electron_distribution_transport!(du.fneq, p.sim.athermalelectrons.v_g, u.fneq, p.sim.structure.dimension.spacing)))
     end
     push!(cond_exprs, :(return nothing))
     return Expr(:block,cond_exprs...)
@@ -422,18 +420,10 @@ function variable_renaming(sim::Simulation)
             push!(old_name, :(p.noe[i]))#:(LightMatter.access_DiffCache(p.noe, u.Tel[i])[i]))
             push!(new_name, :noe)
         end
-        #= if sim.electronictemperature.Conductivity == true
-            push!(old_name,:(p.Tel_cond[i]))#:(LightMatter.access_DiffCache(p.Tel_cond,u.Tel[i])[i]))
-            push!(new_name,:Tel_cond)
-        end =#
     end
     if sim.phononictemperature.Enabled == true
         push!(old_name, :(u.Tph[i]))
         push!(new_name, :Tph)
-        #= if sim.phononictemperature.Conductivity == true
-            push!(old_name, :(p.Tph_cond[i]))#:(LightMatter.access_DiffCache(p.Tph_cond,u.Tph[i])[i]))
-            push!(new_name, :Tph_cond)
-        end =#
     end
     old_name = Tuple(old_name)
     new_name = Tuple(new_name)

@@ -329,9 +329,8 @@ end
     # Returns
     - Spline of yvals vs xvals
 """
-
-
 @inline get_interpolant(xvals, yvals) = Interpolations.linear_interpolation(xvals, yvals, extrapolation_bc = Flat())#Interpolations.interpolate((xvals,), yvals, Gridded(Linear()))
+
 """
     build_group_velocity(v_g::Union{Vector{Float64},Nothing}, FE::Union{Float64,Vector{Float64}}, Conductivity::Bool, conductive_velocity::Symbol, structure::Structure)
     

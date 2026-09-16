@@ -243,7 +243,7 @@ end
     - Fermi-Dirac distribution with same internal energy as the goal.
 """
 function find_relaxeddistribution!(out, egrid, goal, n, DOS, int_vec, tmp)
-    prob = IntervalNonlinearProblem(find_relaxedtemp, (1e-6, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp))
+    prob = IntervalNonlinearProblem(find_relaxedtemp, (1.0, 1e6), (out, n, DOS, egrid, goal, int_vec, tmp))
     sol = solve(prob; alg=Brent(),abstol=1e-6, reltol=1e-6).u
     μ = find_chemicalpotential(n, sol, DOS, egrid, int_vec, tmp)
     FermiDirac!(out, sol, μ, egrid)
@@ -266,7 +266,7 @@ end
 function find_relaxedtemp(u, (out, n, DOS, egrid, goal, int_vec, tmp))
     μ = find_chemicalpotential(n, ForwardDiff.value(u), DOS, egrid, int_vec, tmp)
     FermiDirac!(out, ForwardDiff.value(u), μ, egrid)
-    return goal - get_internalenergy(int_vec, out, DOS, egrid)
+    return get_internalenergy(int_vec, out, DOS, egrid) - goal
 end 
 """
     athem_electronelectroninteraction(sim::Simulation)
@@ -338,54 +338,42 @@ end
     # Returns
     - In-place change to Δf
 """
-function electron_distribution_transport!(Δf, v_g::Vector{Float64}, f, dz, Tel, noe, ftot, tmp, sim)
-    calculate_ftot(f, Tel, noe, ftot, tmp, sim)
-    
-    @views @inbounds for i in 2:size(f, 1)-1
-        # Ballistic transport: advection in space
-        X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-        X_plus = mat_picker(sim.structure.dimension.grid[i+1], sim.structure.dimension.InterfaceHeight)
-        X_minus = mat_picker(sim.structure.dimension.grid[i-1], sim.structure.dimension.InterfaceHeight)
-        DOS_plus = sim.structure.DOS[X_plus](sim.structure.egrid)
-        DOS_minus = sim.structure.DOS[X_minus](sim.structure.egrid)
-        @. Δf[i,:] = -v_g * (DOS_plus*ftot[i+1,:] - DOS_minus*ftot[i-1,:]) / (2*dz * (DOS_plus + DOS_minus))
+function electron_distribution_transport!(
+    Δf,
+    v_g::Vector{Float64},
+    f,
+    dz
+)
+    Nz, Ne = size(f)
+    fill!(Δf, 0.0)
+
+    @inbounds for i in 2:Nz-1
+        for j in 1:Ne
+            v = v_g[j]
+
+            if v >= 0.0
+                # Backward difference for positive velocity.
+                Δf[i, j] = -v * (f[i, j] - f[i-1, j]) / dz
+            else
+                # Forward difference for negative velocity.
+                Δf[i, j] = -v * (f[i+1, j] - f[i, j]) / dz
+            end
+        end
     end
-    X_1 = mat_picker(sim.structure.dimension.grid[1], sim.structure.dimension.InterfaceHeight)
-    X_2 = mat_picker(sim.structure.dimension.grid[2], sim.structure.dimension.InterfaceHeight)
-    X_end = mat_picker(sim.structure.dimension.grid[end], sim.structure.dimension.InterfaceHeight)
-    X_end_minus = mat_picker(sim.structure.dimension.grid[end-1], sim.structure.dimension.InterfaceHeight)
-    DOS_1 = sim.structure.DOS[X_1](sim.structure.egrid)
-    DOS_2 = sim.structure.DOS[X_2](sim.structure.egrid)
-    DOS_end = sim.structure.DOS[X_end](sim.structure.egrid)
-    DOS_end_minus = sim.structure.DOS[X_end_minus](sim.structure.egrid)
-    @views @. Δf[1, :] = -v_g * (DOS_2*ftot[2, :] - DOS_1*ftot[1, :]) / (dz * (DOS_2 + DOS_1))
-    @views @. Δf[end, :] = -v_g * (DOS_end*ftot[end, :] - DOS_end_minus*ftot[end-1, :]) / (dz * (DOS_end + DOS_end_minus))
+
+    # Zero-gradient boundary conditions.
+    Δf[1, :] .= 0.0
+    Δf[Nz, :] .= 0.0
+
+    return nothing
 end
 
-function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz, Tel, noe, ftot, tmp, sim)
-
-    calculate_ftot(f, Tel, noe, ftot, tmp, sim)
-    
+function electron_distribution_transport!(Δf, v_g::Matrix{Float64}, f, dz)
     @views @inbounds for i in 2:size(f, 1)-1
-      # Ballistic transport: advection in space
-        X = mat_picker(sim.structure.dimension.grid[i], sim.structure.dimension.InterfaceHeight)
-        X_plus = mat_picker(sim.structure.dimension.grid[i+1], sim.structure.dimension.InterfaceHeight)
-        X_minus = mat_picker(sim.structure.dimension.grid[i-1], sim.structure.dimension.InterfaceHeight)
-        DOS_plus = sim.structure.DOS[X_plus](sim.structure.egrid)
-        DOS_minus = sim.structure.DOS[X_minus](sim.structure.egrid)
-        DOS = sim.structure.DOS[X](sim.structure.egrid)
-        @. Δf[i,:] = -v_g[i,:] * (ftot[i+1,:] - ftot[i-1,:]) / (2*dz) * (2 * DOS / (DOS_minus + DOS_plus))
+        @. Δf[i,:] = -v_g[i,:] * (f[i+1,:] - f[i-1,:]) / (2*dz) 
     end
-    X_1 = mat_picker(sim.structure.dimension.grid[1], sim.structure.dimension.InterfaceHeight)
-    X_2 = mat_picker(sim.structure.dimension.grid[2], sim.structure.dimension.InterfaceHeight)
-    X_end = mat_picker(sim.structure.dimension.grid[end], sim.structure.dimension.InterfaceHeight)
-    X_end_minus = mat_picker(sim.structure.dimension.grid[end-1], sim.structure.dimension.InterfaceHeight)
-    DOS_1 = sim.structure.DOS[X_1](sim.structure.egrid)
-    DOS_2 = sim.structure.DOS[X_2](sim.structure.egrid)
-    DOS_end = sim.structure.DOS[X_end](sim.structure.egrid)
-    DOS_end_minus = sim.structure.DOS[X_end_minus](sim.structure.egrid)
-    @views @. Δf[1,:] = -v_g[1,:] * (ftot[2, :] - ftot[1, :]) / dz * (DOS_1 / DOS_2)
-    @views @. Δf[end,:] = -v_g[end,:] * (ftot[end, :] - ftot[end-1, :]) / dz * (DOS_end / DOS_end_minus)
+    @views @. Δf[1,:] = -v_g[1,:] * (f[2, :] - f[1, :]) / dz
+    @views @. Δf[end,:] = -v_g[end,:] * (f[end, :] - f[end-1, :]) / dz
 end
 
 function calculate_ftot(f, Tel::Real, noe, tmp, tmp2, sim)

@@ -236,7 +236,7 @@ function ee_collision_integral!(out, sim, fgrid, DOS, cache::RethfeldCollisionIn
     sample_on_grid!(cache.kgrid, sim.structure.bandstructure.E_to_k, egrid)
 
     I = ee_matrix_element(fgrid, sim, cache.kgrid, cache.me_eff)
-    prefactor = pi^3 ./ (Constants.ħ*8*cache.kgrid) 
+    prefactor = pi^3 ./ (Constants.ħ*cache.kgrid) 
     #@inbounds for k in eachindex(egrid)
     Threads.@threads for k in eachindex(egrid)
         tid = Threads.threadid()
